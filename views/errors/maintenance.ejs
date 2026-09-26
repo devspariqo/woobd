@@ -20,6 +20,21 @@
   </style>
 </head>
 <body>
+  <%# Reached only from /maintenance-preview, which staff use to check the
+      switch actually works. Without this note the page is indistinguishable
+      from the real thing and they would think the site had gone down. %>
+  <% if (typeof preview !== 'undefined' && preview) { %>
+    <div class="maintenance-banner" style="position:fixed;top:0;left:0;right:0;border-radius:0">
+      <%# Inline, not <use href="#i-alert"> - this page renders standalone and
+          never loads the icon sprite, so a reference would show nothing. %>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      <span><strong>Preview.</strong> This is what visitors see while maintenance mode is on.</span>
+      <a href="<%= helpers.url('/') %>" class="btn btn-sm btn-outline">Back to the site</a>
+    </div>
+  <% } %>
+
   <div style="max-width:620px">
     <div style="width:88px;height:88px;margin:0 auto 30px;display:grid;place-items:center;border-radius:26px;background:var(--gradient-soft);color:var(--primary)">
       <svg style="width:42px;height:42px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

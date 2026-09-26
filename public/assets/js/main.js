@@ -604,9 +604,22 @@
       var indicator = showTyping();
       scrollDown();
 
+      // The CSRF token has to be sent explicitly.
+      //
+      // This posts JSON, so the token cannot ride along as a hidden form field
+      // the way it does on every other form - and the global CSRF check runs on
+      // the parsed body. Without the header every message is rejected as an
+      // expired session, which is exactly how it looked from the widget.
+      var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+      var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+
       fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-Token': csrfToken,
+        },
         body: JSON.stringify({
           message: message.trim(),
           session_token: sessionToken,
@@ -615,6 +628,16 @@
         credentials: 'same-origin',
       })
         .then(function (response) {
+          // 419 is the CSRF/session rejection. Say so, because "the assistant is
+          // unavailable" sends people looking at the API key instead of the
+          // session - and a reload is all it takes to fix.
+          if (response.status === 419) {
+            return {
+              ok: false,
+              message: 'Your session expired. Please refresh the page and try again.',
+            };
+          }
+
           return response.json().catch(function () {
             // A non-JSON body means the request never reached the handler.
             return { ok: false, message: 'The assistant is unavailable right now. Please try again.' };

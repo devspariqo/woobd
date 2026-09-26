@@ -11,6 +11,14 @@
    -------------------------------------------------------------------------- */
 :root {
   --primary: #5b21f0;
+
+  /* Chat widget accent. Green by default - the colour people already read as
+     "chat", and distinct from the purple used for the site's own actions.
+     Overridden per-page from the admin setting, so this is only the fallback. */
+  --chat-accent: #25d366;
+  --chat-accent-soft: rgba(37, 211, 102, .1);
+  --chat-accent-shadow: rgba(37, 211, 102, .38);
+  --chat-accent-shadow-strong: rgba(37, 211, 102, .48);
   --primary-dark: #4316c4;
   --secondary: #ff6600;
   --success: #0f9d58;
@@ -2031,6 +2039,42 @@ body.no-scroll { overflow: hidden; }
 .footer-legal { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
 
 /* --------------------------------------------------------------------------
+   17b. Staff-only maintenance banner
+
+   Sits above the header so it is unmissable. Its whole job is to explain why
+   the site looks fine to the one person who cannot tell that it is switched
+   off for everyone else.
+   -------------------------------------------------------------------------- */
+.maintenance-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 11px 18px;
+  background: var(--warning);
+  color: #1a1204;
+  font-size: .8438rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.maintenance-banner svg { width: 17px; height: 17px; flex-shrink: 0; }
+.maintenance-banner strong { font-weight: 700; }
+
+.maintenance-banner .btn {
+  background: rgba(0, 0, 0, .12);
+  border-color: rgba(0, 0, 0, .22);
+  color: #1a1204;
+}
+
+.maintenance-banner .btn:hover { background: rgba(0, 0, 0, .2); color: #1a1204; }
+
+@media (max-width: 640px) {
+  .maintenance-banner { padding: 10px 14px; font-size: .8125rem; gap: 9px; }
+}
+
+/* --------------------------------------------------------------------------
    18. Live chat widget
    -------------------------------------------------------------------------- */
 .chat-widget {
@@ -2048,14 +2092,14 @@ body.no-scroll { overflow: hidden; }
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: var(--gradient);
+  background: var(--chat-accent);
   color: #fff;
-  box-shadow: 0 8px 26px rgba(91, 33, 240, .38);
+  box-shadow: 0 8px 26px var(--chat-accent-shadow);
   transition: transform var(--t), box-shadow var(--t);
   position: relative;
 }
 
-.chat-launcher:hover { transform: scale(1.07); box-shadow: 0 12px 34px rgba(91, 33, 240, .48); }
+.chat-launcher:hover { transform: scale(1.07); box-shadow: 0 12px 34px var(--chat-accent-shadow-strong); }
 .chat-launcher svg { width: 26px; height: 26px; }
 
 .chat-launcher .icon-close { display: none; }
@@ -2109,7 +2153,7 @@ body.no-scroll { overflow: hidden; }
   align-items: center;
   gap: 13px;
   padding: 17px 20px;
-  background: var(--gradient);
+  background: var(--chat-accent);
   color: #fff;
   flex-shrink: 0;
 }
@@ -2189,7 +2233,7 @@ body.no-scroll { overflow: hidden; }
 }
 
 .chat-msg.user .bubble {
-  background: var(--gradient);
+  background: var(--chat-accent);
   color: #fff;
   border-bottom-right-radius: 4px;
 }
@@ -2202,7 +2246,7 @@ body.no-scroll { overflow: hidden; }
   border-radius: 50%;
   background: var(--surface);
   border: 1px solid var(--border);
-  color: var(--primary);
+  color: var(--chat-accent);
   flex-shrink: 0;
 }
 
@@ -2230,14 +2274,14 @@ body.no-scroll { overflow: hidden; }
 .chat-quick button {
   padding: 8px 14px;
   font-size: .8125rem;
-  color: var(--primary);
+  color: var(--chat-accent);
   background: var(--surface);
   border: 1.5px solid var(--border);
   border-radius: var(--radius-pill);
   transition: all var(--t-fast);
 }
 
-.chat-quick button:hover { border-color: var(--primary); background: rgba(91, 33, 240, .07); }
+.chat-quick button:hover { border-color: var(--chat-accent); background: var(--chat-accent-soft); }
 
 .chat-foot {
   padding: 14px 16px;
@@ -2262,7 +2306,7 @@ body.no-scroll { overflow: hidden; }
   transition: border-color var(--t-fast);
 }
 
-.chat-form textarea:focus { outline: none; border-color: var(--primary); background: var(--surface); }
+.chat-form textarea:focus { outline: none; border-color: var(--chat-accent); background: var(--surface); }
 
 .chat-send {
   width: 44px;
@@ -2270,7 +2314,7 @@ body.no-scroll { overflow: hidden; }
   display: grid;
   place-items: center;
   border-radius: var(--radius-sm);
-  background: var(--gradient);
+  background: var(--chat-accent);
   color: #fff;
   flex-shrink: 0;
   transition: transform var(--t-fast), opacity var(--t-fast);

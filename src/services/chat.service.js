@@ -14,18 +14,49 @@ const db = require('../config/database');
 const settings = require('../services/settings.service');
 const logger = require('../utils/logger');
 
+/**
+ * Every configured API key, in the order they should be tried.
+ *
+ * A single key is a single point of failure: one that runs out of credit or
+ * gets rate-limited takes the assistant offline entirely, and the visitor just
+ * sees a dead widget. The admin panel accepts a list (one per line), and the
+ * environment variable is used as a fallback when the panel is empty.
+ *
+ * `settings.secret` decrypts stored values, so a list is stored encrypted like
+ * any other credential.
+ */
+function apiKeys() {
+  const split = (value) =>
+    String(value || '')
+      .split(/[\r\n,]+/)
+      .map((key) => key.trim())
+      .filter(Boolean);
+
+  // Order matters: the list is the primary setting and is tried first, then the
+  // older single-key field, then the environment. Prepending the single key
+  // instead would make it win over the list, which contradicts its own label.
+  const list = split(settings.secret('chat_api_keys', ''));
+  const single = split(settings.secret('chat_api_key', ''));
+  const fromEnv = split(config.chat.apiKey);
+
+  const all = [...list, ...single, ...fromEnv];
+
+  // De-duplicate while preserving order, and drop the placeholder so an
+  // untouched .env.example does not look like a configured key.
+  return [...new Set(all.filter((key) => key && key !== 'CHANGE_ME'))];
+}
+
 /** Runtime credentials: the admin panel wins, the environment is the fallback. */
 function credentials() {
   return {
-    apiKey: settings.secret('chat_api_key', config.chat.apiKey),
+    apiKeys: apiKeys(),
     baseUrl: settings.get('chat_base_url') || config.chat.baseUrl,
     model: settings.get('chat_model') || config.chat.model,
   };
 }
 
 function isConfigured() {
-  const { apiKey } = credentials();
-  return Boolean(apiKey && apiKey.trim() && apiKey !== 'CHANGE_ME');
+  return credentials().apiKeys.length > 0;
 }
 
 function isEnabled() {
@@ -80,15 +111,109 @@ async function appendMessage(conversationId, role, content) {
 }
 
 /**
- * Ask the model. Returns { ok, reply, error }.
+ * One attempt against one key. Returns { ok, reply, error, retryable }.
+ *
+ * `retryable` marks the failures worth trying the next key for: an auth
+ * rejection, a rate limit, or a server error. A malformed reply is not
+ * retryable - the request reached a working endpoint, so another key would
+ * behave the same way and the extra round trip only makes the visitor wait.
+ */
+async function attempt({ apiKey, baseUrl, model, messages, timeoutMs }) {
+  const controller = new AbortController();
+  // Assistant replies stream to a human waiting on a widget - fail fast.
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(baseUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: 0.6,
+        max_tokens: 600,
+      }),
+      signal: controller.signal,
+    });
+
+    const raw = await response.text();
+
+    if (!response.ok) {
+      logger.warn('Chat API returned an error', {
+        status: response.status,
+        // Never log the key itself - only enough to tell two keys apart.
+        key: apiKey.slice(0, 6) + '…',
+        body: raw.slice(0, 300),
+      });
+
+      // 401/403: the key is dead or out of credit. 429: rate limited. 5xx: their
+      // problem. All worth trying the next key for.
+      const retryable = [401, 402, 403, 429].includes(response.status) || response.status >= 500;
+
+      return {
+        ok: false,
+        retryable,
+        error:
+          response.status === 401 || response.status === 403
+            ? 'The assistant is temporarily unavailable. Please contact us on WhatsApp.'
+            : 'I could not reach the assistant just now. Please try again in a moment.',
+      };
+    }
+
+    let payload;
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      logger.error('Chat API returned non-JSON', { body: raw.slice(0, 300) });
+      return { ok: false, retryable: false, error: 'The assistant sent an unreadable reply. Please try again.' };
+    }
+
+    const choice = payload.choices && payload.choices[0];
+    let reply = choice && choice.message ? choice.message.content : '';
+
+    // Some models wrap reasoning in  thinking tags; strip before showing.
+    if (typeof reply === 'string') {
+      reply = reply.replace(/<think[\s\S]*?<\/think>/gi, '').trim();
+    }
+
+    if (!reply) {
+      return { ok: false, retryable: true, error: 'The assistant sent an empty reply. Please try a different question.' };
+    }
+
+    return { ok: true, reply, usage: payload.usage || null };
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      // A timeout may well be this particular key or route being slow, so the
+      // next one is worth a try - but only within the caller's budget.
+      return { ok: false, retryable: true, error: 'The assistant took too long to reply. Please try again.' };
+    }
+
+    logger.error('Chat request failed', err);
+    return {
+      ok: false,
+      retryable: true,
+      error: 'I could not reach the assistant. Please contact us on WhatsApp.',
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Ask the model, falling back through the configured keys.
+ *
+ * Returns { ok, reply, error }.
  *
  * History is trimmed before sending so a long conversation cannot grow the
  * request without bound and start costing real money per message.
  */
 async function ask({ conversationId, message, customerName }) {
-  const { apiKey, baseUrl, model } = credentials();
+  const { apiKeys: keys, baseUrl, model } = credentials();
 
-  if (!apiKey) {
+  if (!keys.length) {
     return {
       ok: false,
       error: 'The assistant is not configured yet. Please reach us on WhatsApp in the meantime.',
@@ -119,69 +244,45 @@ async function ask({ conversationId, message, customerName }) {
     { role: 'user', content: message },
   ];
 
-  const controller = new AbortController();
-  // Assistant replies stream to a human waiting on a widget - fail fast.
-  const timer = setTimeout(() => controller.abort(), 25000);
+  // Split the waiting budget across the keys rather than giving each one the
+  // full 25s - a visitor watching a typing indicator will not wait 75s.
+  const totalBudgetMs = 25000;
+  const perAttemptMs = Math.max(8000, Math.floor(totalBudgetMs / keys.length));
 
-  try {
-    const response = await fetch(baseUrl, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: 0.6,
-        max_tokens: 600,
-      }),
-      signal: controller.signal,
+  let last = null;
+
+  for (let i = 0; i < keys.length; i += 1) {
+    const result = await attempt({
+      apiKey: keys[i],
+      baseUrl,
+      model,
+      messages,
+      timeoutMs: perAttemptMs,
     });
 
-    const raw = await response.text();
-
-    if (!response.ok) {
-      logger.error('Chat API returned an error', { status: response.status, body: raw.slice(0, 500) });
-      return {
-        ok: false,
-        error:
-          response.status === 401
-            ? 'The assistant is temporarily unavailable. Please contact us on WhatsApp.'
-            : 'I could not reach the assistant just now. Please try again in a moment.',
-      };
+    if (result.ok) {
+      if (i > 0) {
+        // Worth knowing: it means the earlier key is failing and should be
+        // rotated. Without this the fallback is silent and you never find out.
+        // `i` is 0-based, so the key that just answered is i + 1 and the one
+        // that failed before it is i.
+        logger.warn(
+          `Chat: key #${i} failed, key #${i + 1} answered. Check the earlier key.`
+        );
+      }
+      return result;
     }
 
-    let payload;
-    try {
-      payload = JSON.parse(raw);
-    } catch {
-      logger.error('Chat API returned non-JSON', { body: raw.slice(0, 300) });
-      return { ok: false, error: 'The assistant sent an unreadable reply. Please try again.' };
-    }
+    last = result;
 
-    const choice = payload.choices && payload.choices[0];
-    let reply = choice && choice.message ? choice.message.content : '';
-
-    // Some models wrap reasoning in  thinking tags; strip before showing.
-    if (typeof reply === 'string') {
-      reply = reply.replace(/<think[\s\S]*?<\/think>/gi, '').trim();
+    if (!result.retryable) return result;
+    if (i < keys.length - 1) {
+      logger.warn(`Chat: key #${i + 1} failed, trying the next of ${keys.length}.`);
     }
-
-    if (!reply) {
-      return { ok: false, error: 'The assistant sent an empty reply. Please try a different question.' };
-    }
-
-    return { ok: true, reply, usage: payload.usage || null };
-  } catch (err) {
-    if (err.name === 'AbortError') {
-      return { ok: false, error: 'The assistant took too long to reply. Please try again.' };
-    }
-    logger.error('Chat request failed', err);
-    return { ok: false, error: 'I could not reach the assistant. Please contact us on WhatsApp.' };
-  } finally {
-    clearTimeout(timer);
   }
+
+  logger.error(`Chat: all ${keys.length} configured key(s) failed.`);
+  return last || { ok: false, error: 'The assistant is unavailable right now.' };
 }
 
 /** Admin transcript view. */

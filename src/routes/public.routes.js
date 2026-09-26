@@ -27,6 +27,24 @@ router.get('/portfolio/:slug', ctrl.portfolioSingle);
 router.get('/contact', ctrl.contactForm);
 router.get('/live-chat', ctrl.staticPage('live-chat'));
 
+// What visitors see while maintenance mode is on.
+//
+// Staff are let through maintenance by design, so without this the only way to
+// check the switch is working is to sign out or open a private window - and
+// the obvious conclusion from browsing normally is that the setting is broken.
+router.get('/maintenance-preview', (req, res) => {
+  if (!res.locals.isStaff) {
+    return res.redirect(res.locals.helpers.url('/'));
+  }
+
+  return res.status(503).render('errors/maintenance', {
+    title: res.locals.settings.maintenance_title || 'We will be right back',
+    layout: false,
+    message: res.locals.settings.maintenance_message || '',
+    preview: true,
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Legal / static pages.
 //

@@ -245,6 +245,12 @@ function viewContext() {
         title: pw.chat_widget_title,
         subtitle: pw.chat_widget_subtitle,
         greeting: pw.chat_greeting,
+        // Validated before it reaches a style attribute: this value is rendered
+        // into the page, so anything that is not a plain hex colour is dropped
+        // in favour of the default rather than being injected as-is.
+        accentColor: /^#[0-9a-f]{3,8}$/i.test(String(pw.chat_accent_color || '').trim())
+          ? String(pw.chat_accent_color).trim()
+          : '#25D366',
       };
 
       // reCAPTCHA only works when BOTH keys are present - middleware/captcha.js

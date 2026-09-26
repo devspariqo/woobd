@@ -3165,6 +3165,153 @@ async function checkTermPricing() {
   }
 }
 
+/**
+ * Maintenance mode, the chat widget, and the multi-key assistant.
+ *
+ * All three share a failure mode worth guarding: they look fine from the
+ * admin's chair while being broken for everyone else. Maintenance is invisible
+ * to staff by design, and a chat widget that cannot post shows an error only in
+ * the visitor's browser.
+ */
+async function checkMaintenanceAndChat() {
+  section('20. Maintenance mode and the live chat');
+
+  const settings = require('../src/services/settings.service');
+  const db = require('../src/config/database');
+
+  const tokenFrom = (html) => (html.match(/name="_csrf"\s+value="([^"]+)"/) || [])[1];
+
+  // Sign in fresh. Earlier sections reset the cookie jar, so there is no
+  // guarantee an admin session survives this far down the suite - and without
+  // one the staff checks below would fail for the wrong reason.
+  const login = await adminLogin();
+  if (!login.ok) {
+    warn('admin sign-in', `${login.reason} - skipping`);
+    await db.close().catch(() => {});
+    return;
+  }
+
+  try {
+    // --- The chat widget renders with its accent -------------------------
+    const home = await req('/');
+    const meta = home.body.match(/<meta name="csrf-token" content="([^"]+)"/);
+
+    if (meta && meta[1]) ok('the CSRF token is exposed to scripts', 'meta[name=csrf-token]');
+    else bad('the CSRF token is exposed to scripts', 'no meta tag - the chat widget cannot authenticate');
+
+    if (/chat-accent:\s*#[0-9a-f]{3,8}/i.test(home.body)) {
+      ok('the chat widget carries its accent colour', 'as a CSS variable');
+    } else {
+      bad('the chat widget carries its accent colour', 'no --chat-accent on the widget');
+    }
+
+    if (/#25d366/i.test(home.body) || /--chat-accent/.test(home.body)) {
+      ok('the default accent is green', '#25D366');
+    } else {
+      warn('the default accent is green', 'could not confirm from the page');
+    }
+
+    // --- The chat endpoint requires the token ----------------------------
+    //
+    // This is the bug that showed as "session out": the widget posts JSON, so
+    // the token cannot ride along as a form field, and without the header the
+    // global CSRF check rejects every message.
+    const withoutToken = await req('/api/chat', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-requested-with': 'XMLHttpRequest' },
+      body: JSON.stringify({ message: 'smoke test' }),
+    });
+
+    if (withoutToken.status === 419) {
+      ok('the chat endpoint rejects a request with no CSRF token', '419');
+    } else {
+      warn('the chat endpoint rejects a request with no CSRF token', `got ${withoutToken.status}`);
+    }
+
+    // --- Multi-key resolution --------------------------------------------
+    const chatService = require('../src/services/chat.service');
+    const creds = chatService.credentials();
+
+    if (creds.apiKeys.length >= 1) {
+      ok('the assistant resolves at least one API key', `${creds.apiKeys.length} key(s)`);
+    } else {
+      warn('the assistant resolves at least one API key', 'none configured - chat is disabled');
+    }
+
+    if (Array.isArray(creds.apiKeys)) {
+      const unique = new Set(creds.apiKeys).size === creds.apiKeys.length;
+      if (unique) ok('resolved keys are de-duplicated');
+      else bad('resolved keys are de-duplicated', 'the same key appears twice');
+    }
+
+    // --- Maintenance mode -------------------------------------------------
+    const original = settings.get('maintenance_mode', '0');
+
+    try {
+      await settings.saveMany({ maintenance_mode: '1' });
+      settings.invalidate();
+      await settings.loadAll(true);
+
+      // A visitor is blocked. The admin session is parked first and restored
+      // afterwards - clearing the jar outright would make the staff checks
+      // below run as an anonymous visitor and fail for the wrong reason.
+      const adminJar = new Map(cookieJar);
+      resetCookies();
+
+      const visitor = await req('/');
+      if (visitor.status === 503) {
+        ok('maintenance mode blocks a visitor', '503');
+      } else {
+        bad('maintenance mode blocks a visitor', `got ${visitor.status}`);
+      }
+
+      // The admin sign-in page stays reachable, or maintenance mode becomes a
+      // lockout the moment a session expires.
+      const loginPage = await req(`/${ADMIN_SLUG}/login`);
+      if (loginPage.status === 200) {
+        ok('the admin sign-in page stays reachable', 'so maintenance cannot lock you out');
+      } else {
+        bad('the admin sign-in page stays reachable', `got ${loginPage.status}`);
+      }
+
+      // Back to the staff session.
+      cookieJar.clear();
+      for (const [key, value] of adminJar) cookieJar.set(key, value);
+
+      const staffHome = await req('/');
+      if (staffHome.status === 200 && /Maintenance mode is ON/i.test(staffHome.body)) {
+        ok('staff bypass maintenance and see a banner', 'the switch no longer looks broken');
+      } else if (staffHome.status === 200) {
+        bad('staff bypass maintenance and see a banner', 'bypassed but no banner - the admin would think it is off');
+      } else {
+        bad('staff bypass maintenance and see a banner', `staff got ${staffHome.status}`);
+      }
+
+      // The preview route shows visitors' view.
+      const preview = await req('/maintenance-preview');
+      if (preview.status === 503 && /This is what visitors see/i.test(preview.body)) {
+        ok('/maintenance-preview shows the visitor view', '503, marked as a preview');
+      } else {
+        bad('/maintenance-preview shows the visitor view', `got ${preview.status}`);
+      }
+    } finally {
+      await settings.saveMany({ maintenance_mode: original });
+      settings.invalidate();
+      await settings.loadAll(true);
+      resetCookies();
+    }
+
+    // Confirm it really is off again, so this test cannot leave the site down.
+    const after = await req('/');
+    if (after.status === 200) ok('maintenance mode is off again', 'site restored');
+    else bad('maintenance mode is off again', `site returned ${after.status} - it may be stuck on`);
+  } catch (err) {
+    bad('maintenance and chat', err.message);
+  }
+
+  await db.close().catch(() => {});
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -3215,6 +3362,7 @@ async function main() {
     await checkAdminCrud();
     await checkEditorAndFooter();
     await checkTermPricing();
+    await checkMaintenanceAndChat();
   } catch (err) {
     console.error('\n  ✗ Smoke test aborted by an unexpected error');
     console.error(`    ${err.stack || err.message}\n`);

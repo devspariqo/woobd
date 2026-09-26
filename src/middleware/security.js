@@ -29,6 +29,16 @@ function maintenanceMode() {
 
     // Admins and staff can always preview the real site.
     if (req.session && req.session.staff) return next();
+
+    // The admin sign-in page has to stay reachable.
+    //
+    // Staff bypass maintenance once signed in, but a session eventually
+    // expires - and without this, turning maintenance on and then being signed
+    // out locks you out of your own admin panel with no way back except
+    // editing the database by hand.
+    const adminPath = settings.get('admin_path_slug', 'dev-cp');
+    if (req.path === `/${adminPath}/login`) return next();
+
     if (ALWAYS_ALLOWED.some((prefix) => req.path.startsWith(prefix))) return next();
 
     if (req.path.startsWith('/api/') || req.xhr) {

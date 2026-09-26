@@ -30,6 +30,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <%# Exposed so JavaScript can send it. The chat widget posts JSON, which
+      the global CSRF check cannot read from a form field, so without this
+      every message is rejected as an expired session. %>
+  <meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
   <meta name="theme-color" content="#ffffff">
   <title><%= pageTitle %> - <%= site.name %> Admin</title>
   <meta name="description" content="<%= seo.description %>">

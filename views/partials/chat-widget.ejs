@@ -1,5 +1,25 @@
 <% if (chat.enabled && chat.showOnPublic && settings.chat_enabled === '1') { %>
+<%
+  // The accent is applied as CSS variables on the widget itself rather than in
+  // a <style> block, so it overrides the stylesheet without a specificity
+  // fight and without injecting anything into the page head.
+  var accent = chat.accentColor || '#25d366';
+  // Derived shades, so the shadows and hover tints follow the accent instead of
+  // staying purple. Parsed from the hex, so any configured colour works.
+  var hex = accent.replace('#', '');
+  if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+  var r = parseInt(hex.slice(0, 2), 16) || 37;
+  var g = parseInt(hex.slice(2, 4), 16) || 211;
+  var b = parseInt(hex.slice(4, 6), 16) || 102;
+  var accentVars = [
+    '--chat-accent:' + accent,
+    '--chat-accent-soft:rgba(' + r + ',' + g + ',' + b + ',.1)',
+    '--chat-accent-shadow:rgba(' + r + ',' + g + ',' + b + ',.38)',
+    '--chat-accent-shadow-strong:rgba(' + r + ',' + g + ',' + b + ',.48)'
+  ].join(';');
+%>
 <div class="chat-widget <%= chat.position === 'left' ? 'left' : '' %>" id="chatWidget"
+     style="<%= accentVars %>"
      data-endpoint="<%= helpers.url('/api/chat') %>"
      data-greeting="<%= chat.greeting %>"
      aria-hidden="true">
