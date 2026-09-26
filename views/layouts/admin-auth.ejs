@@ -66,7 +66,13 @@
     }
 
     .admin-auth-brand { text-align: center; margin-bottom: 24px; }
-    .admin-auth-brand img { max-height: 44px; width: auto; margin: 0 auto 15px; display: block; }
+    <%#
+      No `display` here on purpose. Setting one would apply to BOTH logo
+      variants and override the theme swap that hides the other one - which is
+      exactly how this page ended up showing two logos. The parent's
+      `text-align: center` centres the inline image instead.
+    %>
+    .admin-auth-brand img { max-height: 44px; width: auto; margin: 0 auto 15px; }
     .admin-auth-brand h1 { font-size: 1.375rem; margin-bottom: 6px; }
     .admin-auth-brand p { font-size: .875rem; color: var(--text-soft); margin: 0; }
 

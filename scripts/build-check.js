@@ -396,6 +396,66 @@ console.log('\nChecking error-path renderability…');
 }
 
 // ---------------------------------------------------------------------------
+// Theme-aware logo swap
+//
+// Both logo variants sit in the DOM and CSS hides one. That only works if
+// nothing else sets `display` on them: a page-level rule like
+// `.admin-auth-brand img { display: block }` has higher specificity than a bare
+// `.logo-for-dark { display: none }`, wins the cascade, and the page shows two
+// logos. That is exactly how it broke, and it is invisible in the template -
+// the markup looks correct.
+// ---------------------------------------------------------------------------
+console.log('\nChecking the theme logo swap…');
+
+{
+  const css = fs.readFileSync(path.join(ROOT, 'public', 'assets', 'css', 'theme.css'), 'utf8');
+
+  const hasLightRule = /:root\s+\.logo-for-dark\s*\{[^}]*display:\s*none/.test(css);
+  const hasDarkHide = /\[data-theme=['"]dark['"]\]\s+\.logo-for-light\s*\{[^}]*display:\s*none/.test(css);
+  const hasDarkShow = /\[data-theme=['"]dark['"]\]\s+\.logo-for-dark\s*\{[^}]*display:\s*(block|inline-block)/.test(css);
+
+  if (hasLightRule && hasDarkHide && hasDarkShow) {
+    pass('the logo swap has all three rules');
+  } else {
+    const missing = [
+      !hasLightRule && 'light mode hides .logo-for-dark',
+      !hasDarkHide && 'dark mode hides .logo-for-light',
+      !hasDarkShow && 'dark mode shows .logo-for-dark',
+    ].filter(Boolean);
+    fail(`the logo swap is incomplete: ${missing.join('; ')}`);
+  }
+
+  // The light-mode rule must out-rank a plain page-level `img` rule.
+  if (/^\.logo-for-dark\s*\{/m.test(css)) {
+    fail('a bare `.logo-for-dark` rule exists without `:root` - a page-level img rule would out-rank it');
+  }
+
+  // Any view that ships its own <style> must not set `display` on an image
+  // inside a container that holds both variants.
+  let overrides = 0;
+
+  for (const file of templates) {
+    const src = fs.readFileSync(file, 'utf8');
+    if (!/logo-for-/.test(src)) continue;
+
+    const styles = [...src.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]).join('\n');
+    const offender = styles
+      .split('}')
+      .find((block) => /img\b/.test(block.split('{')[0] || '') && /display\s*:/.test(block));
+
+    if (offender) {
+      overrides += 1;
+      fail(
+        `${path.relative(ROOT, file)} sets \`display\` on an image via its own styles, ` +
+          `which overrides the theme logo swap and shows both logos`
+      );
+    }
+  }
+
+  if (!overrides) pass('no page style overrides the logo swap');
+}
+
+// ---------------------------------------------------------------------------
 // Result
 // ---------------------------------------------------------------------------
 if (failures > 0) {

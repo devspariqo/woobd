@@ -821,9 +821,13 @@ select.form-control {
 /* Swap the logo asset with the theme, so one <img> serves both modes. */
 /* Theme-aware logo swap.
    Both variants sit in the DOM and CSS picks one, so the right artwork shows
-   immediately without waiting for JavaScript to run. Scoped globally rather
-   than to `.brand`, so the admin sign-in card can use the same mechanism. */
-.logo-for-dark { display: none; }
+   immediately without waiting for JavaScript to run.
+
+   `:root` is not decoration: it raises the specificity to (0,2,0), above the
+   page-level rules like `.admin-auth-brand img { display: block }` at (0,1,1).
+   Without it those rules win, both logos get `display: block`, and the page
+   shows two. */
+:root .logo-for-dark { display: none; }
 [data-theme='dark'] .logo-for-light { display: none; }
 [data-theme='dark'] .logo-for-dark { display: block; }
 
