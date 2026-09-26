@@ -38,6 +38,12 @@ npm run smoke
 npm start          # http://localhost:3000
 ```
 
+**No terminal?** `database/install.sql` does step 4 as a single import — schema,
+settings, demo content and staff accounts. Import it through phpMyAdmin into an
+empty database. It ships with a published demo password (`WooBD-Demo-2026`), so
+change it straight after signing in; `npm run setup` generates a random one
+instead, which is why it is the better choice when you can run it.
+
 Then sign in at **http://localhost:3000/dev-cp/login** with `mdshojibmiya` /
 `CHANGE_ME`.
 

@@ -274,6 +274,42 @@ After adding variables, click **Save** and then **Restart** the application.
 
 ## 5. Install the schema and seed data
 
+There are two ways to do this. Pick one — **not both**, they do the same job.
+
+| | Use when | What you get |
+|---|---|---|
+| **A. Import a SQL file** | You have phpMyAdmin but no terminal, or you want a known demo password | Schema + settings + demo content + staff accounts, in one import |
+| **B. Run the installer** | You have terminal access to the app | The same, plus a **randomly generated** staff password that is never written to a file |
+
+**B is the better choice when you can run it** — nothing sensitive ends up in a
+file you might share. Use A when you cannot.
+
+### A. Import `database/install.sql`
+
+1. In hPanel, create the MySQL database (section 2). Leave it **empty**.
+2. Open phpMyAdmin, select that database, go to **Import**, and upload
+   `database/install.sql` from the repository.
+3. Set `DB_NAME`, `DB_USER` and `DB_PASSWORD` in `.env` to match.
+
+Then sign in with the credentials printed at the top of that file:
+
+```
+URL      https://your-domain.com/dev-cp/login
+Username mdshojibmiya
+Password WooBD-Demo-2026
+```
+
+> **⚠️ Change that password immediately.** It is published in this repository, so
+> it is not a secret — anyone who reads the repo knows it. Two more staff accounts
+> (`romenroy`, `mehedihasan`) share it and should be changed or deleted.
+
+The file drops and recreates every table, so **never import it over a database
+that already holds data**. It contains demo content only: customers use
+`@example.com` addresses, and the header lists exactly which tables to empty if
+you would rather start clean.
+
+### B. Run the installer
+
 You need a terminal inside the application environment. Use hPanel's
 **Node.js → Run command** (or SSH if your plan includes it).
 
