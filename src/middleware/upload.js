@@ -16,7 +16,7 @@
 const multer = require('multer');
 const fs = require('fs');
 
-const { upload, uploadAny, FOLDER_RULES } = require('../lib/storage');
+const { upload, uploadAny, uploadAnyRouted, FOLDER_RULES } = require('../lib/storage');
 const csrf = require('./csrf');
 const logger = require('../utils/logger');
 
@@ -126,6 +126,30 @@ function uploadGuarded(folder = 'media', field = 'upload') {
 function uploadGuardedAny(folder = 'media') {
   const handler = uploadAny(folder);
 
+  return guarded(handler);
+}
+
+/**
+ * Like uploadGuardedAny, but the folder is chosen per form field.
+ *
+ * The settings screen posts brand images and a hero video together, and one
+ * multer instance has one destination - so the folder has to be resolved from
+ * `file.fieldname`. See storage.uploadAnyRouted.
+ *
+ * @param {(fieldname: string) => string} resolver
+ */
+function uploadGuardedRouted(resolver) {
+  return guarded(uploadAnyRouted(resolver));
+}
+
+/**
+ * Wrap a multer handler with CSRF validation and cleanup-on-rejection.
+ *
+ * Shared by every guarded uploader so the ordering rule - multer first, then
+ * the token check - and the discard-on-failure behaviour cannot drift between
+ * them.
+ */
+function guarded(handler) {
   return (req, res, next) => {
     handler(req, res, async (err) => {
       if (err) {
@@ -155,4 +179,4 @@ function uploadLimits(folder) {
   return { maxMb: rules.maxMb, types: rules.types };
 }
 
-module.exports = { uploadGuarded, uploadGuardedAny, uploadLimits };
+module.exports = { uploadGuarded, uploadGuardedAny, uploadGuardedRouted, uploadLimits };

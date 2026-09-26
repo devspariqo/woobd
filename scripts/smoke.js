@@ -3311,6 +3311,50 @@ async function checkMaintenanceAndChat() {
     const after = await req('/');
     if (after.status === 200) ok('maintenance mode is off again', 'site restored');
     else bad('maintenance mode is off again', `site returned ${after.status} - it may be stuck on`);
+    // --- Hero media ------------------------------------------------------
+    //
+    // The hero swaps between an image and a video. The failure worth guarding
+    // is a folder/URL mismatch: the upload lands in one folder while the stored
+    // URL names another, so the admin looks right and the asset 404s.
+    //
+    // Sign in again first: the maintenance block above ends by resetting the
+    // cookie jar, so an admin request here would be anonymous.
+    await adminLogin();
+
+    const homeHero = await req('/');
+    const heroAdmin = await req(`/${ADMIN_SLUG}/settings?group=homepage`);
+
+    if (/name="hero_video"/.test(heroAdmin.body) && /name="hero_media_type"/.test(heroAdmin.body)) {
+      ok('the hero media settings render in the admin', 'video upload and type selector');
+    } else {
+      bad('the hero media settings render in the admin', 'hero_video or hero_media_type missing from the form');
+    }
+
+    // The floating stat badges were removed when the video took their place.
+    if (/hero-float/.test(homeHero.body)) {
+      bad('the hero float badges are gone', 'hero-float markup is still rendered');
+    } else {
+      ok('the hero float badges are gone');
+    }
+
+    // With no video configured the hero must fall back to an image, not render
+    // an empty frame.
+    if (/hero_media_type/.test(heroAdmin.body) && !/<video/.test(homeHero.body)) {
+      ok('the hero falls back to an image when no video is set');
+    } else if (/<video/.test(homeHero.body)) {
+      ok('the hero renders a video', 'a video is configured');
+    } else {
+      warn('the hero falls back to an image when no video is set', 'could not confirm');
+    }
+
+    // A video element is useless without muted + playsinline: browsers block
+    // autoplay with sound and iOS refuses to play inline without it.
+    const heroVid = homeHero.body.match(/<video[^>]*>/);
+    if (heroVid) {
+      const missing = ['muted', 'playsinline'].filter((attr) => !heroVid[0].includes(attr));
+      if (!missing.length) ok('the hero video is muted and playsinline', 'autoplay is permitted');
+      else bad('the hero video is muted and playsinline', `missing: ${missing.join(', ')}`);
+    }
   } catch (err) {
     bad('maintenance and chat', err.message);
   }

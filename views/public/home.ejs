@@ -45,29 +45,35 @@
         </ul>
       </div>
 
+      <%
+        // Hero media: video when one is configured and the type is set to
+        // video, otherwise the image. The fallback matters - switching the type
+        // to video before uploading one should show the image, not an empty box.
+        var heroVideoSrc = settings.hero_video_url || settings.hero_video || '';
+        var heroPoster = settings.hero_image ? helpers.url(settings.hero_image) : helpers.url('/assets/img/hero-default.svg');
+        var useVideo = settings.hero_media_type === 'video' && heroVideoSrc;
+        var heroVideoSrcFull = useVideo && /^https?:\/\//i.test(heroVideoSrc) ? heroVideoSrc : helpers.url(heroVideoSrc);
+      %>
       <div class="hero-visual">
         <div class="frame">
-          <% if (settings.hero_image) { %>
-            <img src="<%= helpers.url(settings.hero_image) %>" alt="<%= site.name %> - e-commerce website design" width="640" height="480" fetchpriority="high">
+          <% if (useVideo) { %>
+            <%
+              // muted + playsinline are not optional: every browser blocks
+              // autoplay with sound, and iOS refuses to play inline without
+              // playsinline. Without both, the video silently does not start.
+            %>
+            <video class="hero-video"
+                   src="<%= heroVideoSrcFull %>"
+                   poster="<%= heroPoster %>"
+                   <%= settings.hero_video_autoplay === '1' ? 'autoplay' : '' %>
+                   <%= settings.hero_video_loop === '1' ? 'loop' : '' %>
+                   <%= settings.hero_video_controls === '1' ? 'controls' : '' %>
+                   muted playsinline preload="metadata">
+              Your browser cannot play this video.
+            </video>
           <% } else { %>
-            <img src="<%= helpers.url('/assets/img/hero-default.svg') %>" alt="E-commerce website design by <%= site.name %>" width="640" height="480" fetchpriority="high">
+            <img src="<%= heroPoster %>" alt="<%= site.name %> - e-commerce website design" width="640" height="480" fetchpriority="high">
           <% } %>
-        </div>
-
-        <div class="hero-float hero-float-a">
-          <span class="ico"><svg><use href="#i-trending-up"/></svg></span>
-          <span>
-            <span class="value"><%= settings.about_projects %></span>
-            <span class="label">Projects delivered</span>
-          </span>
-        </div>
-
-        <div class="hero-float hero-float-b">
-          <span class="ico"><svg><use href="#i-star"/></svg></span>
-          <span>
-            <span class="value"><%= settings.about_rating %>/5</span>
-            <span class="label">Client rating</span>
-          </span>
         </div>
       </div>
     </div>

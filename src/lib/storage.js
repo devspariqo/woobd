@@ -132,6 +132,10 @@ class MySQLSessionStore extends require('express-session').Store {
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'image/avif'];
 const DOC_TYPES = ['application/pdf', 'application/zip', 'text/plain'];
+// MP4 and WebM are the two every current browser plays. Deliberately not
+// QuickTime or AVI: accepting a file the browser cannot play just produces a
+// silent black box on the homepage.
+const VIDEO_TYPES = ['video/mp4', 'video/webm'];
 
 const FOLDER_RULES = {
   packages: { types: IMAGE_TYPES, maxMb: config.uploads.maxSizeMb },
@@ -144,6 +148,9 @@ const FOLDER_RULES = {
   // The image is only ever displayed at ~78px, so this is generous on purpose:
   // refusing a valid photo is a worse outcome than storing a large one.
   avatars: { types: IMAGE_TYPES, maxMb: 5 },
+  // Homepage hero media. Generous because a hero video is a real video, not a
+  // thumbnail - a 30-second 1080p clip is comfortably 20-40 MB.
+  hero: { types: [...IMAGE_TYPES, ...VIDEO_TYPES], maxMb: 60 },
   media: { types: [...IMAGE_TYPES, ...DOC_TYPES], maxMb: 10 },
   payments: { types: [...IMAGE_TYPES, ...DOC_TYPES], maxMb: 5 },
   tickets: { types: [...IMAGE_TYPES, ...DOC_TYPES], maxMb: 5 },
@@ -255,6 +262,70 @@ function uploadAny(folder = 'media') {
 }
 
 /**
+ * An uploader whose folder is chosen per form field.
+ *
+ * The settings screen posts brand images and a hero video in one request, and a
+ * multer instance has a single destination - so the choice has to be made per
+ * file. `file.fieldname` is available inside both the destination callback and
+ * the filter, which is what makes that possible.
+ *
+ * The size limit is the largest of the folders involved rather than each
+ * folder's own, because multer applies `limits.fileSize` per instance. The type
+ * filter IS per folder, so a video still cannot be posted into an image-only
+ * folder. The per-folder `maxMb` remains the figure shown in the form.
+ *
+ * @param {(fieldname: string) => string} resolver  field name -> folder key
+ */
+function uploadAnyRouted(resolver) {
+  const folderFor = (fieldname) => {
+    const key = resolver(fieldname);
+    return FOLDER_RULES[key] ? key : 'media';
+  };
+
+  // multer applies `limits.fileSize` per instance, not per file, so this has to
+  // be the largest of the folders involved. The type filter below IS per
+  // folder, so a video still cannot be posted into an image-only folder.
+  const maxMb = Math.max(...Object.keys(FOLDER_RULES).map((key) => FOLDER_RULES[key].maxMb || 5));
+
+  const handler = multer({
+    storage: multer.diskStorage({
+      destination(req, file, cb) {
+        const target = path.join(config.uploads.dir, folderFor(file.fieldname));
+        fs.mkdir(target, { recursive: true }, (err) => cb(err, target));
+      },
+      filename(req, file, cb) {
+        const name = safeFileName(file.originalname);
+        // Recorded for the same reason as in storage(): a rejected request has
+        // to be able to clean up after itself.
+        req.__uploadPaths = req.__uploadPaths || [];
+        req.__uploadPaths.push(path.join(config.uploads.dir, folderFor(file.fieldname), name));
+        cb(null, name);
+      },
+    }),
+    limits: { fileSize: maxMb * 1024 * 1024, files: 12 },
+    fileFilter(req, file, cb) {
+      const rules = FOLDER_RULES[folderFor(file.fieldname)] || FOLDER_RULES.media;
+      if (rules.types.includes(file.mimetype)) return cb(null, true);
+      cb(new Error(`Unsupported file type: ${file.mimetype}`));
+    },
+  });
+
+  return handler.any();
+}
+
+/**
+ * Which upload folder a settings-screen file field belongs to.
+ *
+ * Exported because the route that RECEIVES the upload and the controller that
+ * records the resulting URL both need it. When they disagree the stored path
+ * points somewhere the file is not - the admin looks correct and the asset
+ * 404s, which is a slow bug to find.
+ */
+function settingsUploadFolder(fieldname) {
+  return fieldname === 'hero_video' ? 'hero' : 'logos';
+}
+
+/**
  * Turn saved multer files into a media-table payload list.
  * `fileUrl` is built from the public mount path, which is independent of where
  * the file physically lives.
@@ -312,6 +383,8 @@ module.exports = {
   upload,
   uploadSingle,
   uploadAny,
+  uploadAnyRouted,
+  settingsUploadFolder,
   ensureUploadDirs,
   safeFileName,
   toMediaRecords,

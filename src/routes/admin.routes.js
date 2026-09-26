@@ -20,7 +20,8 @@ const { RESOURCE_KEYS } = require('../config/admin-resources');
 const auth = require('../middleware/auth');
 const security = require('../middleware/security');
 const captcha = require('../middleware/captcha');
-const { uploadGuarded, uploadGuardedAny } = require('../middleware/upload');
+const storage = require('../lib/storage');
+const { uploadGuarded, uploadGuardedAny, uploadGuardedRouted } = require('../middleware/upload');
 
 const router = express.Router();
 
@@ -35,7 +36,9 @@ const uploadAvatar = uploadGuarded('avatars', 'upload');
 const uploadMedia = uploadGuarded('media', 'upload');
 // Settings posts four independent image fields (light logo, dark logo, footer
 // logo, favicon), so each file is matched back to its setting by fieldname.
-const uploadSettings = uploadGuardedAny('logos');
+// Brand images go to logos; the hero video to hero. One multer instance has
+// one destination, so the folder is resolved per form field.
+const uploadSettings = uploadGuardedRouted(storage.settingsUploadFolder);
 
 // ---------------------------------------------------------------------------
 // Public: login

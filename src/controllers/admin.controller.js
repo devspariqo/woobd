@@ -961,7 +961,10 @@ exports.saveSettings = async (req, res, next) => {
         const current = String(settings.get(def.key, '') || '');
 
         if (uploaded) {
-          pairs[def.key] = `${config.uploads.publicPath}/${UPLOAD_FOLDER_FOR_FILES}/${uploaded.filename}`;
+          // Same resolver the route used to place the file, so the URL cannot
+          // point somewhere the file is not.
+          const folder = storage.settingsUploadFolder(def.key);
+          pairs[def.key] = `${config.uploads.publicPath}/${folder}/${uploaded.filename}`;
           uploadedFiles.push(uploaded);
           // Replacing a logo leaves the previous file behind otherwise.
           if (current.startsWith(config.uploads.publicPath)) filesToRemove.push(current);

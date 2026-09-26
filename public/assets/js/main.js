@@ -941,6 +941,29 @@
     });
   }
 
+  /**
+   * Hero video.
+   *
+   * Autoplay is a request, not a guarantee: browsers block it for a video with
+   * sound, in low-power mode, and on some metered connections. When it is
+   * refused the element just sits on its poster frame, which looks broken.
+   *
+   * So if play() rejects and the controls were switched off, turn them on -
+   * the visitor can start it themselves rather than being left with a still
+   * image and no explanation.
+   */
+  function initHeroVideo() {
+    $$('.hero-video').forEach(function (video) {
+      var attempt = video.play();
+      if (!attempt || typeof attempt.catch !== 'function') return;
+
+      attempt.catch(function () {
+        video.setAttribute('controls', 'controls');
+        video.classList.add('is-paused');
+      });
+    });
+  }
+
   function boot() {
     initTheme();
     initHeader();
@@ -957,6 +980,7 @@
     initChat();
     initCarousel();
     initInvisibleCaptcha();
+    initHeroVideo();
   }
 
   if (document.readyState === 'loading') {

@@ -1335,6 +1335,24 @@ body.no-scroll { overflow: hidden; }
 
 .hero-visual img { width: 100%; display: block; }
 
+/* Hero video.
+   `aspect-ratio` reserves the space before the video loads, so the hero does
+   not jump as it arrives - and `object-fit: cover` keeps it filling the frame
+   whatever shape the source is. */
+.hero-visual .hero-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: var(--bg-alt);
+}
+
+/* The controls bar sits over a video that may be any colour. A soft scrim keeps
+   the buttons legible without hiding the footage. */
+.hero-visual .hero-video::-webkit-media-controls-panel {
+  background-image: linear-gradient(transparent, rgba(0, 0, 0, .45));
+}
+
 /* Floating stat cards over the hero image. */
 .hero-float {
   position: absolute;
