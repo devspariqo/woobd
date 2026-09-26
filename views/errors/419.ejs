@@ -1,0 +1,29 @@
+<%
+  // `isAdmin` is set when the rejection came from the admin panel, so the
+  // recovery links point at the panel sign-in rather than the customer one.
+  const admin = typeof isAdmin !== 'undefined' && isAdmin;
+  const signInUrl = admin ? helpers.url('/' + adminPath + '/login') : helpers.url('/signin');
+  const backUrl = admin ? helpers.url('/' + adminPath + '/dashboard') : helpers.url('/');
+%>
+<section class="section" style="padding:80px 0">
+  <div class="container container-narrow text-center">
+    <div class="feature-icon" style="margin:0 auto 24px;width:72px;height:72px;background:rgba(240,160,32,.12);color:var(--warning)">
+      <svg style="width:34px;height:34px"><use href="#i-refresh"/></svg>
+    </div>
+
+    <h1 style="margin-bottom:16px;font-size:2rem">Your session expired</h1>
+
+    <p style="font-size:1.0625rem;max-width:520px;margin:0 auto 34px">
+      For your security this page timed out while you were away. Nothing was lost —
+      sign in again and resubmit.
+      <% if (admin) { %>
+        <br><strong>Note:</strong> if you were uploading a file, you will need to choose it again.
+      <% } %>
+    </p>
+
+    <div style="display:flex;gap:13px;justify-content:center;flex-wrap:wrap">
+      <a href="<%= signInUrl %>" class="btn btn-primary btn-lg">Sign in again</a>
+      <a href="<%= backUrl %>" class="btn btn-outline btn-lg"><%= admin ? 'Back to the dashboard' : 'Back to homepage' %></a>
+    </div>
+  </div>
+</section>

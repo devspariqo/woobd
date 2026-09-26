@@ -1,0 +1,238 @@
+<%
+  const url = function (p) { return helpers.url('/' + adminPath + '/staff' + p); };
+  const roleTone = { admin: 'danger', manager: 'warning', editor: 'info' };
+  const roleRank = { editor: 1, manager: 2, admin: 3 };
+  // res.locals.staff is the signed-in user (set by middleware/auth).
+  const meId = staff ? staff.id : null;
+%>
+
+<div class="panel" style="margin-bottom:20px">
+  <div class="panel-head">
+    <h2 style="font-size:.9375rem;font-weight:700;margin:0">Add a staff member</h2>
+    <span style="font-size:.8125rem;color:var(--text-soft)">They can sign in as soon as you save.</span>
+  </div>
+  <form method="post" action="<%= url('') %>" data-validate>
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="panel-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="n-name">Full name <span class="req">*</span></label>
+          <input type="text" class="form-control" id="n-name" name="name" required maxlength="120">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="n-username">Username <span class="req">*</span></label>
+          <input type="text" class="form-control" id="n-username" name="username" required
+                 maxlength="60" spellcheck="false" placeholder="lowercase, no spaces">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="n-email">Email <span class="req">*</span></label>
+          <input type="email" class="form-control" id="n-email" name="email" required maxlength="191">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="n-phone">Phone <span class="optional">optional</span></label>
+          <input type="text" class="form-control" id="n-phone" name="phone" maxlength="30">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="n-role">Role <span class="req">*</span></label>
+          <select class="form-control" id="n-role" name="role" required>
+            <option value="editor">Editor — content only</option>
+            <option value="manager">Manager — orders, customers, payments</option>
+            <option value="admin">Administrator — full access</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="n-password">Password <span class="req">*</span></label>
+          <div class="input-group">
+            <input type="password" class="form-control" id="n-password" name="password" required
+                   autocomplete="new-password" data-strength-source>
+            <button type="button" class="input-action" data-toggle-password="n-password" aria-label="Show password">
+              <svg><use href="#i-eye"/></svg>
+            </button>
+          </div>
+          <div class="strength" aria-hidden="true"><span class="strength-bar"></span></div>
+          <p class="form-hint strength-text">At least 8 characters.</p>
+        </div>
+      </div>
+    </div>
+    <div class="panel-foot">
+      <button type="submit" class="btn btn-primary">
+        <svg><use href="#i-plus"/></svg> Add staff member
+      </button>
+    </div>
+  </form>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <form class="toolbar" method="get" action="<%= url('') %>"
+          style="margin:0;padding:0;border:0;box-shadow:none;background:transparent;flex-wrap:wrap">
+      <div class="search-box">
+        <svg><use href="#i-search"/></svg>
+        <input type="search" name="q" class="form-control" value="<%= search %>"
+               placeholder="Name, username or email…" aria-label="Search staff">
+      </div>
+      <select name="role" class="form-control" style="max-width:170px" aria-label="Role">
+        <option value="">All roles</option>
+        <% roles.forEach(function (r) { %>
+          <option value="<%= r %>" <%= activeRole === r ? 'selected' : '' %>><%= helpers.humanise(r) %></option>
+        <% }); %>
+      </select>
+      <select name="status" class="form-control" style="max-width:170px" aria-label="Status">
+        <option value="">All statuses</option>
+        <option value="active" <%= activeStatus === 'active' ? 'selected' : '' %>>Active</option>
+        <option value="suspended" <%= activeStatus === 'suspended' ? 'selected' : '' %>>Suspended</option>
+      </select>
+      <button type="submit" class="btn btn-outline btn-sm">Apply</button>
+      <% if (search || activeRole || activeStatus) { %><a href="<%= url('') %>" class="btn btn-ghost btn-sm">Clear</a><% } %>
+    </form>
+  </div>
+
+  <% if (members && members.length) { %>
+    <div class="table-wrap">
+      <table class="dash-table">
+        <thead>
+          <tr><th>Member</th><th>Role</th><th>Status</th><th>Last sign-in</th><th class="num">Actions</th></tr>
+        </thead>
+        <tbody>
+          <% members.forEach(function (member) { %>
+            <%
+              const isMe = meId && Number(meId) === Number(member.id);
+              const isLastAdmin = member.role === 'admin' && adminCount <= 1;
+            %>
+            <tr>
+              <td>
+                <div class="table-product">
+                  <img src="<%= member.avatar ? helpers.url(member.avatar) : helpers.url('/assets/img/client-default.svg') %>" alt="">
+                  <div>
+                    <div class="strong">
+                      <%= member.name %>
+                      <% if (isMe) { %><span class="pill pill-info" style="margin-left:6px">You</span><% } %>
+                    </div>
+                    <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px">
+                      <code><%= member.username %></code> · <%= member.email %>
+                    </div>
+                  </div>
+                </div>
+              </td>
+              <td><span class="pill pill-<%= roleTone[member.role] || 'muted' %>"><%= helpers.humanise(member.role) %></span></td>
+              <td>
+                <span class="pill pill-<%= member.status === 'active' ? 'success' : 'danger' %>"><%= helpers.humanise(member.status) %></span>
+              </td>
+              <td style="font-size:.8125rem">
+                <% if (member.last_login_at) { %>
+                  <time data-relative datetime="<%= new Date(member.last_login_at).toISOString() %>"><%= helpers.timeAgo(member.last_login_at) %></time>
+                <% } else { %>
+                  <span style="color:var(--text-soft)">Never</span>
+                <% } %>
+              </td>
+              <td>
+                <div class="actions">
+                  <button type="button" class="btn btn-outline btn-sm" data-staff-edit="<%= member.id %>">Edit</button>
+
+                  <% if (!isMe && !isLastAdmin) { %>
+                    <form method="post" action="<%= url('/' + member.id + '/delete') %>" style="display:inline">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)"
+                              data-confirm="Remove <%= member.name %>? They lose access immediately.">Remove</button>
+                    </form>
+                  <% } else { %>
+                    <span style="font-size:.75rem;color:var(--text-soft)">
+                      <%= isMe ? 'Your own account' : 'Last administrator' %>
+                    </span>
+                  <% } %>
+                </div>
+
+                <%# Inline edit panel, hidden until the Edit button is pressed. %>
+                <div id="staff-edit-<%= member.id %>" class="staff-edit" hidden>
+                  <form method="post" action="<%= url('/' + member.id) %>">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <div class="form-row" style="margin-top:14px">
+                      <div class="form-group">
+                        <label class="form-label" for="e-name-<%= member.id %>">Full name</label>
+                        <input type="text" class="form-control" id="e-name-<%= member.id %>" name="name"
+                               value="<%= member.name %>" required maxlength="120">
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label" for="e-username-<%= member.id %>">Username</label>
+                        <input type="text" class="form-control" id="e-username-<%= member.id %>" name="username"
+                               value="<%= member.username %>" required maxlength="60" spellcheck="false">
+                      </div>
+                    </div>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label class="form-label" for="e-email-<%= member.id %>">Email</label>
+                        <input type="email" class="form-control" id="e-email-<%= member.id %>" name="email"
+                               value="<%= member.email %>" required maxlength="191">
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label" for="e-phone-<%= member.id %>">Phone</label>
+                        <input type="text" class="form-control" id="e-phone-<%= member.id %>" name="phone"
+                               value="<%= member.phone || '' %>" maxlength="30">
+                      </div>
+                    </div>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label class="form-label" for="e-role-<%= member.id %>">Role</label>
+                        <select class="form-control" id="e-role-<%= member.id %>" name="role"
+                                <%= isLastAdmin ? 'disabled' : '' %>>
+                          <% roles.forEach(function (r) { %>
+                            <option value="<%= r %>" <%= member.role === r ? 'selected' : '' %>><%= helpers.humanise(r) %></option>
+                          <% }); %>
+                        </select>
+                        <% if (isLastAdmin) { %>
+                          <p class="form-hint">The only administrator must stay an administrator.</p>
+                          <input type="hidden" name="role" value="admin">
+                        <% } %>
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label" for="e-status-<%= member.id %>">Status</label>
+                        <select class="form-control" id="e-status-<%= member.id %>" name="status"
+                                <%= isLastAdmin ? 'disabled' : '' %>>
+                          <option value="active" <%= member.status === 'active' ? 'selected' : '' %>>Active</option>
+                          <option value="suspended" <%= member.status === 'suspended' ? 'selected' : '' %>>Suspended</option>
+                        </select>
+                        <% if (isLastAdmin) { %><input type="hidden" name="status" value="active"><% } %>
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" for="e-password-<%= member.id %>">New password <span class="optional">leave blank to keep</span></label>
+                      <div class="input-group">
+                        <input type="password" class="form-control" id="e-password-<%= member.id %>" name="password"
+                               autocomplete="new-password" data-strength-source>
+                        <button type="button" class="input-action" data-toggle-password="e-password-<%= member.id %>" aria-label="Show password">
+                          <svg><use href="#i-eye"/></svg>
+                        </button>
+                      </div>
+                      <div class="strength" aria-hidden="true"><span class="strength-bar"></span></div>
+                      <p class="form-hint strength-text">At least 8 characters.</p>
+                    </div>
+                    <div style="display:flex;gap:10px;margin-top:6px">
+                      <button type="submit" class="btn btn-primary btn-sm">Save changes</button>
+                      <button type="button" class="btn btn-ghost btn-sm" data-staff-cancel="<%= member.id %>">Cancel</button>
+                    </div>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if (pager.totalPages > 1) { %>
+      <div class="panel-foot">
+        <%- include('../partials/pagination', { baseUrl: '/' + adminPath + '/staff' }) %>
+      </div>
+    <% } %>
+  <% } else { %>
+    <div class="empty-state">
+      <div class="ico"><svg><use href="#i-users"/></svg></div>
+      <h3>No staff match those filters</h3>
+      <p>Add someone above, or clear the search.</p>
+    </div>
+  <% } %>
+</div>

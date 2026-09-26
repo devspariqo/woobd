@@ -1,0 +1,106 @@
+<%
+  const cur = site.currency;
+  const money = helpers.money;
+%>
+
+<% if (subscriptions && subscriptions.length) { %>
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Recurring plans</h2>
+        <p>Cancel any time — your service runs to the end of the current paid period.</p>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="dash-table">
+        <thead>
+          <tr>
+            <th>Plan</th>
+            <th>Cycle</th>
+            <th>Started</th>
+            <th>Next billing</th>
+            <th>Status</th>
+            <th class="num">Amount</th>
+            <th class="num">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% subscriptions.forEach(function (sub) { %>
+            <%
+              // Flag a renewal that is close enough to matter, so the customer
+              // is not surprised by an upcoming charge.
+              var daysToRenewal = null;
+              if (sub.next_billing_at && sub.status === 'active') {
+                daysToRenewal = Math.ceil((new Date(sub.next_billing_at) - Date.now()) / 86400000);
+              }
+            %>
+            <tr>
+              <td>
+                <div class="strong"><%= helpers.excerpt(sub.plan_name, 40) %></div>
+                <% if (sub.order_id) { %>
+                  <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px">
+                    <a href="<%= helpers.url('/account/orders/' + sub.order_id) %>">View order</a>
+                  </div>
+                <% } %>
+              </td>
+              <td><%= helpers.humanise(sub.billing_cycle) %></td>
+              <td style="font-size:.8438rem;white-space:nowrap"><%= helpers.formatDate(sub.started_at) %></td>
+              <td style="white-space:nowrap">
+                <% if (sub.next_billing_at) { %>
+                  <span style="font-size:.8438rem"><%= helpers.formatDate(sub.next_billing_at) %></span>
+                  <% if (daysToRenewal !== null && daysToRenewal <= 7 && daysToRenewal >= 0) { %>
+                    <div style="font-size:.75rem;color:var(--warning);font-weight:600;margin-top:2px">
+                      <%= daysToRenewal === 0 ? 'Due today' : 'In ' + daysToRenewal + ' day' + (daysToRenewal > 1 ? 's' : '') %>
+                    </div>
+                  <% } else if (daysToRenewal !== null && daysToRenewal < 0) { %>
+                    <div style="font-size:.75rem;color:var(--danger);font-weight:600;margin-top:2px">Overdue</div>
+                  <% } %>
+                <% } else { %>
+                  <span style="color:var(--text-soft)">—</span>
+                <% } %>
+              </td>
+              <td><span class="pill pill-<%= helpers.statusTone(sub.status) %>"><%= helpers.humanise(sub.status) %></span></td>
+              <td class="num strong"><%= money(sub.amount, cur) %></td>
+              <td>
+                <div class="actions">
+                  <% if (sub.order_id) { %>
+                    <a href="<%= helpers.url('/account/orders/' + sub.order_id) %>" class="btn btn-ghost btn-sm">Order</a>
+                  <% } %>
+                  <% if (sub.status === 'active') { %>
+                    <form method="post" action="<%= helpers.url('/account/subscriptions/' + sub.id + '/cancel') %>" data-validate style="display:inline">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <button type="submit" class="btn btn-outline btn-sm"
+                              data-confirm="Cancel this subscription? Your service continues until the end of the current paid period.">
+                        Cancel
+                      </button>
+                    </form>
+                  <% } else { %>
+                    <span style="font-size:.78rem;color:var(--text-soft);padding-right:6px">
+                      Cancelled <%= sub.cancelled_at ? helpers.formatDate(sub.cancelled_at) : '' %>
+                    </span>
+                  <% } %>
+                </div>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if (pager.totalPages > 1) { %>
+      <div class="panel-foot">
+        <%- include('../partials/pagination', { baseUrl: '/account/subscriptions' }) %>
+      </div>
+    <% } %>
+  </div>
+<% } else { %>
+  <div class="panel">
+    <div class="empty-state">
+      <div class="ico"><svg><use href="#i-refresh"/></svg></div>
+      <h3>No subscriptions</h3>
+      <p>Recurring plans appear here when you order a package with monthly or yearly billing — they cover hosting, updates and ongoing support.</p>
+      <a href="<%= helpers.url('/services') %>" class="btn btn-primary">See packages with plans</a>
+    </div>
+  </div>
+<% } %>

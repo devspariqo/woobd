@@ -1,0 +1,118 @@
+<%
+  const c = counts || {};
+  const num = function (v) { return Number(v || 0); };
+  const cur = site.currency;
+  const tabs = [
+    ['', 'All', num(c.total)],
+    ['pending', 'Pending', num(c.pending)],
+    ['in_progress', 'In progress', num(c.in_progress)],
+    ['active', 'Active', num(c.active)],
+    ['completed', 'Completed', num(c.completed)],
+    ['on_hold', 'On hold', num(c.on_hold)],
+    ['cancelled', 'Cancelled', num(c.cancelled)]
+  ];
+%>
+
+<div class="tab-bar" style="margin-bottom:20px">
+  <% tabs.forEach(function (tab) { %>
+    <a href="<%= helpers.url('/account/orders' + (tab[0] ? '?status=' + tab[0] : '')) %>"
+       class="<%= (activeStatus || '') === tab[0] ? 'active' : '' %>">
+      <%= tab[1] %>
+      <% if (tab[2]) { %><span class="tab-count"><%= tab[2] %></span><% } %>
+    </a>
+  <% }); %>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <form class="toolbar" method="get" action="<%= helpers.url('/account/orders') %>" style="margin:0;padding:0;border:0;box-shadow:none;background:transparent">
+      <% if (activeStatus) { %><input type="hidden" name="status" value="<%= activeStatus %>"><% } %>
+      <div class="search-box">
+        <svg><use href="#i-search"/></svg>
+        <input type="search" name="q" class="form-control" value="<%= search %>"
+               placeholder="Search order number, package or domain…" aria-label="Search orders">
+      </div>
+      <button type="submit" class="btn btn-outline btn-sm">Search</button>
+      <% if (search) { %>
+        <a href="<%= helpers.url('/account/orders' + (activeStatus ? '?status=' + activeStatus : '')) %>" class="btn btn-ghost btn-sm">Clear</a>
+      <% } %>
+    </form>
+  </div>
+
+  <% if (orders && orders.length) { %>
+    <div class="table-wrap">
+      <table class="dash-table">
+        <thead>
+          <tr>
+            <th>Order</th>
+            <th>Package</th>
+            <th>Status</th>
+            <th>Payment</th>
+            <th>Due</th>
+            <th class="num">Total</th>
+            <th class="num">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% orders.forEach(function (order) { %>
+            <tr>
+              <td>
+                <a href="<%= helpers.url('/account/orders/' + order.id) %>" class="strong"><%= order.order_number %></a>
+                <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px">
+                  <%= helpers.formatDate(order.created_at) %>
+                </div>
+              </td>
+              <td>
+                <div class="table-product">
+                  <% if (order.service_image) { %>
+                    <img class="table-thumb" src="<%= helpers.url(order.service_image) %>" alt="" loading="lazy">
+                  <% } %>
+                  <div>
+                    <div class="name"><%= helpers.excerpt(order.service_title, 38) %></div>
+                    <div class="meta">
+                      <%= helpers.humanise(order.billing_cycle) %>
+                      <% if (order.domain_name) { %> · <%= order.domain_name %><% } %>
+                    </div>
+                  </div>
+                </div>
+              </td>
+              <td><span class="pill pill-<%= helpers.statusTone(order.status) %>"><%= helpers.humanise(order.status) %></span></td>
+              <td><span class="pill pill-<%= helpers.statusTone(order.payment_status) %>"><%= helpers.humanise(order.payment_status) %></span></td>
+              <td style="font-size:.8438rem;color:var(--text-soft);white-space:nowrap">
+                <%= order.due_at ? helpers.formatDate(order.due_at) : '—' %>
+              </td>
+              <td class="num strong"><%= helpers.money(order.total, cur) %></td>
+              <td>
+                <div class="actions">
+                  <a href="<%= helpers.url('/account/orders/' + order.id) %>" class="btn btn-outline btn-sm">View</a>
+                  <% if (order.payment_status !== 'paid' && order.status !== 'cancelled') { %>
+                    <a href="<%= helpers.url('/account/orders/' + order.id + '/pay') %>" class="btn btn-primary btn-sm">Pay</a>
+                  <% } %>
+                </div>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if (pager.totalPages > 1) { %>
+      <div class="panel-foot">
+        <%- include('../partials/pagination', { baseUrl: '/account/orders' }) %>
+      </div>
+    <% } %>
+  <% } else { %>
+    <div class="empty-state">
+      <div class="ico"><svg><use href="#i-package"/></svg></div>
+      <h3><%= search || activeStatus ? 'No matching orders' : 'No orders yet' %></h3>
+      <p>
+        <% if (search || activeStatus) { %>
+          Nothing matches that filter. Try a different search or clear the filters.
+        <% } else { %>
+          You have not ordered a website from us yet. Browse our packages to get started.
+        <% } %>
+      </p>
+      <a href="<%= helpers.url('/services') %>" class="btn btn-primary">Browse packages</a>
+    </div>
+  <% } %>
+</div>

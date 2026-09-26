@@ -1,0 +1,146 @@
+<%
+  const errs = errors || {};
+  const u = user || {};
+%>
+
+<div class="two-col">
+  <div>
+    <form method="post" action="<%= helpers.url('/account/security') %>" data-validate novalidate>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2><%= hasPassword ? 'Change your password' : 'Set a password' %></h2>
+            <p>
+              <% if (hasPassword) { %>
+                Choose something long and unique. You will be signed out of every device afterwards.
+              <% } else { %>
+                You signed up with Google. Setting a password lets you also sign in with your email address.
+              <% } %>
+            </p>
+          </div>
+        </div>
+
+        <div class="panel-body">
+          <% if (!hasPassword) { %>
+            <div class="alert alert-info">
+              <svg><use href="#i-info"/></svg>
+              <div>Your account currently signs in with Google only. There is no existing password to confirm.</div>
+            </div>
+          <% } %>
+
+          <% if (hasPassword) { %>
+            <div class="form-group">
+              <label class="form-label" for="current_password">Current password <span class="req">*</span></label>
+              <div class="input-group">
+                <svg class="input-icon"><use href="#i-lock"/></svg>
+                <input type="password" id="current_password" name="current_password"
+                       class="form-control has-action <%= errs.current_password ? 'is-invalid' : '' %>"
+                       autocomplete="current-password" required>
+                <button type="button" class="input-action" data-toggle-password="current_password" aria-label="Show password">
+                  <svg style="width:17px;height:17px"><use href="#i-eye"/></svg>
+                </button>
+              </div>
+              <% if (errs.current_password) { %><span class="form-error"><%= errs.current_password %></span><% } %>
+            </div>
+          <% } %>
+
+          <div class="form-group">
+            <label class="form-label" for="password">New password <span class="req">*</span></label>
+            <div class="input-group">
+              <svg class="input-icon"><use href="#i-lock"/></svg>
+              <input type="password" id="password" name="password"
+                     class="form-control has-action <%= errs.password ? 'is-invalid' : '' %>"
+                     minlength="8" autocomplete="new-password" placeholder="At least 8 characters"
+                     data-strength-source required>
+              <button type="button" class="input-action" data-toggle-password="password" aria-label="Show password">
+                <svg style="width:17px;height:17px"><use href="#i-eye"/></svg>
+              </button>
+            </div>
+            <div class="strength">
+              <span class="strength-bar"></span><span class="strength-bar"></span>
+              <span class="strength-bar"></span><span class="strength-bar"></span>
+              <span class="strength-bar"></span>
+            </div>
+            <span class="strength-text"></span>
+            <% if (errs.password) { %><span class="form-error"><%= errs.password %></span><% } %>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="password_confirm">Confirm new password <span class="req">*</span></label>
+            <div class="input-group">
+              <svg class="input-icon"><use href="#i-lock"/></svg>
+              <input type="password" id="password_confirm" name="password_confirm"
+                     class="form-control has-action <%= errs.password_confirm ? 'is-invalid' : '' %>"
+                     autocomplete="new-password" placeholder="Re-enter your new password" required>
+              <button type="button" class="input-action" data-toggle-password="password_confirm" aria-label="Show password">
+                <svg style="width:17px;height:17px"><use href="#i-eye"/></svg>
+              </button>
+            </div>
+            <% if (errs.password_confirm) { %><span class="form-error"><%= errs.password_confirm %></span><% } %>
+          </div>
+
+          <button type="submit" class="btn btn-primary">
+            <svg><use href="#i-shield"/></svg> <%= hasPassword ? 'Change password' : 'Set password' %>
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div>
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-head">
+        <div><h3>Account security</h3></div>
+      </div>
+      <div class="panel-body" style="font-size:.875rem">
+        <div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text-soft)">Email</span>
+          <span style="font-weight:600;word-break:break-all;text-align:right"><%= u.email %></span>
+        </div>
+        <div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text-soft)">Password</span>
+          <span class="pill pill-<%= hasPassword ? 'success' : 'warning' %>"><%= hasPassword ? 'Set' : 'Not set' %></span>
+        </div>
+        <div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text-soft)">Google linked</span>
+          <span class="pill pill-<%= u.google_id ? 'success' : 'muted' %>"><%= u.google_id ? 'Yes' : 'No' %></span>
+        </div>
+        <div class="row-between" style="padding:8px 0">
+          <span style="color:var(--text-soft)">Last sign-in</span>
+          <span><%= u.last_login_at ? helpers.formatDateTime(u.last_login_at) : '—' %></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-head">
+        <div><h3>Password tips</h3></div>
+      </div>
+      <div class="panel-body" style="font-size:.8438rem;color:var(--text-soft);line-height:1.8">
+        <ul style="margin:0;padding-left:17px">
+          <li>Use at least 12 characters if you can.</li>
+          <li>Do not reuse a password from another site.</li>
+          <li>A passphrase of three random words beats a short complex one.</li>
+          <li>Never share it with anyone — we will never ask for it.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div><h3>Forgot your password?</h3></div>
+      </div>
+      <div class="panel-body" style="font-size:.8438rem;color:var(--text-soft);line-height:1.75">
+        <p style="margin:0 0 13px">
+          Sign out and use the "Forgot password" link on the sign-in page. We will email you a
+          secure reset link that expires in one hour.
+        </p>
+        <a href="<%= helpers.url('/account/logout') %>" class="btn btn-outline btn-block btn-sm">
+          <svg><use href="#i-log-out"/></svg> Sign out
+        </a>
+      </div>
+    </div>
+  </div>
+</div>

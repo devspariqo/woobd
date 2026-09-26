@@ -1,0 +1,318 @@
+<%#
+  Generic CMS create/edit form, driven by a resource from admin-resources.js.
+  Expects: resource, resourceKey, record, values, optionSets, errors,
+           basePath, adminPath, csrfToken, helpers.
+
+  Field rendering switches on the declared `type`, so adding a field to the
+  registry is enough. Fields may declare a `group` to get a section heading;
+  ungrouped fields are rendered first under no heading.
+%>
+<%
+  var url = function (path) { return helpers.url('/' + adminPath + '/' + resourceKey + path); };
+  var isEdit = !!record;
+  var err = errors || {};
+
+  // Preserve declaration order while collecting the distinct groups.
+  var groups = [];
+  (resource.fields || []).forEach(function (f) {
+    var g = f.group || '';
+    if (groups.indexOf(g) === -1) groups.push(g);
+  });
+
+  var valueOf = function (field) {
+    var v = values ? values[field.key] : undefined;
+    if (v === undefined || v === null) return '';
+    // A `list` field is stored as JSON but edited one item per line.
+    if (field.type === 'list') {
+      try {
+        var arr = typeof v === 'string' ? JSON.parse(v) : v;
+        return Array.isArray(arr) ? arr.join('\n') : '';
+      } catch (e) { return ''; }
+    }
+    if (field.type === 'date' && v) return String(v).slice(0, 10);
+    return v;
+  };
+
+  // dashboard.js initSlugSync reads [data-slug-source] (the input being typed in)
+  // and data-slug-target (the id of the slug input to fill). So the attribute
+  // belongs on the SOURCE field - the title - not on the slug field itself.
+  var slugTargetFor = function (key) {
+    var match = null;
+    (resource.fields || []).forEach(function (f) {
+      if (f.type === 'slug' && f.source === key) match = 'f-' + f.key;
+    });
+    return match;
+  };
+%>
+
+<%
+  // Only a resource with an image field needs a multipart form. That matters
+  // beyond the file itself: express's urlencoded parser skips multipart, so a
+  // multipart form on a resource with no upload middleware would arrive with an
+  // EMPTY body - every field missing, every save rejected with 422.
+  var hasImageField = (resource.fields || []).some(function (f) { return f.type === 'image'; });
+%>
+<%#
+  The enctype is emitted as a conditional BLOCK, not as an escaped expression.
+  An escaped output tag would HTML-encode the quotes to &#34;, which the browser
+  reads as a broken attribute - so the form silently stops being multipart and
+  every file upload is lost.
+%>
+<form method="post" action="<%= url(isEdit ? '/' + record.id : '') %>"
+      <% if (hasImageField) { %>enctype="multipart/form-data"<% } %> data-validate>
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+  <div class="two-col" style="align-items:start">
+    <div>
+      <% groups.forEach(function (groupName) { %>
+        <div class="panel" style="margin-bottom:20px">
+          <% if (groupName) { %>
+            <div class="panel-head">
+              <h2 style="font-size:.9375rem;font-weight:700;margin:0"><%= groupName %></h2>
+            </div>
+          <% } %>
+
+          <div class="panel-body">
+            <% resource.fields.filter(function (f) { return (f.group || '') === groupName; }).forEach(function (field) { %>
+              <%
+                var id = 'f-' + field.key;
+                var val = valueOf(field);
+                var hasError = err[field.key];
+              %>
+
+              <% if (field.type === 'boolean') { %>
+                <div class="setting-row">
+                  <div class="setting-text">
+                    <label class="setting-label" for="<%= id %>"><%= field.label %></label>
+                    <% if (field.help) { %><p class="setting-help"><%= field.help %></p><% } %>
+                  </div>
+                  <div class="setting-control">
+                    <label class="switch" data-on="On" data-off="Off">
+                      <input type="checkbox" id="<%= id %>" name="<%= field.key %>" value="1"
+                             <% if (String(val) === '1' || val === true) { %>checked<% } %>>
+                      <span class="track"></span>
+                      <span class="switch-state"><%= String(val) === '1' || val === true ? 'On' : 'Off' %></span>
+                    </label>
+                  </div>
+                </div>
+
+              <% } else { %>
+                <div class="form-group">
+                  <label class="form-label" for="<%= id %>">
+                    <%= field.label %>
+                    <% if (field.required) { %><span class="req">*</span><% } %>
+                  </label>
+
+                  <% if (field.type === 'textarea') { %>
+                    <textarea class="form-control" id="<%= id %>" name="<%= field.key %>"
+                              rows="<%= field.rows || 3 %>"
+                              <% if (field.maxlength) { %>maxlength="<%= field.maxlength %>"<% } %>
+                              <% if (field.required) { %>required<% } %>><%= val %></textarea>
+
+                  <% } else if (field.type === 'html') { %>
+                    <%#
+                      Rich text editor.
+
+                      A contenteditable surface with a small toolbar, syncing into
+                      the textarea that actually carries the field name. No editor
+                      library: the project ships no CDN and no third-party JS, and
+                      this is a few dozen lines.
+
+                      The textarea is NOT hidden with display:none - a required but
+                      unfocusable control makes Chrome refuse to submit the form
+                      with "not focusable". It is moved off-screen instead, and
+                      `required` is omitted for html fields because none of them
+                      are mandatory.
+                    %>
+                    <div class="html-editor" data-html-editor>
+                      <div class="html-editor-bar" role="toolbar" aria-label="Formatting">
+                        <button type="button" class="he-btn" data-he-cmd="bold" title="Bold (Ctrl+B)" aria-label="Bold"><strong>B</strong></button>
+                        <button type="button" class="he-btn" data-he-cmd="italic" title="Italic (Ctrl+I)" aria-label="Italic"><em>I</em></button>
+                        <button type="button" class="he-btn" data-he-cmd="underline" title="Underline (Ctrl+U)" aria-label="Underline"><span style="text-decoration:underline">U</span></button>
+                        <span class="he-sep" aria-hidden="true"></span>
+                        <button type="button" class="he-btn" data-he-block="h2" title="Heading 2">H2</button>
+                        <button type="button" class="he-btn" data-he-block="h3" title="Heading 3">H3</button>
+                        <button type="button" class="he-btn" data-he-block="p" title="Paragraph">¶</button>
+                        <span class="he-sep" aria-hidden="true"></span>
+                        <button type="button" class="he-btn" data-he-cmd="insertUnorderedList" title="Bulleted list" aria-label="Bulleted list">• List</button>
+                        <button type="button" class="he-btn" data-he-cmd="insertOrderedList" title="Numbered list" aria-label="Numbered list">1. List</button>
+                        <button type="button" class="he-btn" data-he-block="blockquote" title="Quote">❝</button>
+                        <span class="he-sep" aria-hidden="true"></span>
+                        <button type="button" class="he-btn" data-he-link title="Insert link" aria-label="Insert link">
+                          <svg><use href="#i-external"/></svg>
+                        </button>
+                        <button type="button" class="he-btn" data-he-cmd="unlink" title="Remove link" aria-label="Remove link">⛓</button>
+                        <button type="button" class="he-btn" data-he-cmd="removeFormat" title="Clear formatting" aria-label="Clear formatting">✕</button>
+                        <span class="he-sep" aria-hidden="true"></span>
+                        <button type="button" class="he-btn he-btn-wide" data-he-source title="Edit the raw HTML">Source</button>
+                      </div>
+
+                      <div class="html-editor-surface" id="<%= id %>-surface" contenteditable="true"
+                           role="textbox" aria-multiline="true" aria-label="<%= field.label %>"
+                           data-he-surface><%- val %></div>
+
+                      <%# Off-screen rather than display:none, so it stays submittable. %>
+                      <textarea class="html-editor-store" id="<%= id %>" name="<%= field.key %>"
+                                data-he-store aria-hidden="true" tabindex="-1"><%= val %></textarea>
+                    </div>
+                    <p class="form-hint">
+                      Format with the toolbar, or switch to <strong>Source</strong> to write HTML directly.
+                      Headings and lists help search engines read the page.
+                    </p>
+
+                  <% } else if (field.type === 'list') { %>
+                    <textarea class="form-control" id="<%= id %>" name="<%= field.key %>" rows="7"><%= val %></textarea>
+                    <p class="form-hint"><%= field.help || 'One item per line.' %></p>
+
+                  <% } else if (field.type === 'select') { %>
+                    <select class="form-control" id="<%= id %>" name="<%= field.key %>"
+                            <% if (field.required) { %>required<% } %>>
+                      <% if (field.emptyLabel) { %><option value=""><%= field.emptyLabel %></option><% } %>
+                      <%
+                        var opts = field.optionsFrom && optionSets[field.key]
+                          ? optionSets[field.key].map(function (c) { return { value: c.id, label: c.name }; })
+                          : (field.options || []);
+                      %>
+                      <% opts.forEach(function (opt) { %>
+                        <option value="<%= opt.value %>" <% if (String(val) === String(opt.value)) { %>selected<% } %>><%= opt.label %></option>
+                      <% }); %>
+                    </select>
+
+                  <% } else if (field.type === 'image') { %>
+                    <div class="upload-field">
+                      <img id="<%= id %>-preview" class="upload-preview"
+                           src="<%= val ? helpers.url(val) : helpers.url('/assets/img/service-default.svg') %>"
+                           alt="">
+                      <div style="flex:1;min-width:0">
+                        <input type="file" class="form-control" id="<%= id %>" name="upload"
+                               accept="image/*" data-preview="<%= id %>-preview"
+                               data-max-mb="<%= uploadLimits[resource.uploadFolder].maxMb %>"
+                               <% if (field.required && !val) { %>required<% } %>>
+                        <p class="form-hint">
+                          JPG, PNG, WebP, SVG or GIF, up to <%= uploadLimits[resource.uploadFolder].maxMb %> MB.
+                          <%= field.help || '' %>
+                          <% if (val) { %><br>Leave empty to keep the current image.<% } %>
+                        </p>
+                      </div>
+                    </div>
+
+                  <% } else if (field.type === 'number' || field.type === 'decimal') { %>
+                    <input type="number" class="form-control" id="<%= id %>" name="<%= field.key %>"
+                           value="<%= val %>"
+                           <% if (field.type === 'decimal') { %>step="0.01"<% } else { %>step="1"<% } %>
+                           min="<%= field.min !== undefined ? field.min : 0 %>"
+                           <% if (field.max !== undefined) { %>max="<%= field.max %>"<% } %>
+                           <% if (field.required) { %>required<% } %>>
+
+                  <% } else if (field.type === 'date') { %>
+                    <input type="date" class="form-control" id="<%= id %>" name="<%= field.key %>" value="<%= val %>">
+
+                  <% } else if (field.type === 'slug') { %>
+                    <input type="text" class="form-control" id="<%= id %>" name="<%= field.key %>"
+                           value="<%= val %>" maxlength="200" spellcheck="false"
+                           <% if (field.required) { %>required<% } %>>
+
+                  <% } else { %>
+                    <%
+                      var slugTarget = slugTargetFor(field.key);
+                    %>
+                    <input type="text" class="form-control" id="<%= id %>" name="<%= field.key %>"
+                           value="<%= val %>"
+                           <% if (field.maxlength) { %>maxlength="<%= field.maxlength %>"<% } %>
+                           <% if (field.required) { %>required<% } %>
+                           <% if (slugTarget) { %>data-slug-source data-slug-target="<%= slugTarget %>"<% } %>>
+                  <% } %>
+
+                  <% if (field.help && field.type !== 'list' && field.type !== 'image') { %>
+                    <p class="form-hint"><%= field.help %></p>
+                  <% } %>
+                  <% if (hasError) { %><p class="form-error"><%= err[field.key] %></p><% } %>
+                </div>
+              <% } %>
+            <% }); %>
+          </div>
+        </div>
+      <% }); %>
+
+      <div class="panel">
+        <div class="panel-body" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+          <button type="submit" class="btn btn-primary">
+            <svg><use href="#i-check"/></svg>
+            <%= isEdit ? 'Save changes' : 'Create ' + resource.singular.toLowerCase() %>
+          </button>
+          <a href="<%= url('') %>" class="btn btn-ghost">Cancel</a>
+
+          <% if (isEdit) { %>
+            <span style="margin-left:auto;font-size:.75rem;color:var(--text-soft)">
+              <% if (record.updated_at) { %>Last updated <%= helpers.formatDateTime(record.updated_at) %><% } %>
+            </span>
+          <% } %>
+        </div>
+      </div>
+    </div>
+
+    <%# Side rail: record metadata and a delete action on edit. %>
+    <div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2 style="font-size:.9375rem;font-weight:700;margin:0"><%= isEdit ? 'Details' : 'About' %></h2>
+        </div>
+        <div class="panel-body">
+          <% if (isEdit) { %>
+            <dl class="meta-list">
+              <div><dt>ID</dt><dd>#<%= record.id %></dd></div>
+              <% if (record.slug) { %><div><dt>Slug</dt><dd><code><%= record.slug %></code></dd></div><% } %>
+              <% if (record.created_at) { %><div><dt>Created</dt><dd><%= helpers.formatDateTime(record.created_at) %></dd></div><% } %>
+              <% if (record.views !== undefined) { %><div><dt>Views</dt><dd><%= record.views %></dd></div><% } %>
+            </dl>
+
+            <% if (record.slug && (resourceKey === 'packages' || resourceKey === 'portfolio')) { %>
+              <a href="<%= helpers.url((resourceKey === 'packages' ? '/services/' : '/portfolio/') + record.slug) %>"
+                 target="_blank" rel="noopener" class="btn btn-outline btn-block" style="margin-top:14px">
+                <svg><use href="#i-external"/></svg>
+                View on the site
+              </a>
+            <% } %>
+
+            <% if (resourceKey === 'pages' && record.slug) { %>
+              <a href="<%= helpers.url('/page/' + record.slug) %>" target="_blank" rel="noopener"
+                 class="btn btn-outline btn-block" style="margin-top:14px">
+                <svg><use href="#i-external"/></svg>
+                View page
+              </a>
+            <% } %>
+          <% } else { %>
+            <p style="font-size:.8438rem;color:var(--text-muted);margin:0">
+              <%= resource.description %>
+            </p>
+          <% } %>
+        </div>
+      </div>
+
+      <% if (isEdit) { %>
+        <div class="panel" style="border-color:rgba(224,43,43,.3)">
+          <div class="panel-head">
+            <h2 style="font-size:.9375rem;font-weight:700;margin:0;color:var(--danger)">Danger zone</h2>
+          </div>
+          <div class="panel-body">
+            <p style="font-size:.8125rem;color:var(--text-muted);margin:0 0 12px">
+              Deleting is permanent. Any page still linking to this item will show a broken link.
+            </p>
+            <button type="submit" form="delete-<%= record.id %>" class="btn btn-outline btn-block"
+                    style="border-color:var(--danger);color:var(--danger)"
+                    data-confirm="Delete this <%= resource.singular.toLowerCase() %> permanently?">
+              Delete <%= resource.singular.toLowerCase() %>
+            </button>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</form>
+
+<% if (isEdit) { %>
+  <%# A separate form, because a nested form is invalid HTML and browsers drop it. %>
+  <form id="delete-<%= record.id %>" method="post" action="<%= url('/' + record.id + '/delete') %>" style="display:none">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  </form>
+<% } %>

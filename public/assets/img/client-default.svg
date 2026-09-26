@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="72" viewBox="0 0 220 72" role="img" aria-label="Client logo placeholder">
+  <title>Client</title>
+  <rect width="220" height="72" rx="12" fill="#ffffff" stroke="#e3e5f0" stroke-width="1.5"/>
+  <!-- Neutral monogram block: replaced by a real logo once uploaded -->
+  <rect x="20" y="20" width="32" height="32" rx="9" fill="#c9cde0"/>
+  <rect x="64" y="26" width="104" height="9" rx="4.5" fill="#dfe2ee"/>
+  <rect x="64" y="42" width="68" height="8" rx="4" fill="#eef0f8"/>
+</svg>

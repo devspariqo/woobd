@@ -1,0 +1,37 @@
+<%# Flash messages + a validation error summary.
+    Expects: flash.{success,error,info} from middleware/context, and optionally
+    `errors` (field -> message map) from a failed form submission. %>
+<% if (typeof errors !== 'undefined' && errors && Object.keys(errors).length) { %>
+  <div class="alert alert-error" role="alert">
+    <svg><use href="#i-alert"/></svg>
+    <div>
+      <strong>Please correct the following:</strong>
+      <ul style="margin:7px 0 0 16px;list-style:disc">
+        <% Object.keys(errors).forEach(function (field) { %>
+          <li><%= errors[field] %></li>
+        <% }); %>
+      </ul>
+    </div>
+  </div>
+<% } %>
+
+<% if (flash.success) { %>
+  <div class="alert alert-success" role="status" data-auto-dismiss="6000">
+    <svg><use href="#i-check-circle"/></svg>
+    <div><%= flash.success %></div>
+  </div>
+<% } %>
+
+<% if (flash.error) { %>
+  <div class="alert alert-error" role="alert">
+    <svg><use href="#i-alert"/></svg>
+    <div><%= flash.error %></div>
+  </div>
+<% } %>
+
+<% if (flash.info) { %>
+  <div class="alert alert-info" role="status" data-auto-dismiss="7000">
+    <svg><use href="#i-info"/></svg>
+    <div><%= flash.info %></div>
+  </div>
+<% } %>

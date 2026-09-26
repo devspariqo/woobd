@@ -1,0 +1,200 @@
+<%
+  var price = service.sale_price && Number(service.sale_price) > 0 ? service.sale_price : service.price;
+  var hasSale = service.sale_price && Number(service.sale_price) > 0 && Number(service.sale_price) < Number(service.price);
+  var features = helpers.parseJson(service.features, []);
+  var cycleLabels = { one_time: 'one-time payment', monthly: 'per month', yearly: 'per year' };
+
+  // Recurring packages may carry a minimum commitment and a yearly discount.
+  var isRecurring = service.billing_cycle !== 'one_time';
+  var minMonths = Number(service.min_months) || 1;
+  var yearlyDiscount = Number(service.yearly_discount_percent) || 0;
+%>
+
+<%- include('../partials/page-hero', {
+  pageTitle: service.title,
+  lead: service.short_description,
+  crumbs: [{ label: 'Packages', url: '/services' }, { label: service.title }]
+}) %>
+
+<section class="section">
+  <div class="container">
+    <%- include('../partials/flash') %>
+
+    <div class="split" style="align-items:start;grid-template-columns:1.6fr 1fr">
+      <div>
+        <%# Hero image %>
+        <div style="border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow);margin-bottom:38px">
+          <% if (service.image) { %>
+            <img src="<%= helpers.url(service.image) %>" alt="<%= service.title %>" width="900" height="506" style="width:100%">
+          <% } else { %>
+            <img src="<%= helpers.url('/assets/img/service-default.svg') %>" alt="<%= service.title %>" width="900" height="506" style="width:100%">
+          <% } %>
+        </div>
+
+        <% if (service.category_name) { %>
+          <span class="eyebrow"><%= service.category_name %></span>
+        <% } %>
+
+        <h2 class="mb-4">About this package</h2>
+
+        <div class="prose" style="font-size:1.0313rem;line-height:1.8;color:var(--text-muted)">
+          <%# Description is authored in the admin rich-text field and rendered as
+              stored; it is trusted staff content, not user input. %>
+          <%- service.description || '<p>' + helpers.excerpt(service.short_description, 400) + '</p>' %>
+        </div>
+
+        <% if (features.length) { %>
+          <h3 class="mb-4" style="margin-top:44px">What's included</h3>
+          <ul class="check-list">
+            <% features.forEach(function (feature) { %>
+              <li>
+                <span class="tick"><svg><use href="#i-check"/></svg></span>
+                <span><%= feature %></span>
+              </li>
+            <% }); %>
+          </ul>
+        <% } %>
+
+        <% if (deliverables.length) { %>
+          <h3 class="mb-4" style="margin-top:44px">What we hand over</h3>
+          <ul class="check-list">
+            <% deliverables.forEach(function (item) { %>
+              <li>
+                <span class="tick"><svg><use href="#i-check"/></svg></span>
+                <span><%= item %></span>
+              </li>
+            <% }); %>
+          </ul>
+        <% } %>
+      </div>
+
+      <%# Sticky order panel %>
+      <aside style="position:sticky;top:calc(var(--header-h) + 24px)">
+        <div class="card card-flat">
+          <div class="card-body-lg">
+            <% if (service.is_featured) { %>
+              <span class="pill pill-info" style="margin-bottom:14px">Most popular</span>
+            <% } %>
+
+            <div class="package-price" style="border-bottom:1px solid var(--border);padding-bottom:20px">
+              <span class="amount" style="font-size:2.25rem"><%= helpers.money(price, site.currency) %></span>
+              <% if (hasSale) { %><span class="was"><%= helpers.money(service.price, site.currency) %></span><% } %>
+            </div>
+            <p style="font-size:.875rem;color:var(--text-soft);margin-bottom:14px">
+              <%= cycleLabels[service.billing_cycle] %>
+              <% if (service.delivery_days) { %> · delivered in <%= service.delivery_days %> days<% } %>
+            </p>
+
+            <% if (isRecurring && (minMonths > 1 || yearlyDiscount > 0)) { %>
+              <%
+                // Show the terms as concrete numbers rather than making the
+                // customer do the arithmetic at checkout.
+                var minTotal = Number(price) * minMonths;
+                var yearGross = Number(price) * 12;
+                var yearSaving = Math.round(yearGross * yearlyDiscount / 100);
+                var yearTotal = yearGross - yearSaving;
+              %>
+              <div class="package-terms-box">
+                <% if (minMonths > 1) { %>
+                  <div class="package-terms-row">
+                    <span>Minimum term</span>
+                    <strong><%= minMonths %> months</strong>
+                  </div>
+                  <div class="package-terms-row">
+                    <span>To start (<%= minMonths %> × <%= helpers.money(price, site.currency) %>)</span>
+                    <strong><%= helpers.money(minTotal, site.currency) %></strong>
+                  </div>
+                <% } %>
+                <% if (yearlyDiscount > 0) { %>
+                  <div class="package-terms-row is-save">
+                    <span>Pay yearly (<%= yearlyDiscount %>% off)</span>
+                    <strong><%= helpers.money(yearTotal, site.currency) %></strong>
+                  </div>
+                  <div class="package-terms-row is-save">
+                    <span>You save</span>
+                    <strong><%= helpers.money(yearSaving, site.currency) %></strong>
+                  </div>
+                <% } %>
+              </div>
+            <% } %>
+
+            <a href="<%= isCustomer ? helpers.url('/account/checkout/' + service.id) : helpers.url('/signup?package=' + service.slug) %>"
+               class="btn btn-primary btn-block btn-lg">
+              <%= isCustomer ? 'Order this package' : 'Sign up to order' %>
+              <svg><use href="#i-arrow-right"/></svg>
+            </a>
+
+            <a href="<%= helpers.url('/contact?package=' + encodeURIComponent(service.title)) %>" class="btn btn-outline btn-block" style="margin-top:11px">
+              <svg><use href="#i-message-square"/></svg>
+              Ask a question
+            </a>
+
+            <ul class="feature-list" style="margin-top:26px;margin-bottom:0;padding-top:24px;border-top:1px solid var(--border)">
+              <li><svg><use href="#i-check"/></svg><span>Fixed price — no hidden charges</span></li>
+              <li><svg><use href="#i-check"/></svg><span>Revisions included before launch</span></li>
+              <li><svg><use href="#i-check"/></svg><span>Support after your site goes live</span></li>
+            </ul>
+          </div>
+        </div>
+
+        <%# Payment methods %>
+        <div class="card card-flat mt-5">
+          <div class="card-body">
+            <h4 class="mb-4" style="font-size:1rem">Accepted payments</h4>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+              <% if (payments.bkash.enabled) { %><span class="pill pill-muted no-dot">bKash</span><% } %>
+              <% if (payments.nagad.enabled) { %><span class="pill pill-muted no-dot">Nagad</span><% } %>
+              <% if (payments.rocket.enabled) { %><span class="pill pill-muted no-dot">Rocket</span><% } %>
+              <% if (payments.card.enabled) { %><span class="pill pill-muted no-dot">Card</span><% } %>
+            </div>
+            <p style="font-size:.8125rem;color:var(--text-soft);margin-top:14px">
+              Manual wallet transfers are verified within 24 hours.
+            </p>
+          </div>
+        </div>
+
+        <div class="card card-flat mt-5">
+          <div class="card-body">
+            <h4 class="mb-4" style="font-size:1rem">Need help deciding?</h4>
+            <a href="tel:<%= site.phone.replace(/\s/g, '') %>" class="footer-links" style="color:var(--text-muted)">
+              <span style="display:flex;align-items:center;gap:9px;font-size:.875rem">
+                <svg style="width:15px;height:15px;color:var(--primary)"><use href="#i-phone"/></svg>
+                <%= site.phone %>
+              </span>
+            </a>
+            <a href="<%= site.whatsappLink %>" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:9px;font-size:.875rem;color:var(--text-muted);margin-top:11px">
+              <svg style="width:15px;height:15px;color:var(--success)"><use href="#i-whatsapp"/></svg>
+              WhatsApp
+            </a>
+            <a href="mailto:<%= site.email %>" style="display:flex;align-items:center;gap:9px;font-size:.875rem;color:var(--text-muted);margin-top:11px">
+              <svg style="width:15px;height:15px;color:var(--primary)"><use href="#i-mail"/></svg>
+              <%= site.email %>
+            </a>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <% if (related.length) { %>
+      <div style="margin-top:72px">
+        <h2 class="mb-5">Other packages</h2>
+        <div class="grid grid-3">
+          <% related.forEach(function (item) { %>
+            <%- include('../partials/service-card', { service: item }) %>
+          <% }); %>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</section>
+
+<%#
+  Structured data for this page is built by buildServiceSchema() in
+  public.controller.js and passed as `extraHead`, so it renders in the <head>
+  where structured data belongs. An identical Product block used to live here
+  as well, which meant the page emitted two entities describing the same
+  package - something Google warns about. Removed in favour of the one in the
+  head. Do not re-add it here.
+%>
+
+<%- include('../partials/cta-band') %>

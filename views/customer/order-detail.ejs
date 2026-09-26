@@ -1,0 +1,325 @@
+<%
+  const cur = site.currency;
+  const money = helpers.money;
+  const paid = payments.filter(function (p) { return p.status === 'approved'; });
+  const paidTotal = paid.reduce(function (sum, p) { return sum + Number(p.amount); }, 0);
+  const balance = Math.max(0, Number(order.total) - paidTotal);
+
+  // Map the order status onto the four-step delivery pipeline so the customer
+  // sees a plain-English stage rather than the raw enum.
+  const stageIndex = { pending: 0, in_progress: 1, on_hold: 1, active: 2, completed: 3, cancelled: 0 }[order.status];
+  const stages = [
+    ['Order placed', 'We received your order and it is queued for a project manager.'],
+    ['In development', 'Our team is designing and building your store.'],
+    ['Live', 'Your website is online and your login details are below.'],
+    ['Completed', 'Project delivered and signed off. Support continues per your plan.']
+  ];
+%>
+
+<div class="two-col">
+  <div>
+    <%# ------------------------------------------------------------------
+        Handover panel. Only populated once an admin activates the order and
+        attaches deliverables.
+        ------------------------------------------------------------------ %>
+    <% if (order.status === 'active' || order.status === 'completed') { %>
+      <div class="panel" style="margin-bottom:22px">
+        <div class="panel-head">
+          <div>
+            <h2><svg style="width:17px;height:17px;vertical-align:-3px;color:var(--success)"><use href="#i-lock"/></svg> Your website access</h2>
+            <p>Save these details somewhere safe. Do not share them publicly.</p>
+          </div>
+          <span class="pill pill-success"><%= helpers.humanise(order.status) %></span>
+        </div>
+        <div class="panel-body">
+          <% if (deliverables && deliverables.length) { %>
+            <% deliverables.forEach(function (item) { %>
+              <div class="cred-row">
+                <span class="label"><%= item.label %></span>
+                <span class="value"><%= item.value || '—' %></span>
+                <% if (item.value) { %>
+                  <button type="button" class="copy-btn" data-copy="<%= helpers.escapeHtml(item.value) %>">Copy</button>
+                <% } %>
+              </div>
+            <% }); %>
+
+            <%# Anything the admin marked hidden stays hidden - filtered out of
+                `deliverables` server-side, so nothing sensitive leaks here. %>
+            <% if (allDeliverables.length > deliverables.length) { %>
+              <p style="font-size:.8125rem;color:var(--text-soft);margin:14px 0 0">
+                Your project manager holds <%= allDeliverables.length - deliverables.length %> further
+                detail<%= (allDeliverables.length - deliverables.length) > 1 ? 's' : '' %> that is not shown here.
+                Message us if you need access.
+              </p>
+            <% } %>
+          <% } else { %>
+            <div class="alert alert-info" style="margin:0">
+              <svg><use href="#i-info"/></svg>
+              <div>
+                Your order is active but the access details have not been attached yet.
+                They normally appear within a few minutes — refresh this page, or
+                <a href="<%= site.whatsappLink %>" target="_blank" rel="noopener">message us on WhatsApp</a>.
+              </div>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    <% } %>
+
+    <%# ---- Delivery pipeline ---- %>
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-head">
+        <div>
+          <h3>Project progress</h3>
+          <p><%= stages[stageIndex][1] %></p>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="timeline">
+          <% stages.forEach(function (stage, i) { %>
+            <% if (order.status === 'cancelled') { %>
+              <div class="timeline-item">
+                <div class="title">Order cancelled</div>
+                <div class="desc">This order was cancelled. Contact us if that was not intended.</div>
+              </div>
+            <% } else { %>
+              <div class="timeline-item <%= i < stageIndex ? 'done' : (i === stageIndex ? 'current' : '') %>">
+                <div class="title"><%= stage[0] %></div>
+                <div class="desc">
+                  <% if (i === stageIndex) { %>
+                    <%= stage[1] %>
+                  <% } else if (i < stageIndex) { %>
+                    Completed
+                  <% } else { %>
+                    Pending
+                  <% } %>
+                </div>
+              </div>
+            <% } %>
+          <% }); %>
+        </div>
+      </div>
+    </div>
+
+    <%# ---- Requirements the customer supplied ---- %>
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-head">
+        <div>
+          <h3>What you asked for</h3>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div style="font-size:.9375rem;line-height:1.75;white-space:pre-wrap"><%= order.requirements || 'No requirements were recorded.' %></div>
+
+        <% if (order.notes) { %>
+          <div style="margin-top:18px;padding-top:18px;border-top:1px solid var(--border)">
+            <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-soft);margin-bottom:7px">Your notes</div>
+            <div style="font-size:.9375rem;line-height:1.75;white-space:pre-wrap"><%= order.notes %></div>
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+    <%# ---- Activity ---- %>
+    <% if (timeline && timeline.length) { %>
+      <div class="panel">
+        <div class="panel-head">
+          <div><h3>Activity</h3></div>
+        </div>
+        <div class="panel-body">
+          <div class="timeline">
+            <% timeline.forEach(function (entry) { %>
+              <div class="timeline-item done">
+                <div class="title"><%= helpers.humanise(entry.action.replace('order.', '')) %></div>
+                <div class="desc">
+                  <span data-relative="<%= new Date(entry.created_at).toISOString() %>"><%= helpers.timeAgo(entry.created_at) %></span>
+                  <% if (entry.description) { %> · <%= helpers.excerpt(entry.description, 140) %><% } %>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        </div>
+      </div>
+    <% } %>
+  </div>
+
+  <%# ---- Summary rail ---- %>
+  <div>
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-head">
+        <div><h3>Summary</h3></div>
+        <span class="pill pill-<%= helpers.statusTone(order.status) %>"><%= helpers.humanise(order.status) %></span>
+      </div>
+      <div class="panel-body">
+        <dl style="margin:0;font-size:.875rem">
+          <div class="row-between" style="padding:9px 0;border-bottom:1px solid var(--border)">
+            <dt style="color:var(--text-soft)">Order number</dt>
+            <dd style="margin:0;font-weight:600"><%= order.order_number %></dd>
+          </div>
+          <div class="row-between" style="padding:9px 0;border-bottom:1px solid var(--border)">
+            <dt style="color:var(--text-soft)">Package</dt>
+            <dd style="margin:0;font-weight:600;text-align:right;max-width:60%"><%= helpers.excerpt(order.service_title, 30) %></dd>
+          </div>
+          <div class="row-between" style="padding:9px 0;border-bottom:1px solid var(--border)">
+            <dt style="color:var(--text-soft)">Billing</dt>
+            <dd style="margin:0;font-weight:600"><%= helpers.humanise(order.billing_cycle) %></dd>
+          </div>
+          <% if (order.domain_name) { %>
+            <div class="row-between" style="padding:9px 0;border-bottom:1px solid var(--border)">
+              <dt style="color:var(--text-soft)">Domain</dt>
+              <dd style="margin:0;font-weight:600;word-break:break-all;text-align:right;max-width:60%"><%= order.domain_name %></dd>
+            </div>
+          <% } %>
+          <div class="row-between" style="padding:9px 0;border-bottom:1px solid var(--border)">
+            <dt style="color:var(--text-soft)">Placed</dt>
+            <dd style="margin:0;font-weight:600"><%= helpers.formatDate(order.created_at) %></dd>
+          </div>
+          <% if (order.due_at) { %>
+            <div class="row-between" style="padding:9px 0;border-bottom:1px solid var(--border)">
+              <dt style="color:var(--text-soft)"><%= order.status === 'active' ? 'Next renewal' : 'Due by' %></dt>
+              <dd style="margin:0;font-weight:600"><%= helpers.formatDate(order.due_at) %></dd>
+            </div>
+          <% } %>
+          <div class="row-between" style="padding:9px 0">
+            <dt style="color:var(--text-soft)">Payment</dt>
+            <dd style="margin:0"><span class="pill pill-<%= helpers.statusTone(order.payment_status) %>"><%= helpers.humanise(order.payment_status) %></span></dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-head">
+        <div><h3>Payment</h3></div>
+      </div>
+      <div class="panel-body">
+        <% if (Number(order.discount) > 0) { %>
+          <div class="row-between" style="font-size:.875rem;padding:5px 0">
+            <span style="color:var(--text-soft)">Amount</span>
+            <span><%= money(order.amount, cur) %></span>
+          </div>
+          <div class="row-between" style="font-size:.875rem;padding:5px 0">
+            <span style="color:var(--text-soft)">Discount</span>
+            <span style="color:var(--success)">−<%= money(order.discount, cur) %></span>
+          </div>
+        <% } %>
+        <div class="row-between" style="font-size:.875rem;padding:5px 0">
+          <span style="color:var(--text-soft)">Order total</span>
+          <span style="font-weight:600"><%= money(order.total, cur) %></span>
+        </div>
+        <div class="row-between" style="font-size:.875rem;padding:5px 0;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:12px">
+          <span style="color:var(--text-soft)">Paid so far</span>
+          <span style="color:var(--success);font-weight:600"><%= money(paidTotal, cur) %></span>
+        </div>
+        <div class="row-between" style="padding:2px 0 16px">
+          <span style="font-weight:600">Balance due</span>
+          <span style="font-size:1.25rem;font-weight:800;color:<%= balance > 0 ? 'var(--warning)' : 'var(--success)' %>"><%= money(balance, cur) %></span>
+        </div>
+
+        <% if (balance > 0 && order.status !== 'cancelled') { %>
+          <a href="<%= helpers.url('/account/orders/' + order.id + '/pay') %>" class="btn btn-primary btn-block">
+            <svg><use href="#i-credit-card"/></svg> Submit payment
+          </a>
+        <% } else if (order.status !== 'cancelled') { %>
+          <div class="alert alert-success" style="margin:0;padding:11px 13px">
+            <svg><use href="#i-check-circle"/></svg>
+            <div style="font-size:.875rem">Paid in full. Thank you!</div>
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+    <%# ---- Invoices ---- %>
+    <% if (invoices && invoices.length) { %>
+      <div class="panel" style="margin-bottom:22px">
+        <div class="panel-head">
+          <div><h3>Invoices</h3></div>
+        </div>
+        <div class="panel-body">
+          <% invoices.forEach(function (invoice, i) { %>
+            <div class="row-between" style="gap:10px;padding:<%= i ? '12px 0 0' : '0' %>">
+              <div style="min-width:0">
+                <a href="<%= helpers.url('/account/invoices/' + invoice.id) %>" style="font-weight:600;font-size:.875rem"><%= invoice.invoice_number %></a>
+                <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px">
+                  Issued <%= helpers.formatDate(invoice.issue_date) %>
+                  <% if (invoice.due_date) { %> · due <%= helpers.formatDate(invoice.due_date) %><% } %>
+                </div>
+              </div>
+              <div style="text-align:right;flex-shrink:0">
+                <div style="font-weight:700;font-size:.875rem"><%= money(invoice.total, cur) %></div>
+                <span class="pill pill-<%= helpers.statusTone(invoice.status) %>"><%= helpers.humanise(invoice.status) %></span>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+    <% } %>
+
+    <%# ---- Payment history ---- %>
+    <% if (payments && payments.length) { %>
+      <div class="panel" style="margin-bottom:22px">
+        <div class="panel-head">
+          <div><h3>Payment history</h3></div>
+        </div>
+        <div class="panel-body">
+          <% payments.forEach(function (payment, i) { %>
+            <div style="padding:<%= i ? '13px 0 0' : '0' %>;margin-bottom:<%= i === payments.length - 1 ? '0' : '13px' %>;border-bottom:<%= i === payments.length - 1 ? 'none' : '1px solid var(--border)' %>">
+              <div class="row-between" style="gap:10px">
+                <div style="font-weight:600;font-size:.875rem"><%= payment.method %></div>
+                <div style="font-weight:700;font-size:.875rem"><%= money(payment.amount, cur) %></div>
+              </div>
+              <div style="font-size:.75rem;color:var(--text-soft);margin-top:3px;display:flex;gap:9px;align-items:center;flex-wrap:wrap">
+                <span><%= helpers.formatDateTime(payment.created_at) %></span>
+                <span class="pill pill-<%= helpers.statusTone(payment.status) %>"><%= helpers.humanise(payment.status) %></span>
+              </div>
+              <% if (payment.transaction_id) { %>
+                <div style="font-size:.75rem;color:var(--text-soft);margin-top:3px;font-family:ui-monospace,monospace">
+                  TrxID: <%= payment.transaction_id %>
+                </div>
+              <% } %>
+              <% if (payment.admin_note) { %>
+                <div style="font-size:.78rem;color:var(--text-muted);margin-top:5px;font-style:italic">Note from us: <%= payment.admin_note %></div>
+              <% } %>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+    <% } %>
+
+    <%# ---- Subscription ---- %>
+    <% if (subscription) { %>
+      <div class="panel" style="margin-bottom:22px">
+        <div class="panel-head">
+          <div><h3>Subscription</h3></div>
+          <span class="pill pill-<%= helpers.statusTone(subscription.status) %>"><%= helpers.humanise(subscription.status) %></span>
+        </div>
+        <div class="panel-body" style="font-size:.875rem">
+          <div class="row-between" style="padding:6px 0">
+            <span style="color:var(--text-soft)"><%= helpers.humanise(subscription.billing_cycle) %> amount</span>
+            <span style="font-weight:600"><%= money(subscription.amount, cur) %></span>
+          </div>
+          <div class="row-between" style="padding:6px 0">
+            <span style="color:var(--text-soft)">Started</span>
+            <span><%= helpers.formatDate(subscription.started_at) %></span>
+          </div>
+          <div class="row-between" style="padding:6px 0">
+            <span style="color:var(--text-soft)">Next billing</span>
+            <span><%= subscription.next_billing_at ? helpers.formatDate(subscription.next_billing_at) : '—' %></span>
+          </div>
+          <a href="<%= helpers.url('/account/subscriptions') %>" class="btn btn-outline btn-sm btn-block" style="margin-top:12px">Manage plan</a>
+        </div>
+      </div>
+    <% } %>
+
+    <div class="panel">
+      <div class="panel-body">
+        <div style="font-size:.8125rem;color:var(--text-soft);line-height:1.7;margin-bottom:13px">
+          Something wrong with this order? Open a ticket and we will pick it up.
+        </div>
+        <a href="<%= helpers.url('/account/tickets/new?order_id=' + order.id) %>" class="btn btn-outline btn-block btn-sm">
+          <svg><use href="#i-ticket"/></svg> Get support
+        </a>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,136 @@
+<%
+  const url = function (p) { return helpers.url('/' + adminPath + '/profile' + p); };
+  const roleTone = { admin: 'danger', manager: 'warning', editor: 'info' };
+%>
+
+<div class="two-col" style="align-items:start">
+  <div>
+    <div class="panel" style="margin-bottom:20px">
+      <div class="panel-head">
+        <h2 style="font-size:.9375rem;font-weight:700;margin:0">Your details</h2>
+      </div>
+      <form method="post" action="<%= url('') %>" enctype="multipart/form-data" data-validate>
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="panel-body">
+          <div class="upload-field" style="margin-bottom:20px">
+            <img id="avatar-preview" class="upload-preview"
+                 src="<%= me.avatar ? helpers.url(me.avatar) : helpers.url('/assets/img/client-default.svg') %>" alt="">
+            <div style="flex:1;min-width:0">
+              <label class="form-label" for="avatar">Profile photo</label>
+              <input type="file" class="form-control" id="avatar" name="upload" accept="image/*" data-max-mb="<%= uploadLimits.avatars.maxMb %>"
+                     data-preview="avatar-preview">
+              <p class="form-hint">Square images work best. Leave empty to keep the current photo.</p>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="p-name">Full name <span class="req">*</span></label>
+              <input type="text" class="form-control" id="p-name" name="name" value="<%= me.name %>"
+                     required maxlength="120">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="p-phone">Phone <span class="optional">optional</span></label>
+              <input type="text" class="form-control" id="p-phone" name="phone" value="<%= me.phone || '' %>" maxlength="30">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="p-email">Email address <span class="req">*</span></label>
+            <input type="email" class="form-control" id="p-email" name="email" value="<%= me.email %>"
+                   required maxlength="191">
+            <p class="form-hint">Used for password resets and notifications.</p>
+          </div>
+        </div>
+        <div class="panel-foot">
+          <button type="submit" class="btn btn-primary">
+            <svg><use href="#i-check"/></svg> Save profile
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2 style="font-size:.9375rem;font-weight:700;margin:0">Change password</h2>
+      </div>
+      <form method="post" action="<%= url('/password') %>" data-validate>
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="panel-body">
+          <div class="form-group">
+            <label class="form-label" for="cur-password">Current password <span class="req">*</span></label>
+            <div class="input-group">
+              <input type="password" class="form-control" id="cur-password" name="current_password"
+                     required autocomplete="current-password">
+              <button type="button" class="input-action" data-toggle-password="cur-password" aria-label="Show password">
+                <svg><use href="#i-eye"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="new-password">New password <span class="req">*</span></label>
+              <div class="input-group">
+                <input type="password" class="form-control" id="new-password" name="new_password"
+                       required autocomplete="new-password" data-strength-source>
+                <button type="button" class="input-action" data-toggle-password="new-password" aria-label="Show password">
+                  <svg><use href="#i-eye"/></svg>
+                </button>
+              </div>
+              <div class="strength" aria-hidden="true"><span class="strength-bar"></span></div>
+              <p class="form-hint strength-text">At least 8 characters.</p>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="confirm-password">Confirm new password <span class="req">*</span></label>
+              <div class="input-group">
+                <input type="password" class="form-control" id="confirm-password" name="confirm_password"
+                       required autocomplete="new-password">
+                <button type="button" class="input-action" data-toggle-password="confirm-password" aria-label="Show password">
+                  <svg><use href="#i-eye"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="panel-foot">
+          <button type="submit" class="btn btn-primary">
+            <svg><use href="#i-lock"/></svg> Change password
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel">
+      <div class="panel-head"><h2 style="font-size:.9375rem;font-weight:700;margin:0">Account</h2></div>
+      <div class="panel-body">
+        <div class="table-product" style="margin-bottom:16px">
+          <img src="<%= me.avatar ? helpers.url(me.avatar) : helpers.url('/assets/img/client-default.svg') %>" alt="">
+          <div>
+            <div class="strong"><%= me.name %></div>
+            <div style="font-size:.75rem;color:var(--text-soft);word-break:break-all"><%= me.email %></div>
+          </div>
+        </div>
+
+        <dl class="meta-list">
+          <div><dt>Username</dt><dd><code><%= me.username %></code></dd></div>
+          <div><dt>Role</dt><dd><span class="pill pill-<%= roleTone[me.role] || 'muted' %>"><%= helpers.humanise(me.role) %></span></dd></div>
+          <div><dt>Status</dt><dd><%= helpers.humanise(me.status) %></dd></div>
+          <% if (me.last_login_at) { %>
+            <div><dt>Last sign-in</dt><dd><%= helpers.formatDateTime(me.last_login_at) %></dd></div>
+          <% } %>
+          <% if (me.last_login_ip) { %>
+            <div><dt>Last IP</dt><dd><code><%= me.last_login_ip %></code></dd></div>
+          <% } %>
+          <div><dt>Member since</dt><dd><%= helpers.formatDate(me.created_at) %></dd></div>
+        </dl>
+
+        <a href="<%= helpers.url('/' + adminPath + '/logout') %>" class="btn btn-outline btn-block" style="margin-top:16px">
+          <svg><use href="#i-log-out"/></svg> Sign out
+        </a>
+      </div>
+    </div>
+  </div>
+</div>

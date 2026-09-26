@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= pageTitle %> - <%= site.name %></title>
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="icon" type="image/svg+xml" href="<%= site.favicon %>">
+  <link rel="stylesheet" href="<%= helpers.url('/assets/css/theme.css') %>">
+
+  <%# Self-contained document styling. The print layout deliberately does not
+      pull in dashboard.css: this page is rendered as paper, and the screen
+      chrome would only fight the print rules. %>
+  <style>
+    :root {
+      --primary: <%= theme.primary %>;
+      --text: #12131a;
+      --muted: #5d6175;
+      --border: #e2e4ee;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      background: #f2f3f7;
+      color: var(--text);
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    .sheet {
+      max-width: 820px;
+      margin: 0 auto 26px;
+      padding: 48px 52px;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 24px rgba(20, 22, 40, .09);
+    }
+
+    .doc-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 30px;
+      padding-bottom: 26px;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 30px;
+    }
+    .doc-head .brand img { max-height: 46px; width: auto; display: block; }
+    .doc-head .brand address {
+      font-style: normal;
+      font-size: .8125rem;
+      color: var(--muted);
+      margin-top: 12px;
+      line-height: 1.75;
+    }
+    .doc-head .doc-meta { text-align: right; flex-shrink: 0; }
+    .doc-head .doc-meta h1 {
+      font-size: 1.75rem;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      margin: 0 0 10px;
+      color: var(--primary);
+    }
+    .doc-head .doc-meta dl { margin: 0; font-size: .875rem; }
+    .doc-head .doc-meta dt { color: var(--muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; }
+    .doc-head .doc-meta dd { margin: 0 0 8px; font-weight: 600; }
+    .doc-head .doc-meta dd:last-child { margin-bottom: 0; }
+
+    .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; margin-bottom: 30px; }
+    .parties h2 {
+      font-size: .75rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--muted);
+      margin: 0 0 9px;
+      font-weight: 700;
+    }
+    .parties p { margin: 0 0 3px; font-size: .9063rem; }
+    .parties .name { font-weight: 700; }
+    .parties .soft { color: var(--muted); font-size: .8438rem; }
+
+    table.items { width: 100%; border-collapse: collapse; margin-bottom: 22px; }
+    table.items th {
+      text-align: left;
+      font-size: .75rem;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--muted);
+      padding: 11px 12px;
+      border-bottom: 2px solid var(--border);
+    }
+    table.items th.num, table.items td.num { text-align: right; }
+    table.items td { padding: 13px 12px; border-bottom: 1px solid var(--border); font-size: .9063rem; }
+    table.items tbody tr:last-child td { border-bottom: 2px solid var(--border); }
+
+    .totals { display: flex; justify-content: flex-end; margin-bottom: 30px; }
+    .totals table { min-width: 280px; border-collapse: collapse; }
+    .totals td { padding: 7px 0; font-size: .9063rem; }
+    .totals td:last-child { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .totals tr.grand td {
+      padding-top: 13px;
+      border-top: 2px solid var(--text);
+      font-size: 1.125rem;
+      font-weight: 800;
+      color: var(--primary);
+    }
+
+    .stamp {
+      display: inline-block;
+      padding: 5px 15px;
+      border-radius: 999px;
+      font-size: .8125rem;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      border: 2px solid currentColor;
+    }
+    .stamp.paid { color: #0f9d58; }
+    .stamp.unpaid { color: #f0a020; }
+    .stamp.draft, .stamp.void { color: var(--muted); }
+    .stamp.refunded { color: #3884ff; }
+
+    .doc-note {
+      padding: 16px 18px;
+      background: #f7f8fc;
+      border-left: 4px solid var(--primary);
+      border-radius: 6px;
+      font-size: .875rem;
+      color: #3d4055;
+      margin-bottom: 26px;
+    }
+    .doc-note strong { display: block; margin-bottom: 5px; }
+
+    .doc-foot {
+      margin-top: 34px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      font-size: .8125rem;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.8;
+    }
+    .doc-foot a { color: var(--primary); text-decoration: none; }
+
+    .doc-actions { max-width: 820px; margin: 0 auto; display: flex; gap: 11px; justify-content: flex-end; flex-wrap: wrap; }
+    .btn-print {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 22px;
+      border-radius: 8px;
+      font-size: .9063rem;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      border: 0;
+      font-family: inherit;
+      background: var(--primary);
+      color: #fff;
+    }
+    .btn-print.ghost { background: #fff; color: var(--text); border: 1.5px solid var(--border); }
+
+    @media (max-width: 640px) {
+      body { padding: 18px 10px; }
+      .sheet { padding: 26px 20px; }
+      .doc-head { flex-direction: column; }
+      .doc-head .doc-meta { text-align: left; }
+      .parties { grid-template-columns: 1fr; gap: 18px; }
+    }
+
+    @media print {
+      body { background: #fff; padding: 0; font-size: 12pt; }
+      .sheet { box-shadow: none; border-radius: 0; padding: 0; margin: 0; max-width: none; }
+      .doc-actions { display: none; }
+      .stamp { border-width: 1.5px; }
+      a { color: inherit; text-decoration: none; }
+      @page { margin: 16mm; }
+    }
+  </style>
+</head>
+<body>
+
+  <main class="sheet">
+    <%- body %>
+  </main>
+
+  <div class="doc-actions">
+    <a href="<%= helpers.url('/account/invoices') %>" class="btn-print ghost">Back to invoices</a>
+    <button type="button" class="btn-print" data-print>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polyline points="6 9 6 2 18 2 18 9"/>
+        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+        <rect x="6" y="14" width="12" height="8"/>
+      </svg>
+      Print / Save as PDF
+    </button>
+  </div>
+
+  <script>
+    (function () {
+      var button = document.querySelector('[data-print]');
+      if (button) button.addEventListener('click', function () { window.print(); });
+    })();
+  </script>
+</body>
+</html>

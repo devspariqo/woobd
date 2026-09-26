@@ -1,0 +1,166 @@
+<%
+  const num = function (v) { return Number(v || 0); };
+  const cur = site.currency;
+  const money = helpers.money;
+  const maxRevenue = Math.max(1, (trend || []).reduce(function (m, r) { return Math.max(m, Number(r.revenue)); }, 0));
+  const maxOrders = Math.max(1, (trend || []).reduce(function (m, r) { return Math.max(m, Number(r.orders)); }, 0));
+  const methodTotal = Math.max(1, (byMethod || []).reduce(function (m, r) { return Math.max(m, Number(r.total)); }, 0));
+%>
+
+<div class="row-between" style="gap:13px;flex-wrap:wrap;margin-bottom:20px">
+  <div class="tab-bar" style="margin:0">
+    <% [6, 12, 24].forEach(function (option) { %>
+      <a href="<%= helpers.url('/' + adminPath + '/analytics?months=' + option) %>"
+         class="<%= Number(option) === Number(months) ? 'active' : '' %>"><%= option %> months</a>
+    <% }); %>
+  </div>
+</div>
+
+<div class="stat-grid">
+  <div class="stat-tile">
+    <div class="ico tone-primary"><svg><use href="#i-shopping-cart"/></svg></div>
+    <div>
+      <div class="value"><%= num(stats && stats.total) %></div>
+      <div class="label">Lifetime orders</div>
+    </div>
+  </div>
+  <div class="stat-tile">
+    <div class="ico tone-success"><svg><use href="#i-dollar"/></svg></div>
+    <div>
+      <div class="value"><%= money(stats ? stats.gross_value : 0, cur) %></div>
+      <div class="label">Gross value</div>
+    </div>
+  </div>
+  <div class="stat-tile">
+    <div class="ico tone-info"><svg><use href="#i-trending-up"/></svg></div>
+    <div>
+      <%
+        var avg = num(stats && stats.total) > 0
+          ? num(stats.gross_value) / num(stats.total)
+          : 0;
+      %>
+      <div class="value"><%= money(avg, cur) %></div>
+      <div class="label">Average order</div>
+    </div>
+  </div>
+  <div class="stat-tile">
+    <div class="ico tone-warning"><svg><use href="#i-users"/></svg></div>
+    <div>
+      <div class="value"><%= (signupTrend || []).reduce(function (s, r) { return s + Number(r.total); }, 0) %></div>
+      <div class="label">Signups in range</div>
+    </div>
+  </div>
+</div>
+
+<div class="panel" style="margin-bottom:22px">
+  <div class="panel-head">
+    <div>
+      <h3>Orders &amp; revenue by month</h3>
+      <p>Bars are revenue; the smaller bars are order count, same scale per group.</p>
+    </div>
+  </div>
+  <div class="panel-body">
+    <% if (trend && trend.length) { %>
+      <div class="table-wrap">
+        <table class="dash-table" style="min-width:560px">
+          <thead>
+            <tr>
+              <th>Month</th>
+              <th>Revenue</th>
+              <th>Orders</th>
+              <th class="num">Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% trend.forEach(function (row) { %>
+              <tr>
+                <td class="strong" style="white-space:nowrap"><%= row.period %></td>
+                <td style="min-width:180px">
+                  <div style="height:9px;border-radius:999px;background:var(--bg-alt);overflow:hidden">
+                    <div style="height:100%;width:<%= Math.round((Number(row.revenue) / maxRevenue) * 100) %>%;background:linear-gradient(90deg,var(--primary),var(--primary-dark));border-radius:999px"></div>
+                  </div>
+                </td>
+                <td style="min-width:140px">
+                  <div style="height:9px;border-radius:999px;background:var(--bg-alt);overflow:hidden">
+                    <div style="height:100%;width:<%= Math.round((Number(row.orders) / maxOrders) * 100) %>%;background:var(--success);border-radius:999px"></div>
+                  </div>
+                </td>
+                <td class="num strong"><%= money(row.revenue, cur) %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } else { %>
+      <div class="empty-state" style="padding:42px 20px">
+        <div class="ico"><svg><use href="#i-bar-chart"/></svg></div>
+        <h3 style="font-size:1rem">No data in this range</h3>
+        <p style="font-size:.875rem">Widen the date range or wait for orders to come in.</p>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<div class="two-col">
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <h3>Revenue by package</h3>
+      </div>
+    </div>
+    <% if (byService && byService.length) { %>
+      <div class="table-wrap">
+        <table class="dash-table">
+          <thead>
+            <tr>
+              <th>Package</th>
+              <th class="num">Orders</th>
+              <th class="num">Revenue</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% byService.forEach(function (row) { %>
+              <tr>
+                <td class="strong"><%= helpers.excerpt(row.service_title, 44) %></td>
+                <td class="num"><%= row.orders %></td>
+                <td class="num strong"><%= money(row.revenue, cur) %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } else { %>
+      <div class="empty-state" style="padding:40px 20px">
+        <div class="ico"><svg><use href="#i-package"/></svg></div>
+        <h3 style="font-size:1rem">No package sales yet</h3>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <h3>Payments by method</h3>
+        <p>Approved payments only.</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <% if (byMethod && byMethod.length) { %>
+        <% byMethod.forEach(function (row, i) { %>
+          <div style="margin-bottom:<%= i === byMethod.length - 1 ? '0' : '16px' %>">
+            <div class="row-between" style="gap:9px;margin-bottom:6px">
+              <span style="font-size:.875rem;font-weight:600"><%= row.method %></span>
+              <span style="font-size:.8125rem;font-weight:700"><%= money(row.total, cur) %></span>
+            </div>
+            <div style="height:6px;border-radius:999px;background:var(--bg-alt);overflow:hidden">
+              <div style="height:100%;width:<%= Math.round((Number(row.total) / methodTotal) * 100) %>%;background:var(--primary);border-radius:999px"></div>
+            </div>
+            <div style="font-size:.75rem;color:var(--text-soft);margin-top:4px"><%= row.count %> payment(s)</div>
+          </div>
+        <% }); %>
+      <% } else { %>
+        <p style="font-size:.875rem;color:var(--text-soft);margin:0">No approved payments yet.</p>
+      <% } %>
+    </div>
+  </div>
+</div>

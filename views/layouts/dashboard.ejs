@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="<%= defaultColorMode %>">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title><%= pageTitle %> - <%= site.name %></title>
+  <meta name="description" content="<%= seo.description %>">
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="canonical" href="<%= seo.canonical %>">
+  <link rel="icon" type="image/svg+xml" href="<%= site.favicon %>">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=<%= encodeURIComponent(fonts.heading).replace(/%20/g, '+') %>:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="<%= helpers.url('/assets/css/theme.css') %>">
+  <link rel="stylesheet" href="<%= helpers.url('/assets/css/dashboard.css') %>">
+
+  <style>
+    :root {
+      --primary: <%= theme.primary %>;
+      --primary-dark: <%= theme.primaryDark %>;
+      --secondary: <%= theme.secondary %>;
+      --success: <%= theme.success %>;
+      --danger: <%= theme.danger %>;
+      --warning: <%= theme.warning %>;
+      --bg: <%= theme.bgLight %>;
+      --bg-alt: <%= theme.bgLightAlt %>;
+      --surface: <%= theme.bgLight %>;
+      --surface-2: <%= theme.bgLightAlt %>;
+      --text: <%= theme.textLight %>;
+      --radius: <%= theme.radius %>;
+      --font-heading: '<%= fonts.heading %>', system-ui, sans-serif;
+      --font-body: '<%= fonts.body %>', system-ui, sans-serif;
+    }
+    [data-theme='dark'] {
+      --bg: <%= theme.bgDark %>;
+      --bg-alt: <%= theme.bgDarkAlt %>;
+      --surface: #161a2e;
+      --surface-2: #1c2138;
+      --text: <%= theme.textDark %>;
+    }
+  </style>
+</head>
+<body class="dash-body">
+  <a href="#dash-main" class="sr-only sr-only-focusable">Skip to content</a>
+
+  <%- include('../partials/dashboard-sidebar') %>
+
+  <div class="dash-shell">
+    <%- include('../partials/dashboard-topbar') %>
+
+    <main class="dash-main" id="dash-main">
+      <div class="dash-container">
+        <%- include('../partials/flash') %>
+        <%- body %>
+      </div>
+    </main>
+
+    <footer class="dash-footer">
+      <div class="dash-container row-between">
+        <span>© <%= new Date().getFullYear() %> <%= site.name %>. All rights reserved.</span>
+        <span style="display:flex;gap:18px;flex-wrap:wrap">
+          <a href="<%= helpers.url('/') %>">Visit website</a>
+          <a href="<%= helpers.url('/contact') %>">Contact support</a>
+          <a href="<%= helpers.url('/privacy-policy') %>">Privacy</a>
+        </span>
+      </div>
+    </footer>
+  </div>
+
+  <%- include('../partials/icons') %>
+  <script src="<%= helpers.url('/assets/js/main.js') %>" defer></script>
+  <script src="<%= helpers.url('/assets/js/dashboard.js') %>" defer></script>
+  <script>
+    // Live password strength meter. Mirrors the one on the auth layout so the
+    // account security page scores a password identically to sign-up.
+    (function () {
+      var input = document.querySelector('[data-strength-source]');
+      if (!input) return;
+
+      var bars = document.querySelectorAll('.strength-bar');
+      var text = document.querySelector('.strength-text');
+
+      input.addEventListener('input', function () {
+        var value = input.value;
+        var score = 0;
+        if (value.length >= 8) score++;
+        if (value.length >= 12) score++;
+        if (/[A-Z]/.test(value) && /[a-z]/.test(value)) score++;
+        if (/\d/.test(value)) score++;
+        if (/[^A-Za-z0-9]/.test(value)) score++;
+
+        var level = score <= 2 ? 'weak' : score <= 3 ? 'fair' : 'good';
+        var label = score <= 2 ? 'Weak' : score <= 3 ? 'Fair' : score <= 4 ? 'Good' : 'Strong';
+
+        bars.forEach(function (bar, index) {
+          bar.className = 'strength-bar' + (index < score ? ' ' + level : '');
+        });
+        if (text) text.textContent = value ? label + ' password' : '';
+      });
+    })();
+  </script>
+</body>
+</html>

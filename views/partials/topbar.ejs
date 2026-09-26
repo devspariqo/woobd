@@ -1,0 +1,34 @@
+<% if (settings.topbar_enabled === '1') { %>
+<div class="topbar">
+  <div class="container">
+    <div class="topbar-left">
+      <% if (settings.topbar_text) { %>
+        <span><%= settings.topbar_text %></span>
+      <% } %>
+      <% if (settings.topbar_show_phone === '1') { %>
+        <a href="tel:<%= site.phone.replace(/\s/g, '') %>" class="topbar-hide-sm">
+          <svg><use href="#i-phone"/></svg>
+          <span><%= site.phone %></span>
+        </a>
+      <% } %>
+      <% if (settings.topbar_show_email === '1') { %>
+        <a href="mailto:<%= site.email %>" class="topbar-hide-sm">
+          <svg><use href="#i-mail"/></svg>
+          <span><%= site.email %></span>
+        </a>
+      <% } %>
+    </div>
+
+    <% if (settings.topbar_show_socials === '1' && socials.length) { %>
+      <div class="topbar-socials">
+        <% socials.forEach(function (social) { %>
+          <a href="<%= social.href %>" target="_blank" rel="noopener noreferrer nofollow"
+             aria-label="<%= social.label %>" title="<%= social.label %>">
+            <svg><use href="#i-<%= social.key %>"/></svg>
+          </a>
+        <% }); %>
+      </div>
+    <% } %>
+  </div>
+</div>
+<% } %>

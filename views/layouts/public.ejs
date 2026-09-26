@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="<%= defaultColorMode %>">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="<%= defaultColorMode === 'dark' ? '#0c0e1a' : '#ffffff' %>">
+
+  <title><%= typeof pageTitle !== 'undefined' && pageTitle ? pageTitle + ' - ' + site.name : seo.title %></title>
+  <meta name="description" content="<%= typeof pageDescription !== 'undefined' && pageDescription ? pageDescription : seo.description %>">
+  <% if (seo.keywords) { %><meta name="keywords" content="<%= seo.keywords %>"><% } %>
+  <meta name="robots" content="<%= typeof pageRobots !== 'undefined' && pageRobots ? pageRobots : seo.robots %>">
+  <link rel="canonical" href="<%= typeof pageCanonical !== 'undefined' && pageCanonical ? pageCanonical : seo.canonical %>">
+
+  <meta property="og:type" content="<%= typeof ogType !== 'undefined' ? ogType : 'website' %>">
+  <meta property="og:site_name" content="<%= site.name %>">
+  <meta property="og:title" content="<%= typeof pageTitle !== 'undefined' && pageTitle ? pageTitle : seo.title %>">
+  <meta property="og:description" content="<%= typeof pageDescription !== 'undefined' && pageDescription ? pageDescription : seo.description %>">
+  <meta property="og:url" content="<%= typeof pageCanonical !== 'undefined' && pageCanonical ? pageCanonical : seo.canonical %>">
+  <% if (typeof ogImage !== 'undefined' && ogImage) { %><meta property="og:image" content="<%= ogImage %>"><% } else if (seo.ogImage) { %><meta property="og:image" content="<%= seo.ogImage %>"><% } %>
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="<%= typeof pageTitle !== 'undefined' && pageTitle ? pageTitle : seo.title %>">
+  <meta name="twitter:description" content="<%= typeof pageDescription !== 'undefined' && pageDescription ? pageDescription : seo.description %>">
+
+  <link rel="icon" type="image/svg+xml" href="<%= site.favicon %>">
+  <link rel="apple-touch-icon" href="<%= site.favicon %>">
+
+  <% if (seo.verification) { %><meta name="google-site-verification" content="<%= seo.verification %>"><% } %>
+
+  <%# Fonts are loaded from Google Fonts with a preconnect; the fallback stack in
+      the CSS keeps text readable if the request is slow. %>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=<%= encodeURIComponent(fonts.heading).replace(/%20/g, '+') %>:wght@400;500;600;700;800&family=<%= encodeURIComponent(fonts.body).replace(/%20/g, '+') %>:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="<%= helpers.url('/assets/css/theme.css') %>">
+
+  <%# Site tokens come from the settings table, so the admin panel can restyle
+      the whole public site without a deploy. %>
+  <style>
+    :root {
+      --primary: <%= theme.primary %>;
+      --primary-dark: <%= theme.primaryDark %>;
+      --secondary: <%= theme.secondary %>;
+      --success: <%= theme.success %>;
+      --danger: <%= theme.danger %>;
+      --warning: <%= theme.warning %>;
+      --bg: <%= theme.bgLight %>;
+      --bg-alt: <%= theme.bgLightAlt %>;
+      --text: <%= theme.textLight %>;
+      --radius: <%= theme.radius %>;
+      --font-heading: '<%= fonts.heading %>', system-ui, sans-serif;
+      --font-body: '<%= fonts.body %>', system-ui, sans-serif;
+      --fs-base: <%= fonts.baseSize %>px;
+      --fw-heading: <%= fonts.headingWeight %>;
+    }
+    [data-theme='dark'] {
+      --bg: <%= theme.bgDark %>;
+      --bg-alt: <%= theme.bgDarkAlt %>;
+      --text: <%= theme.textDark %>;
+    }
+  </style>
+
+  <%# Set the theme before first paint. Without this the page renders light and
+      then snaps to dark, which reads as a flash on every navigation. %>
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('woobd-theme');
+        var fallback = '<%= defaultColorMode %>';
+        var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', saved || (prefersDark && fallback !== 'light' ? 'dark' : fallback));
+      } catch (e) { /* private mode */ }
+    })();
+  </script>
+
+  <%# extraHead carries pre-built markup (JSON-LD structured data), so it must
+      be emitted RAW with the unescaped output tag. Using the escaped output tag
+      makes EJS HTML-encode it, turning the script tags into entities and
+      rendering the whole payload as visible text at the top of the page instead
+      of registering it as structured data.
+      Controllers build this with helpers.jsonLd(), which escapes the angle
+      brackets and ampersands inside the JSON so page content cannot break out
+      of the script block.
+      (Note for future edits: do not write EJS tag syntax inside this comment -
+      the parser treats an opening tag as the end of the comment.) %>
+  <%- typeof extraHead !== 'undefined' ? extraHead : '' %>
+
+  <% if (seo.analyticsId) { %>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=<%= seo.analyticsId %>"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', '<%= seo.analyticsId %>');
+  </script>
+  <% } %>
+</head>
+<body>
+  <a href="#main" class="sr-only sr-only-focusable">Skip to content</a>
+
+  <%- include('../partials/topbar') %>
+  <%- include('../partials/header') %>
+  <%- include('../partials/mobile-menu') %>
+
+  <main id="main">
+    <%- body %>
+  </main>
+
+  <%- include('../partials/footer') %>
+
+  <%- include('../partials/chat-widget') %>
+  <%- include('../partials/scripts') %>
+</body>
+</html>

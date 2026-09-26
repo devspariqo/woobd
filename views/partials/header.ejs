@@ -1,0 +1,64 @@
+<header class="site-header" data-sticky="<%= settings.header_sticky === '1' ? '1' : '0' %>">
+  <div class="container">
+    <a href="<%= helpers.url('/') %>" class="brand" aria-label="<%= site.name %> - home">
+      <%# Both logo variants are in the DOM; CSS shows the right one for the theme. %>
+      <img src="<%= site.logoLight %>" alt="<%= site.name %>" class="logo-for-light" style="width:<%= site.logoWidth %>px" width="<%= site.logoWidth %>" height="40">
+      <img src="<%= site.logoDark %>" alt="<%= site.name %>" class="logo-for-dark" style="width:<%= site.logoWidth %>px" width="<%= site.logoWidth %>" height="40">
+    </a>
+
+    <nav class="nav" aria-label="Main navigation">
+      <% menus.headerTree.forEach(function (item) { %>
+        <% var hasChildren = item.children && item.children.length; %>
+        <div class="nav-item <% if (hasChildren) { %>has-dropdown<% } %>">
+          <a href="<%= helpers.url(item.url) %>" class="nav-link"
+             <% if (item.target === '_blank') { %>target="_blank" rel="noopener"<% } %>
+             <% if (item.children && item.children.some(function (c) { return currentPath === c.url; })) { %>data-parent-active="1"<% } %>>
+            <%= item.label %>
+            <% if (hasChildren) { %><svg class="caret"><use href="#i-chevron-down"/></svg><% } %>
+          </a>
+          <% if (hasChildren) { %>
+            <div class="dropdown">
+              <% item.children.forEach(function (child) { %>
+                <a href="<%= helpers.url(child.url) %>" <% if (child.target === '_blank') { %>target="_blank" rel="noopener"<% } %>>
+                  <% if (child.icon) { %><svg><use href="#i-<%= child.icon %>"/></svg><% } %>
+                  <%= child.label %>
+                </a>
+              <% }); %>
+            </div>
+          <% } %>
+        </div>
+      <% }); %>
+    </nav>
+
+    <div class="header-actions">
+      <% if (showThemeToggle) { %>
+        <button type="button" class="theme-toggle" data-theme-toggle aria-label="Switch colour theme">
+          <svg class="icon-sun"><use href="#i-sun"/></svg>
+          <svg class="icon-moon"><use href="#i-moon"/></svg>
+        </button>
+      <% } %>
+
+      <% if (settings.auth_buttons_enabled === '1') { %>
+        <% if (isCustomer) { %>
+          <a href="<%= helpers.url('/account') %>" class="btn btn-outline btn-sm">
+            <svg><use href="#i-grid"/></svg> Dashboard
+          </a>
+        <% } else { %>
+          <a href="<%= helpers.url('/signin') %>" class="auth-link">Sign in</a>
+          <a href="<%= helpers.url('/signup') %>" class="btn btn-outline btn-sm">Sign up</a>
+        <% } %>
+      <% } %>
+
+      <% if (settings.header_cta_enabled === '1' && settings.header_cta_text) { %>
+        <a href="<%= helpers.url(settings.header_cta_link) %>" class="btn btn-primary btn-sm">
+          <%= settings.header_cta_text %>
+          <svg><use href="#i-arrow-right"/></svg>
+        </a>
+      <% } %>
+
+      <button type="button" class="hamburger" data-menu-open aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>

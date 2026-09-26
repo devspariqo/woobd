@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="WooBD.Com">
+  <title>WooBD.Com</title>
+
+  <!-- Favicon. Deliberately simpler than the header mark: at 16px an awning and
+       a door collapse into mush, so this keeps only the two shapes that survive
+       - the awning band and a single accent dot. -->
+  <defs>
+    <linearGradient id="wbdFavicon" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7c4dff"/>
+      <stop offset="1" stop-color="#5b21f0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="64" height="64" rx="15" fill="url(#wbdFavicon)"/>
+
+  <!-- Awning -->
+  <path d="M14 22h36v8.5a5 5 0 0 1-9.8.8 5 5 0 0 1-8.4 0 5 5 0 0 1-8.4 0A5 5 0 0 1 14 30.5z"
+        fill="#ffffff" opacity=".95"/>
+
+  <!-- Shopfront body, with one accent dot for the brand's second colour -->
+  <rect x="19" y="36" width="15" height="15" rx="3" fill="#ffffff" opacity=".9"/>
+  <circle cx="43" cy="43.5" r="5" fill="#ff6600"/>
+</svg>

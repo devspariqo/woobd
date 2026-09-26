@@ -1,0 +1,304 @@
+<%
+  const num = function (v) { return Number(v || 0); };
+  const cur = site.currency;
+  const money = helpers.money;
+  const maxRevenue = Math.max(1, (trend || []).reduce(function (m, row) { return Math.max(m, Number(row.revenue)); }, 0));
+%>
+
+<div class="stat-grid">
+  <div class="stat-tile">
+    <div class="ico tone-primary"><svg><use href="#i-shopping-cart"/></svg></div>
+    <div>
+      <div class="value"><%= num(orderStats && orderStats.total) %></div>
+      <div class="label">Total orders</div>
+      <div class="delta"><%= num(orderStats && orderStats.in_progress) %> in progress</div>
+    </div>
+  </div>
+
+  <div class="stat-tile">
+    <div class="ico tone-success"><svg><use href="#i-dollar"/></svg></div>
+    <div>
+      <div class="value"><%= money(paymentStats ? paymentStats.collected : 0, cur) %></div>
+      <div class="label">Collected</div>
+      <div class="delta"><%= money(paymentStats ? paymentStats.awaiting : 0, cur) %> awaiting review</div>
+    </div>
+  </div>
+
+  <div class="stat-tile">
+    <div class="ico tone-warning"><svg><use href="#i-users"/></svg></div>
+    <div>
+      <div class="value"><%= num(customerCounts && customerCounts.total) %></div>
+      <div class="label">Customers</div>
+      <div class="delta up">+<%= num(customerCounts && customerCounts.last_30_days) %> in 30 days</div>
+    </div>
+  </div>
+
+  <div class="stat-tile">
+    <div class="ico tone-info"><svg><use href="#i-globe"/></svg></div>
+    <div>
+      <div class="value"><%= num(orderStats && orderStats.active) %></div>
+      <div class="label">Live websites</div>
+      <div class="delta"><%= num(orderStats && orderStats.completed) %> completed</div>
+    </div>
+  </div>
+</div>
+
+<%# ---- Action-required queue. This is the operator's to-do list. ---- %>
+<% if (pendingPaymentCount || num(orderStats && orderStats.pending)) { %>
+  <div class="panel" style="margin-bottom:22px;border-color:var(--warning)">
+    <div class="panel-head" style="background:rgba(240,160,32,.06)">
+      <div>
+        <h3><svg style="width:17px;height:17px;vertical-align:-3px;color:var(--warning)"><use href="#i-alert"/></svg>
+          Needs your attention</h3>
+        <p>Items waiting on an operator decision.</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="three-col">
+        <% if (pendingPaymentCount) { %>
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            <span style="flex-shrink:0;width:34px;height:34px;display:grid;place-items:center;border-radius:9px;background:rgba(240,160,32,.14);color:var(--warning)">
+              <svg style="width:17px;height:17px"><use href="#i-credit-card"/></svg>
+            </span>
+            <div>
+              <div style="font-weight:700;font-size:1.0625rem"><%= pendingPaymentCount %> payment<%= pendingPaymentCount > 1 ? 's' : '' %></div>
+              <div style="font-size:.8125rem;color:var(--text-soft);margin-top:2px">Submitting approval releases an order into production.</div>
+              <a href="<%= helpers.url('/' + adminPath + '/payments?status=pending') %>" class="btn btn-outline btn-sm" style="margin-top:9px">Review payments</a>
+            </div>
+          </div>
+        <% } %>
+
+        <% if (num(orderStats && orderStats.pending)) { %>
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            <span style="flex-shrink:0;width:34px;height:34px;display:grid;place-items:center;border-radius:9px;background:rgba(91,33,240,.11);color:var(--primary)">
+              <svg style="width:17px;height:17px"><use href="#i-package"/></svg>
+            </span>
+            <div>
+              <div style="font-weight:700;font-size:1.0625rem"><%= num(orderStats.pending) %> new order<%= num(orderStats.pending) > 1 ? 's' : '' %></div>
+              <div style="font-size:.8125rem;color:var(--text-soft);margin-top:2px">Move them to "In progress" to start the build.</div>
+              <a href="<%= helpers.url('/' + adminPath + '/orders?status=pending') %>" class="btn btn-outline btn-sm" style="margin-top:9px">Open orders</a>
+            </div>
+          </div>
+        <% } %>
+
+        <% if (invoiceStats && num(invoiceStats.unpaid)) { %>
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            <span style="flex-shrink:0;width:34px;height:34px;display:grid;place-items:center;border-radius:9px;background:rgba(56,132,255,.12);color:#3884ff">
+              <svg style="width:17px;height:17px"><use href="#i-file"/></svg>
+            </span>
+            <div>
+              <div style="font-weight:700;font-size:1.0625rem"><%= money(invoiceStats.outstanding, cur) %> outstanding</div>
+              <div style="font-size:.8125rem;color:var(--text-soft);margin-top:2px"><%= num(invoiceStats.unpaid) %> unpaid invoice<%= num(invoiceStats.unpaid) > 1 ? 's' : '' %>.</div>
+              <a href="<%= helpers.url('/' + adminPath + '/invoices?status=unpaid') %>" class="btn btn-outline btn-sm" style="margin-top:9px">View invoices</a>
+            </div>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<div class="two-col" style="margin-bottom:22px">
+  <%# ---- Revenue trend: CSS bars, no chart library (no-CDN requirement) ---- %>
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <h3>Revenue trend</h3>
+        <p>Order value per month, cancelled orders excluded.</p>
+      </div>
+      <a href="<%= helpers.url('/' + adminPath + '/analytics') %>" class="btn btn-outline btn-sm">Full report</a>
+    </div>
+    <div class="panel-body">
+      <% if (trend && trend.length) { %>
+        <div style="display:flex;align-items:flex-end;gap:11px;height:190px;padding-top:10px">
+          <% trend.forEach(function (row) { %>
+            <%
+              var height = Math.max(4, Math.round((Number(row.revenue) / maxRevenue) * 100));
+              var label = String(row.period || '').slice(5);
+            %>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0" title="<%= row.period %>: <%= money(row.revenue, cur) %> from <%= row.orders %> order(s)">
+              <span style="font-size:.6875rem;color:var(--text-soft);white-space:nowrap"><%= money(row.revenue, cur) %></span>
+              <div style="width:100%;height:<%= height %>%;min-height:6px;border-radius:6px 6px 0 0;background:linear-gradient(180deg, var(--primary), var(--primary-dark));transition:opacity var(--t)"></div>
+              <span style="font-size:.75rem;color:var(--text-soft);font-weight:600"><%= label %></span>
+            </div>
+          <% }); %>
+        </div>
+      <% } else { %>
+        <div class="empty-state" style="padding:38px 16px">
+          <div class="ico"><svg><use href="#i-bar-chart"/></svg></div>
+          <h3 style="font-size:1rem">No revenue yet</h3>
+          <p style="font-size:.875rem">Numbers appear here once orders start coming in.</p>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <%# ---- Top packages ---- %>
+  <div class="panel">
+    <div class="panel-head">
+      <div><h3>Top packages</h3></div>
+    </div>
+    <div class="panel-body">
+      <% if (byService && byService.length) { %>
+        <%
+          var maxServiceRevenue = Math.max(1, byService.reduce(function (m, row) {
+            return Math.max(m, Number(row.revenue));
+          }, 0));
+        %>
+        <% byService.forEach(function (row, i) { %>
+          <div style="margin-bottom:<%= i === byService.length - 1 ? '0' : '15px' %>">
+            <div class="row-between" style="gap:9px;margin-bottom:6px">
+              <span style="font-size:.875rem;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                <%= helpers.excerpt(row.service_title, 30) %>
+              </span>
+              <span style="font-size:.8125rem;font-weight:700;white-space:nowrap"><%= money(row.revenue, cur) %></span>
+            </div>
+            <div style="height:5px;border-radius:999px;background:var(--bg-alt);overflow:hidden">
+              <div style="height:100%;width:<%= Math.round((Number(row.revenue) / maxServiceRevenue) * 100) %>%;background:var(--primary);border-radius:999px"></div>
+            </div>
+            <div style="font-size:.75rem;color:var(--text-soft);margin-top:4px"><%= row.orders %> order(s)</div>
+          </div>
+        <% }); %>
+      <% } else { %>
+        <p style="font-size:.875rem;color:var(--text-soft);margin:0">No package sales recorded yet.</p>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<div class="two-col">
+  <%# ---- Recent orders ---- %>
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <h3>Recent orders</h3>
+      </div>
+      <a href="<%= helpers.url('/' + adminPath + '/orders') %>" class="btn btn-outline btn-sm">All orders</a>
+    </div>
+
+    <% if (recentOrders && recentOrders.length) { %>
+      <div class="table-wrap">
+        <table class="dash-table">
+          <thead>
+            <tr>
+              <th>Order</th>
+              <th>Customer</th>
+              <th>Status</th>
+              <th class="num">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% recentOrders.forEach(function (order) { %>
+              <tr>
+                <td>
+                  <a href="<%= helpers.url('/' + adminPath + '/orders/' + order.id) %>" class="strong"><%= order.order_number %></a>
+                  <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px"><%= helpers.excerpt(order.service_title, 32) %></div>
+                </td>
+                <td style="font-size:.8438rem">
+                  <%= order.customer_name %>
+                  <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px"><%= helpers.timeAgo(order.created_at) %></div>
+                </td>
+                <td><span class="pill pill-<%= helpers.statusTone(order.status) %>"><%= helpers.humanise(order.status) %></span></td>
+                <td class="num strong"><%= money(order.total, cur) %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } else { %>
+      <div class="empty-state" style="padding:46px 20px">
+        <div class="ico"><svg><use href="#i-package"/></svg></div>
+        <h3 style="font-size:1rem">No orders yet</h3>
+        <p style="font-size:.875rem">Orders placed on the public site show up here.</p>
+      </div>
+    <% } %>
+  </div>
+
+  <div>
+    <%# ---- Pending payments ---- %>
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-head">
+        <div><h3>Payments to verify</h3></div>
+        <a href="<%= helpers.url('/' + adminPath + '/payments') %>" class="btn btn-outline btn-sm">All</a>
+      </div>
+      <div class="panel-body">
+        <% if (recentPayments && recentPayments.length) { %>
+          <% recentPayments.forEach(function (payment, i) { %>
+            <div style="padding:<%= i ? '13px 0 0' : '0' %>;margin-bottom:<%= i === recentPayments.length - 1 ? '0' : '13px' %>;border-bottom:<%= i === recentPayments.length - 1 ? 'none' : '1px solid var(--border)' %>">
+              <div class="row-between" style="gap:9px">
+                <span style="font-weight:600;font-size:.875rem"><%= payment.method %></span>
+                <span style="font-weight:700;font-size:.875rem"><%= money(payment.amount, cur) %></span>
+              </div>
+              <div style="font-size:.75rem;color:var(--text-soft);margin-top:3px">
+                <%= payment.customer_name %><%= payment.order_number ? ' · ' + payment.order_number : '' %>
+              </div>
+              <% if (payment.transaction_id) { %>
+                <div style="font-size:.75rem;color:var(--text-soft);font-family:ui-monospace,monospace;margin-top:2px">
+                  <%= payment.transaction_id %>
+                </div>
+              <% } %>
+              <div class="actions" style="justify-content:flex-start;margin-top:8px">
+                <form method="post" action="<%= helpers.url('/' + adminPath + '/payments/' + payment.id + '/approve') %>" style="display:inline">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button type="submit" class="btn btn-primary btn-sm">Approve</button>
+                </form>
+                <a href="<%= helpers.url('/' + adminPath + '/payments') %>" class="btn btn-ghost btn-sm">Review</a>
+              </div>
+            </div>
+          <% }); %>
+        <% } else { %>
+          <p style="font-size:.875rem;color:var(--text-soft);margin:0">Nothing pending. All caught up.</p>
+        <% } %>
+      </div>
+    </div>
+
+    <%# ---- Recent tickets ---- %>
+    <div class="panel">
+      <div class="panel-head">
+        <div><h3>Recent tickets</h3></div>
+        <a href="<%= helpers.url('/' + adminPath + '/tickets') %>" class="btn btn-outline btn-sm">All</a>
+      </div>
+      <div class="panel-body">
+        <% if (recentTickets && recentTickets.length) { %>
+          <% recentTickets.forEach(function (ticket, i) { %>
+            <div class="row-between" style="gap:9px;padding:<%= i ? '12px 0 0' : '0' %>;margin-bottom:<%= i === recentTickets.length - 1 ? '0' : '12px' %>;border-bottom:<%= i === recentTickets.length - 1 ? 'none' : '1px solid var(--border)' %>">
+              <div style="min-width:0">
+                <div style="font-weight:600;font-size:.8438rem"><%= helpers.excerpt(ticket.subject, 34) %></div>
+                <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px"><%= ticket.customer_name %></div>
+              </div>
+              <span class="pill pill-<%= helpers.statusTone(ticket.status) %>"><%= helpers.humanise(ticket.status) %></span>
+            </div>
+          <% }); %>
+        <% } else { %>
+          <p style="font-size:.875rem;color:var(--text-soft);margin:0">No tickets open.</p>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# ---- Activity feed ---- %>
+<% if (activityFeed && activityFeed.length) { %>
+  <div class="panel" style="margin-top:22px">
+    <div class="panel-head">
+      <div>
+        <h3>Recent activity</h3>
+      </div>
+      <a href="<%= helpers.url('/' + adminPath + '/activity') %>" class="btn btn-outline btn-sm">Full log</a>
+    </div>
+    <div class="panel-body">
+      <div class="timeline">
+        <% activityFeed.forEach(function (entry) { %>
+          <div class="timeline-item done">
+            <div class="title" style="font-size:.9063rem"><%= helpers.humanise(String(entry.action || '').replace(/[._]/g, ' ')) %></div>
+            <div class="desc">
+              <time data-relative datetime="<%= new Date(entry.created_at).toISOString() %>"><%= helpers.timeAgo(entry.created_at) %></time>
+              <% if (entry.actor_name) { %> · <%= entry.actor_name %><% } %>
+              <% if (entry.description) { %> — <%= helpers.excerpt(entry.description, 110) %><% } %>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+  </div>
+<% } %>

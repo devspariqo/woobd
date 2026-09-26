@@ -1,0 +1,85 @@
+<%
+  const cur = site.currency;
+  const money = helpers.money;
+  const tabs = [
+    ['', 'All'],
+    ['unpaid', 'Unpaid'],
+    ['paid', 'Paid'],
+    ['void', 'Void']
+  ];
+%>
+
+<div class="tab-bar" style="margin-bottom:20px">
+  <% tabs.forEach(function (tab) { %>
+    <a href="<%= helpers.url('/account/invoices' + (tab[0] ? '?status=' + tab[0] : '')) %>"
+       class="<%= (activeStatus || '') === tab[0] ? 'active' : '' %>"><%= tab[1] %></a>
+  <% }); %>
+</div>
+
+<div class="panel">
+  <% if (invoices && invoices.length) { %>
+    <div class="table-wrap">
+      <table class="dash-table">
+        <thead>
+          <tr>
+            <th>Invoice</th>
+            <th>Order</th>
+            <th>Issued</th>
+            <th>Due</th>
+            <th>Status</th>
+            <th class="num">Total</th>
+            <th class="num">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% invoices.forEach(function (invoice) { %>
+            <%
+              var overdue = invoice.status === 'unpaid' && invoice.due_date
+                && new Date(invoice.due_date) < new Date();
+            %>
+            <tr>
+              <td class="strong"><%= invoice.invoice_number %></td>
+              <td style="font-size:.8438rem">
+                <% if (invoice.order_id && invoice.order_number) { %>
+                  <a href="<%= helpers.url('/account/orders/' + invoice.order_id) %>" style="font-weight:600"><%= invoice.order_number %></a>
+                <% } else { %>
+                  <span style="color:var(--text-soft)">—</span>
+                <% } %>
+              </td>
+              <td style="font-size:.8438rem;white-space:nowrap"><%= helpers.formatDate(invoice.issue_date) %></td>
+              <td style="font-size:.8438rem;white-space:nowrap">
+                <%= invoice.due_date ? helpers.formatDate(invoice.due_date) : '—' %>
+                <% if (overdue) { %>
+                  <div style="font-size:.75rem;color:var(--danger);font-weight:600;margin-top:2px">Overdue</div>
+                <% } %>
+              </td>
+              <td><span class="pill pill-<%= helpers.statusTone(invoice.status) %>"><%= helpers.humanise(invoice.status) %></span></td>
+              <td class="num strong"><%= money(invoice.total, cur) %></td>
+              <td>
+                <div class="actions">
+                  <a href="<%= helpers.url('/account/invoices/' + invoice.id) %>" class="btn btn-outline btn-sm" target="_blank" rel="noopener">View</a>
+                  <% if (invoice.status === 'unpaid' && invoice.order_id) { %>
+                    <a href="<%= helpers.url('/account/orders/' + invoice.order_id + '/pay') %>" class="btn btn-primary btn-sm">Pay</a>
+                  <% } %>
+                </div>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if (pager.totalPages > 1) { %>
+      <div class="panel-foot">
+        <%- include('../partials/pagination', { baseUrl: '/account/invoices' }) %>
+      </div>
+    <% } %>
+  <% } else { %>
+    <div class="empty-state">
+      <div class="ico"><svg><use href="#i-file"/></svg></div>
+      <h3>No invoices <%= activeStatus ? 'with that status' : 'yet' %></h3>
+      <p>An invoice is generated automatically the moment you place an order, and again for each renewal.</p>
+      <a href="<%= helpers.url('/account/orders') %>" class="btn btn-primary">Go to my orders</a>
+    </div>
+  <% } %>
+</div>

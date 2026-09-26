@@ -1,0 +1,139 @@
+<%
+  const c = counts || {};
+  const num = function (v) { return Number(v || 0); };
+
+  /** Build a tickets URL, carrying the current filters through. */
+  const buildUrl = function (overrides) {
+    const params = new URLSearchParams();
+    const state = {
+      status: activeStatus || '',
+      priority: activePriority || '',
+      department: activeDepartment || '',
+      q: search || '',
+    };
+    Object.assign(state, overrides || {});
+    Object.keys(state).forEach(function (key) {
+      if (state[key]) params.set(key, state[key]);
+    });
+    const qs = params.toString();
+    return helpers.url('/' + adminPath + '/tickets' + (qs ? '?' + qs : ''));
+  };
+
+  const tabs = [
+    ['', 'All', num(c.total)],
+    ['open', 'Open', num(c.open)],
+    ['pending', 'Pending', num(c.pending)],
+    ['answered', 'Answered', num(c.answered)],
+    ['closed', 'Closed', num(c.closed)]
+  ];
+  const priorityTone = { urgent: 'danger', high: 'warning', medium: 'info', low: 'muted' };
+%>
+
+<div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">
+  <div class="stat-tile">
+    <div class="ico tone-primary"><svg><use href="#i-ticket"/></svg></div>
+    <div><div class="value"><%= num(c.open) %></div><div class="label">Open</div></div>
+  </div>
+  <div class="stat-tile">
+    <div class="ico tone-warning"><svg><use href="#i-clock"/></svg></div>
+    <div><div class="value"><%= num(c.pending) %></div><div class="label">Awaiting customer</div></div>
+  </div>
+  <div class="stat-tile">
+    <div class="ico tone-success"><svg><use href="#i-check-circle"/></svg></div>
+    <div><div class="value"><%= num(c.answered) %></div><div class="label">Answered</div></div>
+  </div>
+  <div class="stat-tile">
+    <div class="ico tone-danger"><svg><use href="#i-alert"/></svg></div>
+    <div><div class="value"><%= num(c.urgent) %></div><div class="label">Urgent</div></div>
+  </div>
+</div>
+
+<div class="tab-bar" style="margin-bottom:20px">
+  <% tabs.forEach(function (tab) { %>
+    <a href="<%= buildUrl({ status: tab[0] }) %>" class="<%= (activeStatus || '') === tab[0] ? 'active' : '' %>">
+      <%= tab[1] %><% if (tab[2]) { %><span class="tab-count"><%= tab[2] %></span><% } %>
+    </a>
+  <% }); %>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <form class="toolbar" method="get" action="<%= helpers.url('/' + adminPath + '/tickets') %>"
+          style="margin:0;padding:0;border:0;box-shadow:none;background:transparent;flex-wrap:wrap">
+      <% if (activeStatus) { %><input type="hidden" name="status" value="<%= activeStatus %>"><% } %>
+      <div class="search-box">
+        <svg><use href="#i-search"/></svg>
+        <input type="search" name="q" class="form-control" value="<%= search %>"
+               placeholder="Subject, ticket number or customer…" aria-label="Search tickets">
+      </div>
+      <select name="priority" class="form-control" style="max-width:160px" aria-label="Priority">
+        <option value="">All priorities</option>
+        <% ['urgent','high','medium','low'].forEach(function (p) { %>
+          <option value="<%= p %>" <%= activePriority === p ? 'selected' : '' %>><%= helpers.humanise(p) %></option>
+        <% }); %>
+      </select>
+      <select name="department" class="form-control" style="max-width:170px" aria-label="Department">
+        <option value="">All departments</option>
+        <% ['general','billing','technical','sales'].forEach(function (d) { %>
+          <option value="<%= d %>" <%= activeDepartment === d ? 'selected' : '' %>><%= helpers.humanise(d) %></option>
+        <% }); %>
+      </select>
+      <button type="submit" class="btn btn-outline btn-sm">Apply</button>
+      <% if (search || activePriority || activeDepartment) { %>
+        <a href="<%= buildUrl({ priority: '', department: '', q: '' }) %>" class="btn btn-ghost btn-sm">Clear</a>
+      <% } %>
+    </form>
+  </div>
+
+  <% if (tickets && tickets.length) { %>
+    <div class="table-wrap">
+      <table class="dash-table">
+        <thead>
+          <tr><th>Ticket</th><th>Customer</th><th>Department</th><th>Priority</th><th>Status</th><th>Last reply</th><th class="num">Action</th></tr>
+        </thead>
+        <tbody>
+          <% tickets.forEach(function (t) { %>
+            <tr>
+              <td>
+                <a href="<%= helpers.url('/' + adminPath + '/tickets/' + t.id) %>" class="strong"><%= t.subject %></a>
+                <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px">
+                  <code><%= t.ticket_number %></code>
+                  <% if (t.order_number) { %> · order <%= t.order_number %><% } %>
+                </div>
+              </td>
+              <td style="font-size:.8438rem">
+                <%= t.customer_name || '—' %>
+                <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px;word-break:break-all"><%= t.customer_email %></div>
+              </td>
+              <td style="font-size:.8125rem"><%= helpers.humanise(t.department) %></td>
+              <td><span class="pill pill-<%= priorityTone[t.priority] || 'muted' %>"><%= helpers.humanise(t.priority) %></span></td>
+              <td><span class="pill pill-<%= helpers.statusTone(t.status) %>"><%= helpers.humanise(t.status) %></span></td>
+              <td style="font-size:.8125rem">
+                <% if (t.last_reply_at) { %>
+                  <time data-relative datetime="<%= new Date(t.last_reply_at).toISOString() %>"><%= helpers.timeAgo(t.last_reply_at) %></time>
+                <% } else { %>
+                  <span style="color:var(--text-soft)">No replies</span>
+                <% } %>
+              </td>
+              <td class="num">
+                <a href="<%= helpers.url('/' + adminPath + '/tickets/' + t.id) %>" class="btn btn-outline btn-sm">Open</a>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if (pager.totalPages > 1) { %>
+      <div class="panel-foot">
+        <%- include('../partials/pagination', { baseUrl: '/' + adminPath + '/tickets' }) %>
+      </div>
+    <% } %>
+  <% } else { %>
+    <div class="empty-state">
+      <div class="ico"><svg><use href="#i-ticket"/></svg></div>
+      <h3>No tickets<%= (search || activeStatus) ? ' match those filters' : ' yet' %></h3>
+      <p>Customer support requests appear here.</p>
+    </div>
+  <% } %>
+</div>

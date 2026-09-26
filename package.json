@@ -1,0 +1,35 @@
+{
+  "name": "woobd-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WooBD.Com - Full-stack agency platform for a Bangladesh-based e-commerce website design service.",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18.0.0 <=24.x"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "build": "node scripts/build-check.js",
+    "postinstall": "node scripts/postinstall.js",
+    "setup": "node scripts/setup.js",
+    "setup:docker": "node scripts/setup.js --docker",
+    "smoke": "node scripts/smoke.js",
+    "preview": "node scripts/preview-settings.js",
+    "preview:admin": "node scripts/preview-admin.js",
+    "reset": "node scripts/setup.js --reset"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.19.2",
+    "express-ejs-layouts": "^2.5.1",
+    "express-rate-limit": "^7.4.0",
+    "express-session": "^1.18.0",
+    "mysql2": "^3.11.0",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^6.9.14"
+  }
+}

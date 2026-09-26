@@ -1,0 +1,88 @@
+<div class="mobile-menu" id="mobileMenu" aria-hidden="true">
+  <div class="mobile-menu-backdrop" data-menu-close></div>
+
+  <aside class="mobile-menu-panel" role="dialog" aria-modal="true" aria-label="Site menu">
+    <div class="mobile-menu-head">
+      <img src="<%= site.logoLight %>" alt="<%= site.name %>" class="logo-for-light" style="max-height:38px">
+      <img src="<%= site.logoDark %>" alt="<%= site.name %>" class="logo-for-dark" style="max-height:38px">
+      <button type="button" class="mobile-menu-close" data-menu-close aria-label="Close menu">
+        <svg><use href="#i-x"/></svg>
+      </button>
+    </div>
+
+    <div class="mobile-menu-body">
+      <nav class="mobile-nav" aria-label="Mobile navigation">
+        <% menus.headerTree.forEach(function (item) { %>
+          <% var hasChildren = item.children && item.children.length; %>
+          <% if (hasChildren) { %>
+            <div>
+              <a href="<%= helpers.url(item.url) %>" class="mobile-nav-link" data-submenu-toggle aria-expanded="false">
+                <span><%= item.label %></span>
+                <svg class="caret"><use href="#i-chevron-down"/></svg>
+              </a>
+              <div class="mobile-subnav">
+                <div>
+                  <ul>
+                    <% item.children.forEach(function (child) { %>
+                      <li>
+                        <a href="<%= helpers.url(child.url) %>" <% if (child.target === '_blank') { %>target="_blank" rel="noopener"<% } %>>
+                          <%= child.label %>
+                        </a>
+                      </li>
+                    <% }); %>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          <% } else { %>
+            <a href="<%= helpers.url(item.url) %>" class="mobile-nav-link" <% if (item.target === '_blank') { %>target="_blank" rel="noopener"<% } %>>
+              <span><%= item.label %></span>
+            </a>
+          <% } %>
+        <% }); %>
+
+        <% if (isCustomer) { %>
+          <a href="<%= helpers.url('/account') %>" class="mobile-nav-link">
+            <span>My Dashboard</span>
+            <svg class="caret" style="opacity:.5"><use href="#i-chevron-right"/></svg>
+          </a>
+        <% } %>
+      </nav>
+    </div>
+
+    <div class="mobile-menu-foot">
+      <%# Agency details and the CTA live in the slide-out so the menu is useful
+          on its own, not just a list of links. %>
+      <div class="mobile-contact">
+        <a href="tel:<%= site.phone.replace(/\s/g, '') %>">
+          <svg><use href="#i-phone"/></svg>
+          <span><%= site.phone %></span>
+        </a>
+        <a href="mailto:<%= site.email %>">
+          <svg><use href="#i-mail"/></svg>
+          <span><%= site.email %></span>
+        </a>
+        <a href="<%= site.whatsappLink %>" target="_blank" rel="noopener">
+          <svg><use href="#i-whatsapp"/></svg>
+          <span>Chat on WhatsApp</span>
+        </a>
+        <span class="row" style="gap:11px;color:var(--text-muted);font-size:.875rem;align-items:flex-start">
+          <svg style="width:16px;height:16px;color:var(--primary);flex-shrink:0;margin-top:3px"><use href="#i-map-pin"/></svg>
+          <span><%= site.address %></span>
+        </span>
+      </div>
+
+      <% if (settings.header_cta_enabled === '1' && settings.header_cta_text) { %>
+        <a href="<%= helpers.url(settings.header_cta_link) %>" class="btn btn-primary btn-block">
+          <%= settings.header_cta_text %>
+          <svg><use href="#i-arrow-right"/></svg>
+        </a>
+      <% } %>
+
+      <% if (settings.auth_buttons_enabled === '1' && !isCustomer) { %>
+        <a href="<%= helpers.url('/signin') %>" class="btn btn-outline btn-block">Sign in</a>
+        <a href="<%= helpers.url('/signup') %>" class="btn btn-outline btn-block">Create an account</a>
+      <% } %>
+    </div>
+  </aside>
+</div>

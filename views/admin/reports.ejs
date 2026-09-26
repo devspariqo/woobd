@@ -1,0 +1,219 @@
+<%
+  const url = function (p) { return helpers.url('/' + adminPath + '/reports' + p); };
+  const cur = site.currency;
+  const num = function (v) { return Number(v || 0); };
+  const oc = orderCounts || {};
+  const ic = invoiceCounts || {};
+  const pc = paymentCounts || {};
+  const sc = subscriptionCounts || {};
+  const cc = customerCounts || {};
+
+  // `trend` and `signupTrend` arrive as locals from the controller. Do NOT
+  // redeclare them here - `const trend = trend || []` is a temporal-dead-zone
+  // error because the declaration shadows the local it reads.
+  const trendRows = trend || [];
+  const signupRows = signupTrend || [];
+
+  // Scale the bar charts to the largest value in each series, so a quiet month
+  // still shows a visible bar and the tallest fills the track.
+  const maxRevenue = Math.max(1, ...trendRows.map(function (r) { return num(r.revenue); }));
+  const maxOrders = Math.max(1, ...trendRows.map(function (r) { return num(r.orders); }));
+  const maxSignups = Math.max(1, ...signupRows.map(function (r) { return num(r.customers || r.total || 0); }));
+  const maxService = Math.max(1, ...(revenueByService || []).map(function (r) { return num(r.revenue); }));
+  const maxMethod = Math.max(1, ...(paymentsByMethod || []).map(function (r) { return num(r.total || r.amount || 0); }));
+
+  const monthLabel = function (period) {
+    const parts = String(period || '').split('-');
+    if (parts.length !== 2) return period;
+    const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return names[Number(parts[1]) - 1] + ' ' + parts[0].slice(2);
+  };
+%>
+
+<div class="tab-bar" style="margin-bottom:20px">
+  <% [6, 12, 24].forEach(function (m) { %>
+    <a href="<%= url('?months=' + m) %>" class="<%= months === m ? 'active' : '' %>">Last <%= m %> months</a>
+  <% }); %>
+</div>
+
+<div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-bottom:20px">
+  <div class="stat-tile">
+    <div class="ico tone-primary"><svg><use href="#i-dollar"/></svg></div>
+    <div><div class="value"><%= helpers.money(oc.gross_value, cur) %></div><div class="label">Gross order value</div></div>
+  </div>
+  <div class="stat-tile">
+    <div class="ico tone-success"><svg><use href="#i-check-circle"/></svg></div>
+    <div><div class="value"><%= helpers.money(oc.paid_value, cur) %></div><div class="label">Paid order value</div></div>
+  </div>
+  <div class="stat-tile">
+    <div class="ico tone-warning"><svg><use href="#i-clock"/></svg></div>
+    <div><div class="value"><%= helpers.money(ic.outstanding, cur) %></div><div class="label">Invoiced, unpaid</div></div>
+  </div>
+  <div class="stat-tile">
+    <div class="ico tone-info"><svg><use href="#i-repeat"/></svg></div>
+    <div><div class="value"><%= helpers.money(sc.mrr, cur) %></div><div class="label">Recurring / month</div></div>
+  </div>
+</div>
+
+<div class="two-col" style="align-items:start">
+  <div>
+    <div class="panel" style="margin-bottom:20px">
+      <div class="panel-head">
+        <h2 style="font-size:.9375rem;font-weight:700;margin:0">Revenue by month</h2>
+        <span style="font-size:.8125rem;color:var(--text-soft)">Cancelled orders excluded</span>
+      </div>
+      <div class="panel-body">
+        <% if (trendRows.length) { %>
+          <div class="bar-chart">
+            <% trendRows.forEach(function (row) { %>
+              <div class="bar-row">
+                <span class="bar-label"><%= monthLabel(row.period) %></span>
+                <div class="bar-track">
+                  <div class="bar-fill tone-primary" style="width:<%= Math.round(num(row.revenue) / maxRevenue * 100) %>%"></div>
+                </div>
+                <span class="bar-value"><%= helpers.money(row.revenue, cur) %></span>
+              </div>
+            <% }); %>
+          </div>
+        <% } else { %>
+          <p style="font-size:.875rem;color:var(--text-muted);margin:0">No orders in this period.</p>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:20px">
+      <div class="panel-head">
+        <h2 style="font-size:.9375rem;font-weight:700;margin:0">Orders by month</h2>
+      </div>
+      <div class="panel-body">
+        <% if (trendRows.length) { %>
+          <div class="bar-chart">
+            <% trendRows.forEach(function (row) { %>
+              <div class="bar-row">
+                <span class="bar-label"><%= monthLabel(row.period) %></span>
+                <div class="bar-track">
+                  <div class="bar-fill tone-success" style="width:<%= Math.round(num(row.orders) / maxOrders * 100) %>%"></div>
+                </div>
+                <span class="bar-value"><%= num(row.orders) %></span>
+              </div>
+            <% }); %>
+          </div>
+        <% } else { %>
+          <p style="font-size:.875rem;color:var(--text-muted);margin:0">No orders in this period.</p>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2 style="font-size:.9375rem;font-weight:700;margin:0">New customers by month</h2>
+      </div>
+      <div class="panel-body">
+        <% if (signupRows.length) { %>
+          <div class="bar-chart">
+            <% signupRows.forEach(function (row) { %>
+              <%
+                const count = num(row.customers !== undefined ? row.customers : row.total);
+                const period = row.period || row.month || '';
+              %>
+              <div class="bar-row">
+                <span class="bar-label"><%= monthLabel(period) %></span>
+                <div class="bar-track">
+                  <div class="bar-fill tone-info" style="width:<%= Math.round(count / maxSignups * 100) %>%"></div>
+                </div>
+                <span class="bar-value"><%= count %></span>
+              </div>
+            <% }); %>
+          </div>
+        <% } else { %>
+          <p style="font-size:.875rem;color:var(--text-muted);margin:0">No sign-ups in this period.</p>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel" style="margin-bottom:20px">
+      <div class="panel-head">
+        <h2 style="font-size:.9375rem;font-weight:700;margin:0">Order status</h2>
+      </div>
+      <div class="panel-body">
+        <dl class="meta-list">
+          <% [['pending','Pending'],['in_progress','In progress'],['active','Live'],['completed','Completed'],['on_hold','On hold'],['cancelled','Cancelled']].forEach(function (pair) { %>
+            <div><dt><%= pair[1] %></dt><dd><%= num(oc[pair[0]]) %></dd></div>
+          <% }); %>
+          <div><dt>Total orders</dt><dd><strong><%= num(oc.total) %></strong></dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:20px">
+      <div class="panel-head">
+        <h2 style="font-size:.9375rem;font-weight:700;margin:0">Customers</h2>
+      </div>
+      <div class="panel-body">
+        <dl class="meta-list">
+          <div><dt>Total</dt><dd><strong><%= num(cc.total) %></strong></dd></div>
+          <div><dt>Active</dt><dd><%= num(cc.active) %></dd></div>
+          <div><dt>Suspended</dt><dd><%= num(cc.suspended) %></dd></div>
+          <div><dt>Joined in 30 days</dt><dd><%= num(cc.last_30_days) %></dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:20px">
+      <div class="panel-head">
+        <h2 style="font-size:.9375rem;font-weight:700;margin:0">Top packages by revenue</h2>
+      </div>
+      <div class="panel-body">
+        <% if ((revenueByService || []).length) { %>
+          <div class="bar-chart">
+            <% revenueByService.forEach(function (row) { %>
+              <div class="bar-row">
+                <span class="bar-label" title="<%= row.service_title %>"><%= helpers.excerpt(row.service_title, 20) %></span>
+                <div class="bar-track">
+                  <div class="bar-fill tone-secondary" style="width:<%= Math.round(num(row.revenue) / maxService * 100) %>%"></div>
+                </div>
+                <span class="bar-value"><%= helpers.money(row.revenue, cur) %></span>
+              </div>
+            <% }); %>
+          </div>
+        <% } else { %>
+          <p style="font-size:.875rem;color:var(--text-muted);margin:0">No package sales yet.</p>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2 style="font-size:.9375rem;font-weight:700;margin:0">Payments by method</h2>
+      </div>
+      <div class="panel-body">
+        <% if ((paymentsByMethod || []).length) { %>
+          <div class="bar-chart">
+            <% paymentsByMethod.forEach(function (row) { %>
+              <%
+                const amount = num(row.total !== undefined ? row.total : row.amount);
+              %>
+              <div class="bar-row">
+                <span class="bar-label"><%= helpers.humanise(row.method) %></span>
+                <div class="bar-track">
+                  <div class="bar-fill tone-primary" style="width:<%= Math.round(amount / maxMethod * 100) %>%"></div>
+                </div>
+                <span class="bar-value"><%= helpers.money(amount, cur) %></span>
+              </div>
+            <% }); %>
+          </div>
+        <% } else { %>
+          <p style="font-size:.875rem;color:var(--text-muted);margin:0">No payments recorded yet.</p>
+        <% } %>
+
+        <dl class="meta-list" style="margin-top:16px">
+          <div><dt>Collected</dt><dd><strong><%= helpers.money(pc.collected, cur) %></strong></dd></div>
+          <div><dt>Awaiting verification</dt><dd><%= helpers.money(pc.awaiting, cur) %></dd></div>
+          <div><dt>Rejected</dt><dd><%= num(pc.rejected) %></dd></div>
+        </dl>
+      </div>
+    </div>
+  </div>
+</div>

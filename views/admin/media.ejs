@@ -1,0 +1,104 @@
+<%
+  const url = function (p) { return helpers.url('/' + adminPath + '/media' + p); };
+  // `folders` is rows of { folder, total } for folders that contain files.
+  // `uploadFolders` is every folder the storage rules allow, so an empty one
+  // can still be chosen as an upload destination.
+  const usedFolders = folders || [];
+%>
+
+<div class="panel" style="margin-bottom:20px">
+  <div class="panel-head">
+    <h2 style="font-size:.9375rem;font-weight:700;margin:0">Upload files</h2>
+    <span style="font-size:.8125rem;color:var(--text-soft)">JPG, PNG, WebP, SVG or GIF</span>
+  </div>
+  <form method="post" action="<%= url('/upload') %>" enctype="multipart/form-data">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="panel-body">
+      <div class="form-group">
+        <label class="form-label" for="m-file">Choose files</label>
+        <input type="file" class="form-control" id="m-file" name="upload" accept="image/*"
+               data-max-mb="<%= uploadLimits.media.maxMb %>" multiple required>
+        <p class="form-hint">
+          JPG, PNG, WebP, SVG or GIF, up to <%= uploadLimits.media.maxMb %> MB each.
+          Files land in the general library; the CMS screens (packages, portfolio,
+          testimonials, clients) save to their own folders automatically.
+        </p>
+      </div>
+    </div>
+    <div class="panel-foot">
+      <button type="submit" class="btn btn-primary">
+        <svg><use href="#i-upload"/></svg> Upload
+      </button>
+    </div>
+  </form>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <form class="toolbar" method="get" action="<%= url('') %>"
+          style="margin:0;padding:0;border:0;box-shadow:none;background:transparent;flex-wrap:wrap">
+      <div class="search-box">
+        <svg><use href="#i-search"/></svg>
+        <input type="search" name="q" class="form-control" value="<%= search %>"
+               placeholder="File name…" aria-label="Search media">
+      </div>
+      <select name="folder" class="form-control" style="max-width:190px" aria-label="Folder">
+        <option value="">All folders</option>
+        <% usedFolders.forEach(function (row) { %>
+          <option value="<%= row.folder %>" <%= activeFolder === row.folder ? 'selected' : '' %>><%= helpers.humanise(row.folder) %> (<%= row.total %>)</option>
+        <% }); %>
+      </select>
+      <button type="submit" class="btn btn-outline btn-sm">Apply</button>
+      <% if (search || activeFolder) { %><a href="<%= url('') %>" class="btn btn-ghost btn-sm">Clear</a><% } %>
+    </form>
+  </div>
+
+  <% if (media && media.length) { %>
+    <div class="panel-body">
+      <div class="media-grid">
+        <% media.forEach(function (item) { %>
+          <figure class="media-card">
+            <a href="<%= helpers.url(item.file_url) %>" target="_blank" rel="noopener" class="media-thumb">
+              <img src="<%= helpers.url(item.file_url) %>" alt="<%= item.alt_text || item.original_name %>" loading="lazy">
+            </a>
+            <figcaption>
+              <div class="media-name" title="<%= item.original_name %>"><%= item.original_name %></div>
+              <div class="media-meta">
+                <span class="pill pill-muted"><%= helpers.humanise(item.folder) %></span>
+                <span><%= helpers.fileSize(item.size_bytes) %></span>
+              </div>
+              <div class="media-actions">
+                <button type="button" class="btn btn-ghost btn-sm" data-copy="<%= helpers.url(item.file_url) %>">
+                  <svg><use href="#i-copy"/></svg> Copy URL
+                </button>
+                <form method="post" action="<%= url('/' + item.id + '/delete') %>" style="display:inline">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)"
+                          data-confirm="Delete <%= item.original_name %>? Any page using it will show a broken image.">
+                    Delete
+                  </button>
+                </form>
+              </div>
+            </figcaption>
+          </figure>
+        <% }); %>
+      </div>
+    </div>
+
+    <% if (pager.totalPages > 1) { %>
+      <div class="panel-foot">
+        <span style="font-size:.8125rem;color:var(--text-soft)">
+          Showing <%= pager.from %>–<%= pager.to %> of <%= pager.total %>
+        </span>
+        <%- include('../partials/pagination', { baseUrl: '/' + adminPath + '/media' }) %>
+      </div>
+    <% } %>
+  <% } else { %>
+    <div class="empty-state">
+      <div class="ico"><svg><use href="#i-image"/></svg></div>
+      <h3>No media<%= (search || activeFolder) ? ' in that folder' : ' yet' %></h3>
+      <p>Files uploaded through the CMS screens are catalogued here too.</p>
+      <% if (search || activeFolder) { %><a href="<%= url('') %>" class="btn btn-primary">Clear filters</a><% } %>
+    </div>
+  <% } %>
+</div>

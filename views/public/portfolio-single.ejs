@@ -1,0 +1,121 @@
+<%
+  var gallery = helpers.parseJson(project.gallery, []);
+  var technologies = helpers.parseJson(project.technologies, []);
+%>
+
+<%- include('../partials/page-hero', {
+  pageTitle: project.title,
+  lead: project.short_description,
+  crumbs: [{ label: 'Portfolio', url: '/portfolio' }, { label: project.title }]
+}) %>
+
+<section class="section">
+  <div class="container">
+    <div class="split" style="align-items:start;grid-template-columns:1.7fr 1fr">
+      <div>
+        <div style="border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow);margin-bottom:38px">
+          <% if (project.thumbnail) { %>
+            <img src="<%= helpers.url(project.thumbnail) %>" alt="<%= project.title %>" width="900" height="600" style="width:100%">
+          <% } else { %>
+            <img src="<%= helpers.url('/assets/img/portfolio-default.svg') %>" alt="<%= project.title %>" width="900" height="600" style="width:100%">
+          <% } %>
+        </div>
+
+        <h2 class="mb-4">Project overview</h2>
+        <div style="font-size:1.0313rem;line-height:1.8;color:var(--text-muted)">
+          <%- project.description || '<p>' + helpers.excerpt(project.short_description, 400) + '</p>' %>
+        </div>
+
+        <% if (gallery.length) { %>
+          <h3 class="mb-4" style="margin-top:44px">More screenshots</h3>
+          <div class="grid grid-2" style="gap:18px">
+            <% gallery.forEach(function (image) { %>
+              <img src="<%= helpers.url(image) %>" alt="<%= project.title %> screenshot" loading="lazy"
+                   style="border-radius:var(--radius);border:1px solid var(--border);width:100%">
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+
+      <aside>
+        <div class="card card-flat">
+          <div class="card-body-lg">
+            <h4 class="mb-4" style="font-size:1rem">Project details</h4>
+
+            <table style="font-size:.9063rem">
+              <tbody>
+                <% if (project.client_name) { %>
+                  <tr>
+                    <td style="padding:11px 0;color:var(--text-soft);border-bottom:1px solid var(--border)">Client</td>
+                    <td style="padding:11px 0;text-align:right;font-weight:600;border-bottom:1px solid var(--border)"><%= project.client_name %></td>
+                  </tr>
+                <% } %>
+                <% if (project.category) { %>
+                  <tr>
+                    <td style="padding:11px 0;color:var(--text-soft);border-bottom:1px solid var(--border)">Category</td>
+                    <td style="padding:11px 0;text-align:right;font-weight:600;border-bottom:1px solid var(--border)"><%= project.category %></td>
+                  </tr>
+                <% } %>
+                <% if (project.completed_at) { %>
+                  <tr>
+                    <td style="padding:11px 0;color:var(--text-soft);border-bottom:1px solid var(--border)">Completed</td>
+                    <td style="padding:11px 0;text-align:right;font-weight:600;border-bottom:1px solid var(--border)"><%= helpers.formatDate(project.completed_at) %></td>
+                  </tr>
+                <% } %>
+              </tbody>
+            </table>
+
+            <% if (technologies.length) { %>
+              <h4 class="mb-4" style="font-size:1rem;margin-top:26px">Built with</h4>
+              <div style="display:flex;flex-wrap:wrap;gap:7px">
+                <% technologies.forEach(function (tech) { %>
+                  <span class="pill pill-muted no-dot"><%= tech %></span>
+                <% }); %>
+              </div>
+            <% } %>
+
+            <% if (project.project_url) { %>
+              <a href="<%= project.project_url %>" target="_blank" rel="noopener noreferrer nofollow"
+                 class="btn btn-primary btn-block mt-5">
+                Visit live website
+                <svg><use href="#i-external"/></svg>
+              </a>
+            <% } %>
+
+            <a href="<%= helpers.url('/contact?project=' + encodeURIComponent(project.title)) %>"
+               class="btn btn-outline btn-block" style="margin-top:11px">
+              I want something like this
+            </a>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <% if (related.length) { %>
+      <div style="margin-top:72px">
+        <h2 class="mb-5">More of our work</h2>
+        <div class="grid grid-3">
+          <% related.forEach(function (item) { %>
+            <a href="<%= helpers.url('/portfolio/' + item.slug) %>" class="portfolio-card" data-reveal>
+              <div class="card-media">
+                <% if (item.thumbnail) { %>
+                  <img src="<%= helpers.url(item.thumbnail) %>" alt="<%= item.title %>" loading="lazy" width="400" height="300">
+                <% } else { %>
+                  <div style="width:100%;height:100%;display:grid;place-items:center;background:var(--gradient-soft);color:var(--primary)">
+                    <svg style="width:46px;height:46px"><use href="#i-layout"/></svg>
+                  </div>
+                <% } %>
+              </div>
+              <div class="overlay">
+                <h3><%= item.title %></h3>
+                <span class="meta"><%= item.category || item.client_name || 'Web design' %></span>
+              </div>
+            </a>
+          <% }); %>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</section>
+
+<%- include('../partials/cta-band') %>

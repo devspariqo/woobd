@@ -1,0 +1,247 @@
+<%#
+  Admin settings.
+  Expects: group, groups[], fields[], errors (optional), captchaConfigured,
+  googleConfigured, adminPath, csrfToken, helpers, site.
+
+  The whole page is generated from src/config/settings-schema.js. Each field is
+  rendered by its declared `type`, so adding a setting to the registry makes it
+  editable here with no change to this template.
+%>
+<%
+  var base = '/' + adminPath;
+  var settingsUrl = helpers.url(base + '/settings');
+  var isHexColour = function (v) { return typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v); };
+  var currentGroupLabel = 'Settings';
+  groups.forEach(function (g) { if (g.key === group) currentGroupLabel = g.label; });
+
+  // Boolean keys in this group, so we can warn when a toggle is on but the
+  // credentials it depends on are missing.
+  var boolField = function (key) {
+    var found = null;
+    fields.forEach(function (f) { if (f.key === key) found = f; });
+    return found;
+  };
+  var captchaToggles = ['captcha_on_login', 'captcha_on_signup', 'captcha_on_admin', 'captcha_on_contact']
+    .map(boolField).filter(function (f) { return f && f.value === '1'; });
+  var googleToggles = ['google_auth_on_login', 'google_auth_on_signup']
+    .map(boolField).filter(function (f) { return f && f.value === '1'; });
+%>
+
+<div class="tab-bar" style="margin-bottom:20px">
+  <% groups.forEach(function (g) { %>
+    <a href="<%= settingsUrl %>?group=<%= g.key %>" class="<%= group === g.key ? 'active' : '' %>">
+      <%= g.label %>
+    </a>
+  <% }); %>
+</div>
+
+<%#
+  Connection warnings. These are the difference between "the toggle is on" and
+  "the feature actually works" - a CAPTCHA switch with no keys silently does
+  nothing, and that is worth saying out loud.
+%>
+<% if (group === 'security' && captchaToggles.length && !captchaConfigured) { %>
+  <div class="alert alert-warning" role="status">
+    <svg><use href="#i-alert"/></svg>
+    <div>
+      <strong>CAPTCHA is switched on but not configured.</strong>
+      Add both the reCAPTCHA site key and secret key below, or the checkbox will not
+      appear and submissions will not be verified. Until then the forms stay open,
+      which is the safe failure - nobody is locked out.
+      <div style="margin-top:7px;font-size:.8125rem">
+        Get keys at <a href="https://www.google.com/recaptcha/admin" target="_blank" rel="noopener noreferrer">google.com/recaptcha/admin</a>
+        — choose <strong>reCAPTCHA v2</strong> → <strong>"I'm not a robot" Checkbox</strong>.
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<% if (group === 'google' && googleToggles.length && !googleConfigured) { %>
+  <div class="alert alert-warning" role="status">
+    <svg><use href="#i-alert"/></svg>
+    <div>
+      <strong>Google sign-in buttons are switched on but not configured.</strong>
+      Add the client ID and client secret below. The buttons stay hidden until both are
+      present, so nothing is broken in the meantime - customers just use email and password.
+      <div style="margin-top:7px;font-size:.8125rem">
+        Authorised redirect URI must be exactly
+        <code><%= helpers.absoluteUrl('/auth/google/callback') %></code>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<% if (group === 'google' && googleConfigured && googleToggles.length) { %>
+  <div class="alert alert-success" role="status">
+    <svg><use href="#i-check-circle"/></svg>
+    <div>Google sign-in is configured and the buttons are live on the pages you selected below.</div>
+  </div>
+<% } %>
+
+<div class="panel">
+  <div class="panel-head">
+    <h2 style="font-size:1rem;font-weight:700;margin:0"><%= currentGroupLabel %></h2>
+    <span style="font-size:.8125rem;color:var(--text-soft)">
+      <%= fields.length %> setting<%= fields.length === 1 ? '' : 's' %>
+    </span>
+  </div>
+
+  <form method="post" action="<%= settingsUrl %>" enctype="multipart/form-data" data-validate>
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="group" value="<%= group %>">
+
+    <div class="panel-body">
+      <% fields.forEach(function (f) { %>
+        <%
+          var hasError = errors && errors[f.key];
+          var controlId = 'set-' + f.key;
+        %>
+        <div class="setting-row">
+          <div class="setting-text">
+            <label class="setting-label" for="<%= controlId %>"><%= f.label %></label>
+            <% if (f.help) { %>
+              <p class="setting-help"><%= f.help %></p>
+            <% } %>
+            <% if (hasError) { %>
+              <p class="form-error" style="margin-top:6px"><%= errors[f.key] %></p>
+            <% } %>
+          </div>
+
+          <div class="setting-control">
+            <% if (f.type === 'boolean') { %>
+              <label class="switch" data-on="On" data-off="Off">
+                <input type="checkbox" id="<%= controlId %>" name="<%= f.key %>" value="1"
+                       <%= f.value === '1' ? 'checked' : '' %>>
+                <span class="track"></span>
+                <span class="switch-state"><%= f.value === '1' ? 'On' : 'Off' %></span>
+              </label>
+
+            <% } else if (f.type === 'file') { %>
+              <%#
+                Brand assets. The file input is named after the setting key so
+                multer leaves it on file.fieldname and the controller can match
+                it back. Leaving it empty keeps the stored file; ticking remove
+                clears it and the bundled default takes over again.
+              %>
+              <%
+                var currentFile = f.value ? helpers.url(f.value) : '';
+                // Only the site's own brand assets have a bundled default. Any
+                // other file setting (payment marks, for instance) has none, so
+                // showing the WooBD logo there would be a lie.
+                var brandFallbacks = {
+                  favicon: '/assets/img/favicon.svg',
+                  logo_dark: '/assets/img/logo-dark.svg',
+                  logo_footer: '/assets/img/logo-dark.svg',
+                  logo_light: '/assets/img/logo-light.svg'
+                };
+                var fallbackFile = brandFallbacks[f.key] ? helpers.url(brandFallbacks[f.key]) : '';
+              %>
+              <div class="brand-field">
+                <div class="brand-preview">
+                  <% if (currentFile || fallbackFile) { %>
+                    <img id="<%= controlId %>-preview" src="<%= currentFile || fallbackFile %>"
+                         alt="<%= f.label %> preview">
+                  <% } else { %>
+                    <img id="<%= controlId %>-preview" src="" alt="" hidden>
+                    <span class="brand-empty" id="<%= controlId %>-empty">No file</span>
+                  <% } %>
+                </div>
+                <div style="flex:1;min-width:0">
+                  <input type="file" class="form-control" id="<%= controlId %>" name="<%= f.key %>"
+                         accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif,image/avif"
+                         data-preview="<%= controlId %>-preview"
+                         data-max-mb="<%= uploadLimits.logos.maxMb %>">
+                  <p class="form-hint">
+                    <% if (currentFile) { %>
+                      Custom file in use. Choose a new one to replace it.
+                    <% } else if (fallbackFile) { %>
+                      Using the bundled default — shown above.
+                    <% } else { %>
+                      No file uploaded — the method is shown as a text badge instead.
+                    <% } %>
+                    PNG, JPG, WebP, GIF, AVIF or SVG, up to <%= uploadLimits.logos.maxMb %> MB.
+                  </p>
+                  <% if (currentFile) { %>
+                    <label class="checkbox" style="margin-top:8px">
+                      <input type="checkbox" name="clear_<%= f.key %>" value="1">
+                      <span>Remove this file and go back to the bundled default</span>
+                    </label>
+                  <% } %>
+                </div>
+              </div>
+
+            <% } else if (f.isSecret) { %>
+              <%#
+                A stored secret is never sent to the browser, so the field is
+                always blank. Without a visible confirmation an operator cannot
+                tell whether their key saved - which reads as "it did not save".
+                Show where the value comes from and a masked preview of it.
+              %>
+              <% if (f.hasValue) { %>
+                <span class="secret-state">
+                  <svg style="width:13px;height:13px"><use href="#i-check-circle"/></svg>
+                  Saved<% if (f.masked) { %> <code class="secret-mask"><%= f.masked %></code><% } %>
+                </span>
+              <% } else if (f.fromEnv) { %>
+                <span class="secret-state is-env">
+                  <svg style="width:13px;height:13px"><use href="#i-info"/></svg>
+                  Using the value from your environment
+                  <% if (f.masked) { %><code class="secret-mask"><%= f.masked %></code><% } %>
+                </span>
+              <% } else { %>
+                <span class="secret-state is-missing">
+                  <svg style="width:13px;height:13px"><use href="#i-alert"/></svg>
+                  Not set — this feature is inactive
+                </span>
+              <% } %>
+              <input type="password" class="form-control" id="<%= controlId %>" name="<%= f.key %>"
+                     value="" autocomplete="new-password"
+                     placeholder="<%= f.effective ? 'Leave blank to keep the current value' : 'Paste your key here' %>">
+
+            <% } else if (f.type === 'textarea') { %>
+              <textarea class="form-control" id="<%= controlId %>" name="<%= f.key %>" rows="5"><%= f.value %></textarea>
+
+            <% } else if (f.type === 'select') { %>
+              <select class="form-control" id="<%= controlId %>" name="<%= f.key %>">
+                <% (f.options || []).forEach(function (opt) { %>
+                  <option value="<%= opt %>" <%= String(f.value) === String(opt) ? 'selected' : '' %>><%= opt %></option>
+                <% }); %>
+              </select>
+
+            <% } else if (f.type === 'number') { %>
+              <input type="number" class="form-control" id="<%= controlId %>" name="<%= f.key %>"
+                     value="<%= f.value %>" min="0" step="1">
+
+            <% } else if (isHexColour(f.value)) { %>
+              <%# A colour setting: keep the hex field authoritative, with a picker beside it. %>
+              <div class="input-group">
+                <input type="text" class="form-control" id="<%= controlId %>" name="<%= f.key %>"
+                       value="<%= f.value %>" maxlength="7" spellcheck="false">
+                <input type="color" class="form-control" style="max-width:56px;padding:3px;cursor:pointer"
+                       value="<%= f.value %>" data-colour-picker="<%= controlId %>" aria-label="Pick <%= f.label %>">
+              </div>
+
+            <% } else { %>
+              <input type="text" class="form-control" id="<%= controlId %>" name="<%= f.key %>"
+                     value="<%= f.value %>" spellcheck="false">
+            <% } %>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+
+    <div class="panel-foot" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+      <p style="margin:0;font-size:.8125rem;color:var(--text-soft)">
+        <% if (fields.some(function (f) { return f.isSecret; })) { %>
+          Saved secrets are never sent to the browser. Leave a secret field blank to keep it unchanged.
+        <% } else { %>
+          Changes take effect immediately for new requests.
+        <% } %>
+      </p>
+      <button type="submit" class="btn btn-primary">
+        <svg><use href="#i-check"/></svg>
+        Save <%= currentGroupLabel %>
+      </button>
+    </div>
+  </form>
+</div>

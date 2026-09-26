@@ -1,0 +1,180 @@
+<%
+  const c = counts || {};
+  const num = function (v) { return Number(v || 0); };
+  const cur = site.currency;
+  const money = helpers.money;
+  const tabs = [
+    ['', 'All', num(c.total)],
+    ['pending', 'Pending', num(c.pending)],
+    ['in_progress', 'In progress', num(c.in_progress)],
+    ['active', 'Active', num(c.active)],
+    ['completed', 'Completed', num(c.completed)],
+    ['on_hold', 'On hold', num(c.on_hold)],
+    ['cancelled', 'Cancelled', num(c.cancelled)]
+  ];
+  var query_ = function (overrides) {
+    var params = [];
+    var merged = Object.assign({}, query || {}, overrides || {});
+    Object.keys(merged).forEach(function (key) {
+      if (key === 'page' || merged[key] === undefined || merged[key] === '') return;
+      params.push(encodeURIComponent(key) + '=' + encodeURIComponent(merged[key]));
+    });
+    return helpers.url('/' + adminPath + '/orders' + (params.length ? '?' + params.join('&') : ''));
+  };
+%>
+
+<div class="tab-bar" style="margin-bottom:20px">
+  <% tabs.forEach(function (tab) { %>
+    <a href="<%= query_({ status: tab[0] }) %>" class="<%= (activeStatus || '') === tab[0] ? 'active' : '' %>">
+      <%= tab[1] %>
+      <% if (tab[2]) { %><span class="tab-count"><%= tab[2] %></span><% } %>
+    </a>
+  <% }); %>
+</div>
+
+<div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">
+  <div class="stat-tile">
+    <div class="ico tone-primary"><svg><use href="#i-package"/></svg></div>
+    <div>
+      <div class="value"><%= num(c.total) %></div>
+      <div class="label">Orders</div>
+    </div>
+  </div>
+  <div class="stat-tile">
+    <div class="ico tone-success"><svg><use href="#i-dollar"/></svg></div>
+    <div>
+      <div class="value"><%= money(c.gross_value, cur) %></div>
+      <div class="label">Gross value</div>
+    </div>
+  </div>
+  <div class="stat-tile">
+    <div class="ico tone-info"><svg><use href="#i-check-circle"/></svg></div>
+    <div>
+      <div class="value"><%= money(c.paid_value, cur) %></div>
+      <div class="label">Paid value</div>
+    </div>
+  </div>
+  <div class="stat-tile">
+    <div class="ico tone-warning"><svg><use href="#i-clock"/></svg></div>
+    <div>
+      <div class="value"><%= money(num(c.gross_value) - num(c.paid_value), cur) %></div>
+      <div class="label">Outstanding</div>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <form class="toolbar" method="get" action="<%= helpers.url('/' + adminPath + '/orders') %>"
+          style="margin:0;padding:0;border:0;box-shadow:none;background:transparent">
+      <% if (activeStatus) { %><input type="hidden" name="status" value="<%= activeStatus %>"><% } %>
+      <% if (activePayment) { %><input type="hidden" name="payment" value="<%= activePayment %>"><% } %>
+
+      <div class="search-box">
+        <svg><use href="#i-search"/></svg>
+        <input type="search" name="q" class="form-control" value="<%= search %>"
+               placeholder="Order number, customer, package or domain…" aria-label="Search orders">
+      </div>
+
+      <select name="payment" class="form-control" aria-label="Filter by payment status">
+        <option value="">Any payment</option>
+        <% ['unpaid', 'partial', 'paid', 'refunded'].forEach(function (state) { %>
+          <option value="<%= state %>" <%= activePayment === state ? 'selected' : '' %>><%= helpers.humanise(state) %></option>
+        <% }); %>
+      </select>
+
+      <select name="sort" class="form-control" aria-label="Sort orders">
+        <% [['newest','Newest first'],['oldest','Oldest first'],['amount_high','Highest value'],['amount_low','Lowest value'],['due','Due soonest']].forEach(function (opt) { %>
+          <option value="<%= opt[0] %>" <%= sort === opt[0] ? 'selected' : '' %>><%= opt[1] %></option>
+        <% }); %>
+      </select>
+
+      <button type="submit" class="btn btn-outline btn-sm">Apply</button>
+      <% if (search || activePayment || (activeStatus && sort !== 'newest')) { %>
+        <a href="<%= helpers.url('/' + adminPath + '/orders' + (activeStatus ? '?status=' + activeStatus : '')) %>" class="btn btn-ghost btn-sm">Reset</a>
+      <% } %>
+    </form>
+  </div>
+
+  <% if (orders && orders.length) { %>
+    <div class="table-wrap">
+      <table class="dash-table">
+        <thead>
+          <tr>
+            <th>Order</th>
+            <th>Customer</th>
+            <th>Package</th>
+            <th>Status</th>
+            <th>Payment</th>
+            <th>Due</th>
+            <th class="num">Total</th>
+            <th class="num">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% orders.forEach(function (order) { %>
+            <%
+              // Flag overdue work so it stands out in a long list.
+              var overdue = order.due_at && ['pending','in_progress'].includes(order.status)
+                && new Date(order.due_at) < new Date();
+            %>
+            <tr>
+              <td>
+                <a href="<%= helpers.url('/' + adminPath + '/orders/' + order.id) %>" class="strong"><%= order.order_number %></a>
+                <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px"><%= helpers.formatDate(order.created_at) %></div>
+              </td>
+              <td style="font-size:.8438rem">
+                <%= order.customer_name %>
+                <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px"><%= order.customer_email %></div>
+              </td>
+              <td style="font-size:.8438rem">
+                <%= helpers.excerpt(order.service_title, 30) %>
+                <% if (order.domain_name) { %>
+                  <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px"><%= order.domain_name %></div>
+                <% } %>
+              </td>
+              <td>
+                <span class="pill pill-<%= helpers.statusTone(order.status) %>"><%= helpers.humanise(order.status) %></span>
+                <% if (order.status === 'active') { %>
+                  <div style="font-size:.7rem;color:var(--success);font-weight:600;margin-top:3px">Live</div>
+                <% } %>
+              </td>
+              <td><span class="pill pill-<%= helpers.statusTone(order.payment_status) %>"><%= helpers.humanise(order.payment_status) %></span></td>
+              <td style="font-size:.8125rem;white-space:nowrap;<%= overdue ? 'color:var(--danger);font-weight:600' : 'color:var(--text-soft)' %>">
+                <%= order.due_at ? helpers.formatDate(order.due_at) : '—' %>
+                <% if (overdue) { %><div style="font-size:.7rem">Overdue</div><% } %>
+              </td>
+              <td class="num strong"><%= money(order.total, cur) %></td>
+              <td>
+                <div class="actions">
+                  <a href="<%= helpers.url('/' + adminPath + '/orders/' + order.id) %>" class="btn btn-outline btn-sm">Manage</a>
+                </div>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if (pager.totalPages > 1) { %>
+      <div class="panel-foot">
+        <%- include('../partials/pagination', { baseUrl: '/' + adminPath + '/orders' }) %>
+      </div>
+    <% } %>
+  <% } else { %>
+    <div class="empty-state">
+      <div class="ico"><svg><use href="#i-package"/></svg></div>
+      <h3>No orders <%= (search || activeStatus || activePayment) ? 'match those filters' : 'yet' %></h3>
+      <p>
+        <% if (search || activeStatus || activePayment) { %>
+          Try widening the filters or clearing the search.
+        <% } else { %>
+          When a customer orders a package from the public site it will appear here.
+        <% } %>
+      </p>
+      <% if (search || activePayment) { %>
+        <a href="<%= helpers.url('/' + adminPath + '/orders') %>" class="btn btn-primary">Clear filters</a>
+      <% } %>
+    </div>
+  <% } %>
+</div>

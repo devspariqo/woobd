@@ -1,0 +1,103 @@
+<%
+  const url = function (p) { return helpers.url('/' + adminPath + '/contacts' + p); };
+  const tabs = [
+    ['', 'All'],
+    ['new', 'New'],
+    ['read', 'Read'],
+    ['replied', 'Replied'],
+    ['archived', 'Archived']
+  ];
+%>
+
+<div class="tab-bar" style="margin-bottom:20px">
+  <% tabs.forEach(function (tab) { %>
+    <a href="<%= url(tab[0] ? '?status=' + tab[0] : '') %>" class="<%= (activeStatus || '') === tab[0] ? 'active' : '' %>">
+      <%= tab[1] %>
+    </a>
+  <% }); %>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <form class="toolbar" method="get" action="<%= url('') %>"
+          style="margin:0;padding:0;border:0;box-shadow:none;background:transparent">
+      <% if (activeStatus) { %><input type="hidden" name="status" value="<%= activeStatus %>"><% } %>
+      <div class="search-box">
+        <svg><use href="#i-search"/></svg>
+        <input type="search" name="q" class="form-control" value="<%= search %>"
+               placeholder="Name, email or message…" aria-label="Search messages">
+      </div>
+      <button type="submit" class="btn btn-outline btn-sm">Search</button>
+      <% if (search) { %><a href="<%= url(activeStatus ? '?status=' + activeStatus : '') %>" class="btn btn-ghost btn-sm">Clear</a><% } %>
+    </form>
+  </div>
+
+  <% if (messages && messages.length) { %>
+    <div class="panel-body" style="padding:0">
+      <% messages.forEach(function (m) { %>
+        <div class="contact-msg">
+          <div class="contact-msg-head">
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+                <strong style="font-size:.9375rem"><%= m.name %></strong>
+                <span class="pill pill-<%= m.status === 'new' ? 'warning' : m.status === 'replied' ? 'success' : 'muted' %>"><%= helpers.humanise(m.status) %></span>
+                <% if (m.source && m.source !== 'contact_page') { %>
+                  <span class="pill pill-info"><%= helpers.humanise(m.source) %></span>
+                <% } %>
+                <time data-relative datetime="<%= new Date(m.created_at).toISOString() %>"
+                      style="margin-left:auto;font-size:.75rem;color:var(--text-soft)"><%= helpers.timeAgo(m.created_at) %></time>
+              </div>
+              <div style="font-size:.8125rem;color:var(--text-soft);margin-top:4px">
+                <a href="mailto:<%= m.email %>"><%= m.email %></a>
+                <% if (m.phone) { %> · <a href="tel:<%= m.phone %>"><%= m.phone %></a><% } %>
+                <% if (m.subject) { %> · <span style="color:var(--text-muted)"><%= m.subject %></span><% } %>
+              </div>
+            </div>
+          </div>
+
+          <div class="contact-msg-body"><%= m.message.replace(/\n/g, '<br>') %></div>
+
+          <div class="contact-msg-actions">
+            <a href="mailto:<%= m.email %>?subject=<%= encodeURIComponent('Re: ' + (m.subject || 'Your enquiry')) %>"
+               class="btn btn-outline btn-sm">
+              <svg><use href="#i-mail"/></svg> Reply by email
+            </a>
+
+            <% ['read','replied','archived'].forEach(function (s) { %>
+              <% if (m.status !== s) { %>
+                <form method="post" action="<%= helpers.url('/' + adminPath + '/contacts/' + m.id) %>" style="display:inline">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input type="hidden" name="status" value="<%= s %>">
+                  <button type="submit" class="btn btn-ghost btn-sm">Mark <%= s %></button>
+                </form>
+              <% } %>
+            <% }); %>
+
+            <form method="post" action="<%= helpers.url('/' + adminPath + '/contacts/' + m.id) %>" style="display:inline;margin-left:auto">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="action" value="delete">
+              <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger)"
+                      data-confirm="Delete the enquiry from <%= m.email %>? This cannot be undone.">Delete</button>
+            </form>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+
+    <% if (pager.totalPages > 1) { %>
+      <div class="panel-foot">
+        <span style="font-size:.8125rem;color:var(--text-soft)">
+          Showing <%= pager.from %>–<%= pager.to %> of <%= pager.total %>
+        </span>
+        <%- include('../partials/pagination', { baseUrl: '/' + adminPath + '/contacts' }) %>
+      </div>
+    <% } %>
+  <% } else { %>
+    <div class="empty-state">
+      <div class="ico"><svg><use href="#i-inbox"/></svg></div>
+      <h3>No messages<%= (search || activeStatus) ? ' match those filters' : ' yet' %></h3>
+      <p>Enquiries from the contact form and the homepage quote form appear here.</p>
+      <% if (search || activeStatus) { %><a href="<%= url('') %>" class="btn btn-primary">Clear filters</a><% } %>
+    </div>
+  <% } %>
+</div>

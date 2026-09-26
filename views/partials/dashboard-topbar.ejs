@@ -1,0 +1,40 @@
+<header class="dash-topbar">
+  <button type="button" class="dash-menu-btn" data-dash-toggle aria-label="Open menu">
+    <svg><use href="#i-menu"/></svg>
+  </button>
+
+  <div class="dash-topbar-title">
+    <h1><%= pageTitle %></h1>
+    <% if (typeof pageSubtitle !== 'undefined' && pageSubtitle) { %>
+      <p><%= pageSubtitle %></p>
+    <% } %>
+  </div>
+
+  <div class="dash-topbar-actions">
+    <% if (typeof pageActions !== 'undefined' && pageActions) { %>
+      <%- pageActions %>
+    <% } %>
+
+    <a href="<%= helpers.url('/services') %>" class="btn btn-primary btn-sm">
+      <svg><use href="#i-plus-circle"/></svg>
+      New order
+    </a>
+
+    <% if (showThemeToggle) { %>
+      <button type="button" class="theme-toggle" data-theme-toggle aria-label="Switch colour theme">
+        <svg class="icon-sun"><use href="#i-sun"/></svg>
+        <svg class="icon-moon"><use href="#i-moon"/></svg>
+      </button>
+    <% } %>
+
+    <div class="dash-user-mini">
+      <div class="dash-avatar dash-avatar-sm">
+        <% if (customer.avatar) { %>
+          <img src="<%= helpers.url(customer.avatar) %>" alt="<%= customer.name %>">
+        <% } else { %>
+          <span><%= helpers.initials(customer.name) %></span>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</header>

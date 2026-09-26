@@ -1,0 +1,26 @@
+<section class="section" style="padding:100px 0">
+  <div class="container container-narrow text-center">
+    <div class="feature-icon" style="margin:0 auto 24px;width:72px;height:72px;background:rgba(224,43,43,.1);color:var(--danger)">
+      <svg style="width:34px;height:34px"><use href="#i-shield"/></svg>
+    </div>
+
+    <h1 style="margin-bottom:16px;font-size:2rem">Access denied</h1>
+
+    <p style="font-size:1.0625rem;max-width:520px;margin:0 auto 34px">
+      <%= typeof message !== 'undefined' && message
+            ? message
+            : 'You do not have permission to view this page.' %>
+    </p>
+
+    <div style="display:flex;gap:13px;justify-content:center;flex-wrap:wrap">
+      <% if (isStaff) { %>
+        <a href="<%= helpers.url('/' + adminPath + '/dashboard') %>" class="btn btn-primary btn-lg">Back to dashboard</a>
+      <% } else { %>
+        <a href="<%= helpers.url(isCustomer ? '/account' : '/') %>" class="btn btn-primary btn-lg">
+          <%= isCustomer ? 'Back to my account' : 'Back to homepage' %>
+        </a>
+      <% } %>
+      <a href="<%= helpers.url('/contact') %>" class="btn btn-outline btn-lg">Contact support</a>
+    </div>
+  </div>
+</section>

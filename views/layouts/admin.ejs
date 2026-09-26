@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="<%= defaultColorMode %>">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title><%= pageTitle %> - <%= site.name %> Admin</title>
+  <meta name="description" content="<%= seo.description %>">
+  <%# The whole panel is private; keep it out of every index. %>
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <link rel="icon" type="image/svg+xml" href="<%= site.favicon %>">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=<%= encodeURIComponent(fonts.heading).replace(/%20/g, '+') %>:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="<%= helpers.url('/assets/css/theme.css') %>">
+  <link rel="stylesheet" href="<%= helpers.url('/assets/css/dashboard.css') %>">
+
+  <script>
+    // Apply the stored theme before first paint so the panel never flashes the
+    // wrong colour scheme.
+    (function () {
+      try {
+        var stored = localStorage.getItem('woobd-theme');
+        if (stored) document.documentElement.setAttribute('data-theme', stored);
+      } catch (e) {}
+    })();
+  </script>
+
+  <style>
+    :root {
+      --primary: <%= theme.primary %>;
+      --primary-dark: <%= theme.primaryDark %>;
+      --secondary: <%= theme.secondary %>;
+      --success: <%= theme.success %>;
+      --danger: <%= theme.danger %>;
+      --warning: <%= theme.warning %>;
+      --bg: <%= theme.bgLight %>;
+      --bg-alt: <%= theme.bgLightAlt %>;
+      --surface: <%= theme.bgLight %>;
+      --surface-2: <%= theme.bgLightAlt %>;
+      --text: <%= theme.textLight %>;
+      --radius: <%= theme.radius %>;
+      --font-heading: '<%= fonts.heading %>', system-ui, sans-serif;
+      --font-body: '<%= fonts.body %>', system-ui, sans-serif;
+    }
+    [data-theme='dark'] {
+      --bg: <%= theme.bgDark %>;
+      --bg-alt: <%= theme.bgDarkAlt %>;
+      --surface: #161a2e;
+      --surface-2: #1c2138;
+      --text: <%= theme.textDark %>;
+    }
+  </style>
+  <% if (typeof pageStyles !== 'undefined' && pageStyles) { %><%- pageStyles %><% } %>
+</head>
+<body class="dash-body">
+  <a href="#admin-main" class="sr-only sr-only-focusable">Skip to content</a>
+
+  <%- include('../partials/admin-sidebar') %>
+
+  <div class="dash-shell">
+    <header class="dash-topbar">
+      <button type="button" class="dash-menu-btn" data-dash-toggle aria-label="Open menu">
+        <svg><use href="#i-menu"/></svg>
+      </button>
+
+      <div class="dash-topbar-title">
+        <h1><%= pageTitle %></h1>
+        <% if (typeof pageSubtitle !== 'undefined' && pageSubtitle) { %>
+          <p><%= pageSubtitle %></p>
+        <% } %>
+      </div>
+
+      <div class="dash-topbar-actions">
+        <% if (typeof pageActions !== 'undefined' && pageActions) { %><%- pageActions %><% } %>
+
+        <a href="<%= helpers.url('/') %>" class="btn btn-ghost btn-sm" target="_blank" rel="noopener"
+           title="Open the public website in a new tab">
+          <svg><use href="#i-external"/></svg><span>View site</span>
+        </a>
+
+        <% if (showThemeToggle) { %>
+          <button type="button" class="theme-toggle" data-theme-toggle aria-label="Switch colour theme">
+            <svg class="icon-sun"><use href="#i-sun"/></svg>
+            <svg class="icon-moon"><use href="#i-moon"/></svg>
+          </button>
+        <% } %>
+
+        <div class="dash-user-mini">
+          <div class="dash-avatar dash-avatar-sm" title="<%= staff.role %>">
+            <% if (staff.avatar) { %>
+              <img src="<%= helpers.url(staff.avatar) %>" alt="<%= staff.name %>">
+            <% } else { %>
+              <span><%= helpers.initials(staff.name) %></span>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="dash-main" id="admin-main">
+      <div class="dash-container">
+        <%- include('../partials/flash') %>
+        <%- body %>
+      </div>
+    </main>
+
+    <footer class="dash-footer">
+      <div class="dash-container row-between">
+        <span>© <%= new Date().getFullYear() %> <%= site.name %> — admin panel</span>
+        <span style="display:flex;gap:18px;flex-wrap:wrap">
+          <a href="<%= helpers.url('/' + adminPath + '/activity') %>">Activity</a>
+          <a href="<%= helpers.url('/' + adminPath + '/backup') %>">Backup</a>
+          <a href="<%= helpers.url('/' + adminPath + '/logout') %>">Sign out</a>
+        </span>
+      </div>
+    </footer>
+  </div>
+
+  <%- include('../partials/icons') %>
+  <script src="<%= helpers.url('/assets/js/main.js') %>" defer></script>
+  <script src="<%= helpers.url('/assets/js/dashboard.js') %>" defer></script>
+  <% if (typeof pageScripts !== 'undefined' && pageScripts) { %><%- pageScripts %><% } %>
+</body>
+</html>

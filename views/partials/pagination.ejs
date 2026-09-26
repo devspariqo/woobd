@@ -1,0 +1,35 @@
+<%# Pagination bar. Expects `pager` from utils/paginator and `baseUrl`
+    (current path, no query). Preserves every existing query param except page. %>
+<% if (typeof pager !== 'undefined' && pager.totalPages > 1) { %>
+<%
+  var buildUrl = function (page) {
+    var params = [];
+    Object.keys(query || {}).forEach(function (key) {
+      if (key === 'page' || query[key] === undefined || query[key] === '') return;
+      params.push(encodeURIComponent(key) + '=' + encodeURIComponent(query[key]));
+    });
+    params.push('page=' + page);
+    return helpers.url((typeof baseUrl !== 'undefined' ? baseUrl : currentPath) + '?' + params.join('&'));
+  };
+  var pages = helpers.paginationRange(pager.page, pager.totalPages, 2);
+%>
+<nav class="pagination" aria-label="Pagination">
+  <a href="<%= buildUrl(pager.page - 1) %>" class="<%= pager.hasPrev ? '' : 'disabled' %>" aria-label="Previous page" <% if (!pager.hasPrev) { %>tabindex="-1"<% } %>>
+    <svg style="width:15px;height:15px"><use href="#i-chevron-left"/></svg>
+  </a>
+
+  <% pages.forEach(function (page) { %>
+    <% if (page === '...') { %>
+      <span class="dots">…</span>
+    <% } else if (page === pager.page) { %>
+      <span class="current" aria-current="page"><%= page %></span>
+    <% } else { %>
+      <a href="<%= buildUrl(page) %>"><%= page %></a>
+    <% } %>
+  <% }); %>
+
+  <a href="<%= buildUrl(pager.page + 1) %>" class="<%= pager.hasNext ? '' : 'disabled' %>" aria-label="Next page" <% if (!pager.hasNext) { %>tabindex="-1"<% } %>>
+    <svg style="width:15px;height:15px"><use href="#i-chevron-right"/></svg>
+  </a>
+</nav>
+<% } %>

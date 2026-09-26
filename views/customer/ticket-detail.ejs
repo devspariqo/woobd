@@ -1,0 +1,180 @@
+<%
+  const errs = errors || {};
+  const isClosed = ticket.status === 'closed';
+%>
+
+<div class="two-col">
+  <div>
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-head">
+        <div>
+          <h2><%= ticket.subject %></h2>
+          <p>
+            <%= ticket.ticket_number %> ·
+            <%= helpers.humanise(ticket.department) %> ·
+            opened <%= helpers.formatDateTime(ticket.created_at) %>
+          </p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <span class="pill pill-<%= helpers.statusTone(ticket.priority) %>"><%= helpers.humanise(ticket.priority) %></span>
+          <span class="pill pill-<%= helpers.statusTone(ticket.status) %>"><%= helpers.humanise(ticket.status) %></span>
+        </div>
+      </div>
+    </div>
+
+    <%# ---- Conversation thread ---- %>
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-body">
+        <% if (replies && replies.length) { %>
+          <% replies.forEach(function (reply) { %>
+            <%
+              var fromUs = reply.author_type === 'staff';
+            %>
+            <div style="display:flex;gap:13px;<%= fromUs ? 'flex-direction:row-reverse;text-align:right' : '' %>;padding-bottom:22px">
+              <div class="dash-avatar dash-avatar-sm" style="flex-shrink:0;<%= fromUs ? 'background:var(--primary);color:#fff' : '' %>">
+                <% if (fromUs) { %>
+                  <span>WB</span>
+                <% } else { %>
+                  <span><%= helpers.initials(reply.author_name) %></span>
+                <% } %>
+              </div>
+
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;gap:9px;align-items:baseline;<%= fromUs ? 'justify-content:flex-end' : '' %>;flex-wrap:wrap">
+                  <span style="font-weight:600;font-size:.9063rem">
+                    <%= fromUs ? site.name + ' Support' : reply.author_name %>
+                  </span>
+                  <span style="font-size:.75rem;color:var(--text-soft)">
+                    <span data-relative="<%= new Date(reply.created_at).toISOString() %>"><%= helpers.timeAgo(reply.created_at) %></span>
+                  </span>
+                  <% if (fromUs) { %>
+                    <span class="pill pill-success" style="font-size:.68rem">Support</span>
+                  <% } %>
+                </div>
+
+                <div style="margin-top:9px;padding:14px 16px;background:<%= fromUs ? 'rgba(91,33,240,.06)' : 'var(--bg-alt)' %>;border-radius:var(--radius-sm);font-size:.9375rem;line-height:1.75;white-space:pre-wrap;text-align:left"><%= reply.message %></div>
+
+                <% if (reply.attachment) { %>
+                  <div style="margin-top:9px">
+                    <a href="<%= helpers.url(reply.attachment) %>" target="_blank" rel="noopener"
+                       class="btn btn-outline btn-sm"><svg><use href="#i-file"/></svg> View attachment</a>
+                  </div>
+                <% } %>
+              </div>
+            </div>
+          <% }); %>
+        <% } else { %>
+          <p style="color:var(--text-soft);margin:0">No messages on this ticket yet.</p>
+        <% } %>
+      </div>
+
+      <%# ---- Reply box ---- %>
+      <% if (!isClosed) { %>
+        <div class="panel-foot" style="background:var(--surface);padding:22px">
+          <form method="post" action="<%= helpers.url('/account/tickets/' + ticket.id + '/reply') %>" enctype="multipart/form-data" data-validate novalidate>
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="hidden" name="ticket_id" value="<%= ticket.id %>">
+
+            <div class="form-group">
+              <label for="message" class="form-label">Your reply</label>
+              <textarea id="message" name="message" rows="5" class="form-control <%= errs.message ? 'is-invalid' : '' %>"
+                        placeholder="Add more detail, answer our question, or attach a screenshot…"
+                        maxlength="8000" required></textarea>
+              <% if (errs.message) { %><div class="form-error"><%= errs.message %></div><% } %>
+            </div>
+
+            <div class="form-group">
+              <label for="attachment" class="form-label">Attach a file <span class="optional">(optional)</span></label>
+              <input type="file" id="attachment" name="attachment" class="form-control" accept="image/*,application/pdf" data-max-mb="<%= uploadLimits.tickets.maxMb %>">
+              <div class="form-hint">Screenshots help a lot. Images or PDF, up to 5 MB.</div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">
+              <svg><use href="#i-send"/></svg> Send reply
+            </button>
+          </form>
+        </div>
+      <% } else { %>
+        <div class="panel-foot">
+          <div class="alert alert-info" style="margin:0;padding:11px 13px">
+            <svg><use href="#i-info"/></svg>
+            <div style="font-size:.875rem">This ticket is closed. Send a reply below to reopen it.</div>
+          </div>
+          <form method="post" action="<%= helpers.url('/account/tickets/' + ticket.id + '/reply') %>" data-validate style="margin-top:14px">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="hidden" name="ticket_id" value="<%= ticket.id %>">
+            <div class="form-group" style="margin-bottom:12px">
+              <textarea name="message" rows="3" class="form-control" placeholder="Type a reply to reopen this ticket…" maxlength="8000" required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">Reopen &amp; reply</button>
+          </form>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-head">
+        <div><h3>Ticket details</h3></div>
+      </div>
+      <div class="panel-body" style="font-size:.875rem">
+        <div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text-soft)">Number</span>
+          <span style="font-weight:600"><%= ticket.ticket_number %></span>
+        </div>
+        <div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text-soft)">Department</span>
+          <span style="font-weight:600"><%= helpers.humanise(ticket.department) %></span>
+        </div>
+        <div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text-soft)">Priority</span>
+          <span class="pill pill-<%= helpers.statusTone(ticket.priority) %>"><%= helpers.humanise(ticket.priority) %></span>
+        </div>
+        <div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text-soft)">Status</span>
+          <span class="pill pill-<%= helpers.statusTone(ticket.status) %>"><%= helpers.humanise(ticket.status) %></span>
+        </div>
+        <div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text-soft)">Opened</span>
+          <span><%= helpers.formatDate(ticket.created_at) %></span>
+        </div>
+        <% if (ticket.last_reply_at) { %>
+          <div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--border)">
+            <span style="color:var(--text-soft)">Last activity</span>
+            <span data-relative="<%= new Date(ticket.last_reply_at).toISOString() %>"><%= helpers.timeAgo(ticket.last_reply_at) %></span>
+          </div>
+        <% } %>
+        <% if (ticket.assignee_name) { %>
+          <div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--border)">
+            <span style="color:var(--text-soft)">Handled by</span>
+            <span style="font-weight:600"><%= ticket.assignee_name %></span>
+          </div>
+        <% } %>
+        <% if (ticket.order_id && ticket.order_number) { %>
+          <div class="row-between" style="padding:8px 0">
+            <span style="color:var(--text-soft)">Order</span>
+            <a href="<%= helpers.url('/account/orders/' + ticket.order_id) %>" style="font-weight:600"><%= ticket.order_number %></a>
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+    <% if (!isClosed) { %>
+      <div class="panel">
+        <div class="panel-body">
+          <div style="font-size:.8125rem;color:var(--text-soft);line-height:1.7;margin-bottom:13px">
+            Issue resolved? Closing the ticket keeps your dashboard tidy — you can reopen it any time by replying.
+          </div>
+          <form method="post" action="<%= helpers.url('/account/tickets/' + ticket.id + '/close') %>" data-validate>
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button type="submit" class="btn btn-outline btn-block btn-sm"
+                    data-confirm="Close this ticket? You can reopen it later by replying.">
+              <svg><use href="#i-check-circle"/></svg> Mark as resolved
+            </button>
+          </form>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</div>

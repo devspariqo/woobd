@@ -1,0 +1,109 @@
+<%
+  const c = counts || {};
+  const num = function (v) { return Number(v || 0); };
+  const cur = site.currency;
+  const url = function (p) { return helpers.url('/' + adminPath + '/invoices' + p); };
+  const tabs = [
+    ['', 'All', num(c.total)],
+    ['unpaid', 'Unpaid', num(c.unpaid)],
+    ['paid', 'Paid', num(c.paid)]
+  ];
+%>
+
+<div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">
+  <div class="stat-tile">
+    <div class="ico tone-primary"><svg><use href="#i-file"/></svg></div>
+    <div><div class="value"><%= num(c.total) %></div><div class="label">Invoices</div></div>
+  </div>
+  <div class="stat-tile">
+    <div class="ico tone-warning"><svg><use href="#i-clock"/></svg></div>
+    <div><div class="value"><%= helpers.money(c.outstanding, cur) %></div><div class="label">Outstanding</div></div>
+  </div>
+  <div class="stat-tile">
+    <div class="ico tone-success"><svg><use href="#i-check-circle"/></svg></div>
+    <div><div class="value"><%= helpers.money(c.collected, cur) %></div><div class="label">Collected</div></div>
+  </div>
+  <div class="stat-tile">
+    <div class="ico tone-danger"><svg><use href="#i-alert"/></svg></div>
+    <div><div class="value"><%= num(c.unpaid) %></div><div class="label">Awaiting payment</div></div>
+  </div>
+</div>
+
+<div class="tab-bar" style="margin-bottom:20px">
+  <% tabs.forEach(function (tab) { %>
+    <a href="<%= url(tab[0] ? '?status=' + tab[0] : '') %>" class="<%= (activeStatus || '') === tab[0] ? 'active' : '' %>">
+      <%= tab[1] %><% if (tab[2]) { %><span class="tab-count"><%= tab[2] %></span><% } %>
+    </a>
+  <% }); %>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <form class="toolbar" method="get" action="<%= url('') %>"
+          style="margin:0;padding:0;border:0;box-shadow:none;background:transparent">
+      <% if (activeStatus) { %><input type="hidden" name="status" value="<%= activeStatus %>"><% } %>
+      <div class="search-box">
+        <svg><use href="#i-search"/></svg>
+        <input type="search" name="q" class="form-control" value="<%= search %>"
+               placeholder="Invoice number or customer…" aria-label="Search invoices">
+      </div>
+      <button type="submit" class="btn btn-outline btn-sm">Search</button>
+      <% if (search) { %><a href="<%= url(activeStatus ? '?status=' + activeStatus : '') %>" class="btn btn-ghost btn-sm">Clear</a><% } %>
+    </form>
+  </div>
+
+  <% if (invoices && invoices.length) { %>
+    <div class="table-wrap">
+      <table class="dash-table">
+        <thead>
+          <tr>
+            <th>Invoice</th><th>Customer</th><th>Issued</th><th>Due</th>
+            <th>Status</th><th class="num">Total</th><th class="num">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% invoices.forEach(function (inv) { %>
+            <%
+              const overdue = inv.status === 'unpaid' && inv.due_date && new Date(inv.due_date) < new Date();
+            %>
+            <tr>
+              <td>
+                <a href="<%= helpers.url('/' + adminPath + '/invoices/' + inv.id) %>" class="strong"><%= inv.invoice_number %></a>
+                <% if (inv.order_number) { %>
+                  <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px">Order <%= inv.order_number %></div>
+                <% } %>
+              </td>
+              <td style="font-size:.8438rem">
+                <%= inv.customer_name || '—' %>
+                <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px;word-break:break-all"><%= inv.customer_email %></div>
+              </td>
+              <td style="font-size:.8125rem;white-space:nowrap"><%= helpers.formatDate(inv.issue_date) %></td>
+              <td style="font-size:.8125rem;white-space:nowrap">
+                <%= inv.due_date ? helpers.formatDate(inv.due_date) : '—' %>
+                <% if (overdue) { %><div><span class="pill pill-danger" style="margin-top:3px">Overdue</span></div><% } %>
+              </td>
+              <td><span class="pill pill-<%= helpers.statusTone(inv.status) %>"><%= helpers.humanise(inv.status) %></span></td>
+              <td class="num strong"><%= helpers.money(inv.total, cur) %></td>
+              <td>
+                <a href="<%= helpers.url('/' + adminPath + '/invoices/' + inv.id) %>" class="btn btn-outline btn-sm">Open</a>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if (pager.totalPages > 1) { %>
+      <div class="panel-foot">
+        <%- include('../partials/pagination', { baseUrl: '/' + adminPath + '/invoices' }) %>
+      </div>
+    <% } %>
+  <% } else { %>
+    <div class="empty-state">
+      <div class="ico"><svg><use href="#i-file"/></svg></div>
+      <h3>No invoices<%= (search || activeStatus) ? ' match those filters' : ' yet' %></h3>
+      <p>Invoices are generated when an order is placed.</p>
+      <% if (search || activeStatus) { %><a href="<%= url('') %>" class="btn btn-primary">Clear filters</a><% } %>
+    </div>
+  <% } %>
+</div>

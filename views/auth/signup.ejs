@@ -1,0 +1,130 @@
+<div class="auth-head">
+  <h1>Create your account</h1>
+  <p>Free to join. Order a package and track your project from day one.</p>
+</div>
+
+<%- include('../partials/flash') %>
+
+<% if (googleAuth.enabled && googleAuth.onSignup) { %>
+  <a href="<%= helpers.url('/auth/google?next=' + encodeURIComponent(next || '/account')) %>" class="google-btn">
+    <svg><use href="#i-google"/></svg>
+    Continue with Google
+  </a>
+  <div class="divider">or sign up with email</div>
+<% } %>
+
+<form action="<%= helpers.url('/signup') %>" method="POST" data-validate>
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <input type="hidden" name="next" value="<%= next %>">
+  <% if (packageSlug) { %><input type="hidden" name="package" value="<%= packageSlug %>"><% } %>
+  <div class="hp-field"><input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true"></div>
+
+  <div class="form-group">
+    <label class="form-label" for="name">Full name <span class="req">*</span></label>
+    <div class="input-group">
+      <svg class="input-icon"><use href="#i-user"/></svg>
+      <input type="text" id="name" name="name" class="form-control" required maxlength="120"
+             autocomplete="name" placeholder="Your full name"
+             value="<%= form && form.name ? form.name : '' %>">
+    </div>
+    <% if (errors && errors.name) { %><span class="form-error"><%= errors.name %></span><% } %>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label class="form-label" for="email">Email address <span class="req">*</span></label>
+      <div class="input-group">
+        <svg class="input-icon"><use href="#i-mail"/></svg>
+        <input type="email" id="email" name="email" class="form-control" required maxlength="191"
+               autocomplete="email" placeholder="you@business.com"
+               value="<%= form && form.email ? form.email : '' %>">
+      </div>
+      <% if (errors && errors.email) { %><span class="form-error"><%= errors.email %></span><% } %>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="phone">Phone / WhatsApp <span class="req">*</span></label>
+      <div class="input-group">
+        <svg class="input-icon"><use href="#i-phone"/></svg>
+        <input type="tel" id="phone" name="phone" class="form-control" required maxlength="30"
+               autocomplete="tel" placeholder="01789668276"
+               value="<%= form && form.phone ? form.phone : '' %>">
+      </div>
+      <% if (errors && errors.phone) { %><span class="form-error"><%= errors.phone %></span><% } %>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label" for="company">Business name <span style="color:var(--text-soft);font-weight:400">(optional)</span></label>
+    <div class="input-group">
+      <svg class="input-icon"><use href="#i-briefcase"/></svg>
+      <input type="text" id="company" name="company" class="form-control" maxlength="150"
+             autocomplete="organization" placeholder="Your shop or company name"
+             value="<%= form && form.company ? form.company : '' %>">
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label" for="password">Password <span class="req">*</span></label>
+    <div class="input-group">
+      <svg class="input-icon"><use href="#i-lock"/></svg>
+      <input type="password" id="password" name="password" class="form-control has-action" required
+             minlength="8" autocomplete="new-password" placeholder="At least 8 characters"
+             data-strength-source>
+      <button type="button" class="input-action" data-toggle-password="password" aria-label="Show password">
+        <svg style="width:17px;height:17px"><use href="#i-eye"/></svg>
+      </button>
+    </div>
+    <div class="strength">
+      <span class="strength-bar"></span><span class="strength-bar"></span>
+      <span class="strength-bar"></span><span class="strength-bar"></span>
+      <span class="strength-bar"></span>
+    </div>
+    <span class="strength-text"></span>
+    <% if (errors && errors.password) { %>
+      <span class="form-error"><%= errors.password %></span>
+    <% } else { %>
+      <span class="form-hint">Use at least 8 characters with a mix of letters and numbers.</span>
+    <% } %>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label" for="password_confirm">Confirm password <span class="req">*</span></label>
+    <div class="input-group">
+      <svg class="input-icon"><use href="#i-lock"/></svg>
+      <input type="password" id="password_confirm" name="password_confirm" class="form-control has-action"
+             required autocomplete="new-password" placeholder="Re-enter your password">
+      <button type="button" class="input-action" data-toggle-password="password_confirm" aria-label="Show password">
+        <svg style="width:17px;height:17px"><use href="#i-eye"/></svg>
+      </button>
+    </div>
+    <% if (errors && errors.password_confirm) { %><span class="form-error"><%= errors.password_confirm %></span><% } %>
+  </div>
+
+  <div class="form-group">
+    <label class="checkbox">
+      <input type="checkbox" name="terms" value="1" <%= form && form.terms ? 'checked' : '' %>>
+      <span>
+        I agree to the <a href="<%= helpers.url('/terms-conditions') %>" target="_blank">terms &amp; conditions</a>
+        and <a href="<%= helpers.url('/privacy-policy') %>" target="_blank">privacy policy</a>.
+      </span>
+    </label>
+    <% if (errors && errors.terms) { %><span class="form-error"><%= errors.terms %></span><% } %>
+  </div>
+
+  <% if (captcha.enabled && settings.captcha_on_signup === '1') { %>
+    <div class="form-group">
+      <div class="g-recaptcha" data-sitekey="<%= captcha.siteKey %>"></div>
+    </div>
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+  <% } %>
+
+  <button type="submit" class="btn btn-primary btn-block btn-lg">
+    Create my account
+    <svg><use href="#i-arrow-right"/></svg>
+  </button>
+</form>
+
+<p class="auth-foot">
+  Already have an account? <a href="<%= helpers.url('/signin' + (next ? '?next=' + encodeURIComponent(next) : '')) %>">Sign in</a>
+</p>

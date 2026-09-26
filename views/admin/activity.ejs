@@ -1,0 +1,85 @@
+<%
+  const url = function (p) { return helpers.url('/' + adminPath + '/activity' + p); };
+  const actorTone = { staff: 'primary', customer: 'info', system: 'muted' };
+
+  // Group entries by calendar day so a long log stays readable.
+  const groups = [];
+  (entries || []).forEach(function (entry) {
+    const day = helpers.formatDate(entry.created_at);
+    let group = groups[groups.length - 1];
+    if (!group || group.day !== day) {
+      group = { day: day, items: [] };
+      groups.push(group);
+    }
+    group.items.push(entry);
+  });
+%>
+
+<div class="panel">
+  <div class="panel-head">
+    <form class="toolbar" method="get" action="<%= url('') %>"
+          style="margin:0;padding:0;border:0;box-shadow:none;background:transparent">
+      <div class="search-box">
+        <svg><use href="#i-search"/></svg>
+        <input type="search" name="q" class="form-control" value="<%= search %>"
+               placeholder="Action, actor or description…" aria-label="Search activity">
+      </div>
+      <select name="actor" class="form-control" style="max-width:170px" aria-label="Actor">
+        <option value="">Everyone</option>
+        <% ['staff','customer','system'].forEach(function (a) { %>
+          <option value="<%= a %>" <%= activeActor === a ? 'selected' : '' %>><%= helpers.humanise(a) %></option>
+        <% }); %>
+      </select>
+      <button type="submit" class="btn btn-outline btn-sm">Apply</button>
+      <% if (search || activeActor) { %>
+        <a href="<%= url('') %>" class="btn btn-ghost btn-sm">Clear</a>
+      <% } %>
+    </form>
+  </div>
+
+  <% if (entries && entries.length) { %>
+    <div class="panel-body">
+      <% groups.forEach(function (group) { %>
+        <div class="activity-day"><%= group.day %></div>
+        <ol class="activity-list">
+          <% group.items.forEach(function (entry) { %>
+            <li>
+              <span class="activity-dot tone-<%= actorTone[entry.actor_type] || 'muted' %>"></span>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:.875rem">
+                  <strong><%= entry.actor_name || helpers.humanise(entry.actor_type) %></strong>
+                  <span style="color:var(--text-muted)"><%= entry.description || entry.action %></span>
+                </div>
+                <div style="font-size:.75rem;color:var(--text-soft);margin-top:3px">
+                  <code><%= entry.action %></code>
+                  <% if (entry.entity_type) { %> · <%= entry.entity_type %><% if (entry.entity_id) { %> #<%= entry.entity_id %><% } %><% } %>
+                  <% if (entry.ip_address) { %> · <%= entry.ip_address %><% } %>
+                </div>
+              </div>
+              <time datetime="<%= new Date(entry.created_at).toISOString() %>"
+                    style="font-size:.75rem;color:var(--text-soft);white-space:nowrap">
+                <%= helpers.formatDateTime(entry.created_at) %>
+              </time>
+            </li>
+          <% }); %>
+        </ol>
+      <% }); %>
+    </div>
+
+    <% if (pager.totalPages > 1) { %>
+      <div class="panel-foot">
+        <span style="font-size:.8125rem;color:var(--text-soft)">
+          Showing <%= pager.from %>–<%= pager.to %> of <%= pager.total %>
+        </span>
+        <%- include('../partials/pagination', { baseUrl: '/' + adminPath + '/activity' }) %>
+      </div>
+    <% } %>
+  <% } else { %>
+    <div class="empty-state">
+      <div class="ico"><svg><use href="#i-activity"/></svg></div>
+      <h3>No activity<%= (search || activeActor) ? ' matches those filters' : ' recorded yet' %></h3>
+      <p>Order changes, payment decisions, settings edits and logins are all recorded here.</p>
+      <% if (search || activeActor) { %><a href="<%= url('') %>" class="btn btn-primary">Clear filters</a><% } %>
+    </div>
+  <% } %>
+</div>

@@ -1,0 +1,107 @@
+<%
+  const c = counts || {};
+  const num = function (v) { return Number(v || 0); };
+  const tabs = [
+    ['', 'All', num(c.total)],
+    ['open', 'Open', num(c.open)],
+    ['answered', 'Answered', num(c.answered)],
+    ['closed', 'Closed', num(c.closed)]
+  ];
+%>
+
+<div class="row-between" style="gap:14px;flex-wrap:wrap;margin-bottom:20px">
+  <div class="tab-bar" style="margin:0">
+    <% tabs.forEach(function (tab) { %>
+      <a href="<%= helpers.url('/account/tickets' + (tab[0] ? '?status=' + tab[0] : '')) %>"
+         class="<%= (activeStatus || '') === tab[0] ? 'active' : '' %>">
+        <%= tab[1] %>
+        <% if (tab[2]) { %><span class="tab-count"><%= tab[2] %></span><% } %>
+      </a>
+    <% }); %>
+  </div>
+
+  <a href="<%= helpers.url('/account/tickets/new') %>" class="btn btn-primary btn-sm">
+    <svg><use href="#i-plus-circle"/></svg> New ticket
+  </a>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <form class="toolbar" method="get" action="<%= helpers.url('/account/tickets') %>" style="margin:0;padding:0;border:0;box-shadow:none;background:transparent">
+      <% if (activeStatus) { %><input type="hidden" name="status" value="<%= activeStatus %>"><% } %>
+      <div class="search-box">
+        <svg><use href="#i-search"/></svg>
+        <input type="search" name="q" class="form-control" value="<%= search %>"
+               placeholder="Search ticket number or subject…" aria-label="Search tickets">
+      </div>
+      <button type="submit" class="btn btn-outline btn-sm">Search</button>
+      <% if (search) { %>
+        <a href="<%= helpers.url('/account/tickets' + (activeStatus ? '?status=' + activeStatus : '')) %>" class="btn btn-ghost btn-sm">Clear</a>
+      <% } %>
+    </form>
+  </div>
+
+  <% if (tickets && tickets.length) { %>
+    <div class="table-wrap">
+      <table class="dash-table">
+        <thead>
+          <tr>
+            <th>Ticket</th>
+            <th>Department</th>
+            <th>Priority</th>
+            <th>Status</th>
+            <th>Last reply</th>
+            <th class="num">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% tickets.forEach(function (ticket) { %>
+            <tr>
+              <td>
+                <a href="<%= helpers.url('/account/tickets/' + ticket.id) %>" class="strong"><%= helpers.excerpt(ticket.subject, 52) %></a>
+                <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px">
+                  <%= ticket.ticket_number %>
+                  <% if (ticket.order_number) { %> · order <%= ticket.order_number %><% } %>
+                </div>
+              </td>
+              <td style="font-size:.8438rem"><%= helpers.humanise(ticket.department) %></td>
+              <td><span class="pill pill-<%= helpers.statusTone(ticket.priority) %>"><%= helpers.humanise(ticket.priority) %></span></td>
+              <td><span class="pill pill-<%= helpers.statusTone(ticket.status) %>"><%= helpers.humanise(ticket.status) %></span></td>
+              <td style="font-size:.8125rem;color:var(--text-soft);white-space:nowrap">
+                <% if (ticket.last_reply_at) { %>
+                  <span data-relative="<%= new Date(ticket.last_reply_at).toISOString() %>"><%= helpers.timeAgo(ticket.last_reply_at) %></span>
+                <% } else { %>
+                  <%= helpers.timeAgo(ticket.created_at) %>
+                <% } %>
+              </td>
+              <td>
+                <div class="actions">
+                  <a href="<%= helpers.url('/account/tickets/' + ticket.id) %>" class="btn btn-outline btn-sm">Open</a>
+                </div>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if (pager.totalPages > 1) { %>
+      <div class="panel-foot">
+        <%- include('../partials/pagination', { baseUrl: '/account/tickets' }) %>
+      </div>
+    <% } %>
+  <% } else { %>
+    <div class="empty-state">
+      <div class="ico"><svg><use href="#i-ticket"/></svg></div>
+      <h3><%= search || activeStatus ? 'No matching tickets' : 'No support tickets' %></h3>
+      <p>
+        <% if (search || activeStatus) { %>
+          Nothing matches those filters.
+        <% } else { %>
+          Something not working, or a question about your order? Open a ticket and we will reply within one business day.
+        <% } %>
+      </p>
+      <a href="<%= helpers.url('/account/tickets/new') %>" class="btn btn-primary">Open a ticket</a>
+    </div>
+  <% } %>
+</div>

@@ -1,0 +1,165 @@
+<footer class="site-footer">
+  <div class="footer-top">
+    <div class="container">
+      <div class="footer-grid">
+        <%# Column 1: brand, about, socials, newsletter %>
+        <div class="footer-col">
+          <div class="footer-brand">
+            <img src="<%= site.logoFooter %>" alt="<%= site.name %>" style="max-height:44px">
+          </div>
+          <p class="footer-about"><%= settings.footer_about %></p>
+
+          <% if (socials.length) { %>
+            <div class="footer-socials">
+              <% socials.forEach(function (social) { %>
+                <a href="<%= social.href %>" target="_blank" rel="noopener noreferrer nofollow"
+                   aria-label="<%= social.label %>" title="<%= social.label %>">
+                  <svg><use href="#i-<%= social.key %>"/></svg>
+                </a>
+              <% }); %>
+            </div>
+          <% } %>
+
+          <% if (settings.footer_payment_note) { %>
+            <%
+              // Each method shows its uploaded logo when there is one, and the
+              // plain name otherwise - so the footer is never empty just
+              // because the artwork has not been uploaded yet.
+              var methods = [
+                { key: 'bkash', label: 'bKash', data: payments.bkash },
+                { key: 'nagad', label: 'Nagad', data: payments.nagad },
+                { key: 'rocket', label: 'Rocket', data: payments.rocket },
+                { key: 'card', label: 'Card', data: payments.card }
+              ].filter(function (m) { return m.data.enabled; });
+            %>
+            <% if (methods.length) { %>
+              <div class="footer-payments">
+                <% methods.forEach(function (method) { %>
+                  <% if (method.data.logo) { %>
+                    <span class="payment-logo" title="<%= method.label %>">
+                      <img src="<%= helpers.url(method.data.logo) %>" alt="<%= method.label %>" loading="lazy">
+                    </span>
+                  <% } else { %>
+                    <span class="payment-chip"><%= method.label %></span>
+                  <% } %>
+                <% }); %>
+              </div>
+            <% } %>
+          <% } %>
+        </div>
+
+        <%# Column 2: quick links %>
+        <div class="footer-col">
+          <h4>Quick Links</h4>
+          <ul class="footer-links">
+            <% (menus.footerQuick.length ? menus.footerQuick : [
+                 { label: 'Home', url: '/' },
+                 { label: 'About Us', url: '/about' },
+                 { label: 'Packages', url: '/services' },
+                 { label: 'Portfolio', url: '/portfolio' },
+                 { label: 'Contact', url: '/contact' }
+               ]).forEach(function (link) { %>
+              <li>
+                <a href="<%= helpers.url(link.url) %>" <% if (link.target === '_blank') { %>target="_blank" rel="noopener"<% } %>>
+                  <svg><use href="#i-chevron-right"/></svg>
+                  <%= link.label %>
+                </a>
+              </li>
+            <% }); %>
+          </ul>
+        </div>
+
+        <%# Column 3: services %>
+        <div class="footer-col">
+          <h4>Our Services</h4>
+          <ul class="footer-links">
+            <% if (menus.footerServices.length) { %>
+              <% menus.footerServices.forEach(function (link) { %>
+                <li>
+                  <a href="<%= helpers.url(link.url) %>" <% if (link.target === '_blank') { %>target="_blank" rel="noopener"<% } %>>
+                    <svg><use href="#i-chevron-right"/></svg>
+                    <%= link.label %>
+                  </a>
+                </li>
+              <% }); %>
+            <% } else { %>
+              <% ['E-commerce Website', 'Custom Web Design', 'WooCommerce Store', 'Payment Integration', 'SEO Optimisation', 'Website Maintenance'].forEach(function (label) { %>
+                <li>
+                  <a href="<%= helpers.url('/services') %>">
+                    <svg><use href="#i-chevron-right"/></svg>
+                    <%= label %>
+                  </a>
+                </li>
+              <% }); %>
+            <% } %>
+          </ul>
+        </div>
+
+        <%# Column 4: contact details %>
+        <div class="footer-col">
+          <h4>Get In Touch</h4>
+          <ul class="footer-contact">
+            <li>
+              <span class="ico"><svg><use href="#i-map-pin"/></svg></span>
+              <span>
+                <span class="label">Office</span>
+                <%= site.address %>
+              </span>
+            </li>
+            <li>
+              <span class="ico"><svg><use href="#i-phone"/></svg></span>
+              <span>
+                <span class="label">Phone / WhatsApp</span>
+                <a href="tel:<%= site.phone.replace(/\s/g, '') %>"><%= site.phone %></a>
+              </span>
+            </li>
+            <li>
+              <span class="ico"><svg><use href="#i-mail"/></svg></span>
+              <span>
+                <span class="label">Email</span>
+                <a href="mailto:<%= site.email %>"><%= site.email %></a>
+              </span>
+            </li>
+            <% if (site.hours) { %>
+              <li>
+                <span class="ico"><svg><use href="#i-clock"/></svg></span>
+                <span>
+                  <span class="label">Hours</span>
+                  <%= site.hours %>
+                </span>
+              </li>
+            <% } %>
+          </ul>
+
+          <% if (settings.footer_show_newsletter === '1') { %>
+            <div class="footer-newsletter">
+              <h5>Tips for online sellers</h5>
+              <form class="newsletter-form" action="<%= helpers.url('/newsletter') %>" method="POST" data-validate>
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="email" name="email" placeholder="Your email address" required aria-label="Email address" maxlength="191">
+                <button type="submit" class="btn btn-primary btn-sm" aria-label="Subscribe">
+                  <svg><use href="#i-send"/></svg>
+                </button>
+              </form>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-bottom">
+    <div class="container">
+      <div>
+        © <%= new Date().getFullYear() %>
+        <a href="<%= helpers.url('/') %>"><%= site.name %></a>.
+        <%= settings.footer_credit_text || 'All rights reserved.' %>
+      </div>
+      <div class="footer-legal">
+        <a href="<%= helpers.url('/privacy-policy') %>">Privacy Policy</a>
+        <a href="<%= helpers.url('/terms-conditions') %>">Terms &amp; Conditions</a>
+        <a href="<%= helpers.url('/contact') %>">Contact</a>
+      </div>
+    </div>
+  </div>
+</footer>

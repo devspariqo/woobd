@@ -1,0 +1,160 @@
+<%
+  const errs = errors || {};
+  const u = user || {};
+  const initials = helpers.initials(u.name);
+%>
+
+<div class="two-col">
+  <div>
+    <form method="post" action="<%= helpers.url('/account/profile') %>" data-validate novalidate>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+      <div class="panel" style="margin-bottom:22px">
+        <div class="panel-head">
+          <div>
+            <h2>Your details</h2>
+            <p>We use these to contact you about orders and invoices.</p>
+          </div>
+        </div>
+
+        <div class="panel-body">
+          <div class="form-group">
+            <label for="name" class="form-label">Full name <span class="req">*</span></label>
+            <input type="text" id="name" name="name" class="form-control <%= errs.name ? 'is-invalid' : '' %>"
+                   value="<%= u.name || '' %>" maxlength="120" required>
+            <% if (errs.name) { %><div class="form-error"><%= errs.name %></div><% } %>
+          </div>
+
+          <div class="form-group">
+            <label for="email_display" class="form-label">Email address</label>
+            <input type="email" id="email_display" class="form-control" value="<%= u.email %>" disabled>
+            <div class="form-hint">
+              Your email cannot be changed here because it identifies your account.
+              Contact support if you need to move to a different address.
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="phone" class="form-label">Mobile number <span class="req">*</span></label>
+            <input type="tel" id="phone" name="phone" class="form-control <%= errs.phone ? 'is-invalid' : '' %>"
+                   value="<%= u.phone || '' %>" placeholder="01XXXXXXXXX" maxlength="30" required>
+            <% if (errs.phone) { %><div class="form-error"><%= errs.phone %></div><% } %>
+            <div class="form-hint">Bangladeshi numbers only — this is how we reach you fastest.</div>
+          </div>
+
+          <div class="form-group">
+            <label for="company" class="form-label">Business name <span class="optional">(optional)</span></label>
+            <input type="text" id="company" name="company" class="form-control"
+                   value="<%= u.company || '' %>" maxlength="150" placeholder="Your shop or company name">
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h3>Address</h3>
+            <p>Shown on your invoices.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="form-group">
+            <label for="address" class="form-label">Street address <span class="optional">(optional)</span></label>
+            <input type="text" id="address" name="address" class="form-control"
+                   value="<%= u.address || '' %>" maxlength="255" placeholder="House, road, area">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="city" class="form-label">City <span class="optional">(optional)</span></label>
+              <input type="text" id="city" name="city" class="form-control"
+                     value="<%= u.city || '' %>" maxlength="80" placeholder="Rangpur">
+            </div>
+
+            <div class="form-group">
+              <label for="country" class="form-label">Country</label>
+              <input type="text" id="country" name="country" class="form-control"
+                     value="<%= u.country || 'Bangladesh' %>" maxlength="80">
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary">
+            <svg><use href="#i-check-circle"/></svg> Save changes
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div>
+    <%# ---- Photo upload is its own form: the controller handles it separately,
+        so nesting it inside the profile form would post the wrong action. ---- %>
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-head">
+        <div><h3>Profile photo</h3></div>
+      </div>
+      <div class="panel-body">
+        <div style="display:flex;gap:18px;align-items:center;margin-bottom:20px">
+          <div class="dash-avatar" style="width:78px;height:78px;font-size:1.5rem;flex-shrink:0">
+            <% if (u.avatar) { %>
+              <img src="<%= helpers.url(u.avatar) %>" alt="<%= u.name %>">
+            <% } else { %>
+              <span><%= initials %></span>
+            <% } %>
+          </div>
+          <div style="min-width:0">
+            <div style="font-weight:600;font-size:.9375rem"><%= u.name %></div>
+            <div style="font-size:.8125rem;color:var(--text-soft);margin-top:3px"><%= u.email %></div>
+          </div>
+        </div>
+
+        <form method="post" action="<%= helpers.url('/account/profile/avatar') %>" enctype="multipart/form-data" data-validate novalidate>
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <div class="form-group">
+            <label for="avatar" class="form-label">Choose an image</label>
+            <input type="file" id="avatar" name="avatar" class="form-control" accept="image/*"
+                   data-preview="avatar-preview" data-max-mb="<%= uploadLimits.avatars.maxMb %>" required>
+            <div class="form-hint">
+              JPG, PNG, WebP, GIF or SVG, up to <%= uploadLimits.avatars.maxMb %> MB.
+              A square image works best — it is shown as a circle.
+            </div>
+            <div id="avatar-preview" style="margin-top:11px"></div>
+          </div>
+          <button type="submit" class="btn btn-outline btn-sm">
+            <svg><use href="#i-upload"/></svg> Upload photo
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div><h3>Account</h3></div>
+      </div>
+      <div class="panel-body" style="font-size:.875rem">
+        <div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text-soft)">Member since</span>
+          <span><%= helpers.formatDate(u.created_at) %></span>
+        </div>
+        <div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text-soft)">Sign-in method</span>
+          <span style="font-weight:600"><%= u.google_id && !u.password_hash ? 'Google' : 'Email & password' %></span>
+        </div>
+        <div class="row-between" style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text-soft)">Email verified</span>
+          <span class="pill pill-<%= u.email_verified_at ? 'success' : 'warning' %>">
+            <%= u.email_verified_at ? 'Yes' : 'Not yet' %>
+          </span>
+        </div>
+        <div class="row-between" style="padding:8px 0">
+          <span style="color:var(--text-soft)">Last sign-in</span>
+          <span><%= u.last_login_at ? helpers.timeAgo(u.last_login_at) : '—' %></span>
+        </div>
+
+        <a href="<%= helpers.url('/account/security') %>" class="btn btn-outline btn-block btn-sm" style="margin-top:15px">
+          <svg><use href="#i-shield"/></svg> Security settings
+        </a>
+      </div>
+    </div>
+  </div>
+</div>

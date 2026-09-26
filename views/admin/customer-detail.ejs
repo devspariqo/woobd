@@ -1,0 +1,285 @@
+<%
+  const cur = site.currency;
+  const money = helpers.money;
+  const paidTotal = (payments || []).filter(function (p) { return p.status === 'approved'; })
+    .reduce(function (sum, p) { return sum + Number(p.amount); }, 0);
+%>
+
+<div class="two-col">
+  <div>
+    <%# ---- Editing ---- %>
+    <form method="post" action="<%= helpers.url('/' + adminPath + '/customers/' + customer.id) %>" data-validate novalidate>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+      <div class="panel" style="margin-bottom:22px">
+        <div class="panel-head">
+          <div>
+            <h2>Customer record</h2>
+            <p>Edits are recorded in the activity log.</p>
+          </div>
+          <span class="pill pill-<%= helpers.statusTone(customer.status) %>"><%= helpers.humanise(customer.status) %></span>
+        </div>
+
+        <div class="panel-body">
+          <div class="form-group">
+            <label for="name" class="form-label">Full name <span class="req">*</span></label>
+            <input type="text" id="name" name="name" class="form-control" value="<%= customer.name %>" maxlength="120" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Email address</label>
+            <input type="email" class="form-control" value="<%= customer.email %>" disabled>
+            <div class="form-hint">
+              The email is the account identifier and cannot be changed here.
+              <% if (customer.email_verified_at) { %>
+                <span style="color:var(--success);font-weight:600">Verified.</span>
+              <% } else { %>
+                <span style="color:var(--warning);font-weight:600">Not yet verified.</span>
+              <% } %>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="phone" class="form-label">Phone</label>
+              <input type="tel" id="phone" name="phone" class="form-control" value="<%= customer.phone || '' %>" maxlength="30">
+            </div>
+            <div class="form-group">
+              <label for="company" class="form-label">Business</label>
+              <input type="text" id="company" name="company" class="form-control" value="<%= customer.company || '' %>" maxlength="150">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="address" class="form-label">Address</label>
+            <input type="text" id="address" name="address" class="form-control" value="<%= customer.address || '' %>" maxlength="255">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="city" class="form-label">City</label>
+              <input type="text" id="city" name="city" class="form-control" value="<%= customer.city || '' %>" maxlength="80">
+            </div>
+            <div class="form-group">
+              <label for="country" class="form-label">Country</label>
+              <input type="text" id="country" name="country" class="form-control" value="<%= customer.country || '' %>" maxlength="80">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom:0">
+            <label for="status" class="form-label">Account status</label>
+            <select id="status" name="status" class="form-control">
+              <option value="active" <%= customer.status === 'active' ? 'selected' : '' %>>Active</option>
+              <option value="suspended" <%= customer.status === 'suspended' ? 'selected' : '' %>>Suspended</option>
+            </select>
+            <div class="form-hint">
+              A suspended customer is signed out on their next request and cannot sign back in.
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-foot">
+          <div class="row-between" style="gap:13px;flex-wrap:wrap">
+            <a href="<%= helpers.url('/' + adminPath + '/customers') %>" class="btn btn-ghost">Back</a>
+            <button type="submit" class="btn btn-primary">
+              <svg><use href="#i-save"/></svg> Save customer
+            </button>
+          </div>
+        </div>
+      </div>
+    </form>
+
+    <%# ---- Orders ---- %>
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-head">
+        <div>
+          <h3>Orders</h3>
+        </div>
+        <span class="tab-count"><%= (orders || []).length %></span>
+      </div>
+
+      <% if (orders && orders.length) { %>
+        <div class="table-wrap">
+          <table class="dash-table">
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Package</th>
+                <th>Status</th>
+                <th>Payment</th>
+                <th class="num">Total</th>
+                <th class="num"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% orders.forEach(function (order) { %>
+                <tr>
+                  <td style="font-size:.8438rem">
+                    <a href="<%= helpers.url('/' + adminPath + '/orders/' + order.id) %>" class="strong"><%= order.order_number %></a>
+                    <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px"><%= helpers.formatDate(order.created_at) %></div>
+                  </td>
+                  <td style="font-size:.8438rem"><%= helpers.excerpt(order.service_title, 32) %></td>
+                  <td><span class="pill pill-<%= helpers.statusTone(order.status) %>"><%= helpers.humanise(order.status) %></span></td>
+                  <td><span class="pill pill-<%= helpers.statusTone(order.payment_status) %>"><%= helpers.humanise(order.payment_status) %></span></td>
+                  <td class="num strong"><%= money(order.total, cur) %></td>
+                  <td class="num">
+                    <a href="<%= helpers.url('/' + adminPath + '/orders/' + order.id) %>" class="btn btn-outline btn-sm">Manage</a>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } else { %>
+        <div class="empty-state" style="padding:42px 20px">
+          <div class="ico"><svg><use href="#i-package"/></svg></div>
+          <h3 style="font-size:1rem">No orders</h3>
+          <p style="font-size:.875rem">This customer has not ordered anything yet.</p>
+        </div>
+      <% } %>
+    </div>
+
+    <%# ---- Tickets ---- %>
+    <% if (tickets && tickets.length) { %>
+      <div class="panel">
+        <div class="panel-head">
+          <div><h3>Support tickets</h3></div>
+          <span class="tab-count"><%= tickets.length %></span>
+        </div>
+        <div class="panel-body">
+          <% tickets.forEach(function (ticket, i) { %>
+            <div class="row-between" style="gap:9px;padding:<%= i ? '12px 0 0' : '0' %>;margin-bottom:<%= i === tickets.length - 1 ? '0' : '12px' %>;border-bottom:<%= i === tickets.length - 1 ? 'none' : '1px solid var(--border)' %>">
+              <div style="min-width:0">
+                <div style="font-weight:600;font-size:.8438rem"><%= helpers.excerpt(ticket.subject, 44) %></div>
+                <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px">
+                  <%= ticket.ticket_number %> · <%= helpers.timeAgo(ticket.created_at) %>
+                </div>
+              </div>
+              <div style="display:flex;gap:6px;flex-shrink:0">
+                <span class="pill pill-<%= helpers.statusTone(ticket.priority) %>"><%= helpers.humanise(ticket.priority) %></span>
+                <span class="pill pill-<%= helpers.statusTone(ticket.status) %>"><%= helpers.humanise(ticket.status) %></span>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+    <% } %>
+  </div>
+
+  <%# ---- Rail ---- %>
+  <div>
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-body" style="text-align:center">
+        <div class="dash-avatar" style="width:82px;height:82px;font-size:1.6rem;margin:0 auto 15px">
+          <% if (customer.avatar) { %>
+            <img src="<%= helpers.url(customer.avatar) %>" alt="<%= customer.name %>">
+          <% } else { %>
+            <span><%= helpers.initials(customer.name) %></span>
+          <% } %>
+        </div>
+        <div style="font-weight:700;font-size:1.0625rem"><%= customer.name %></div>
+        <div style="font-size:.8125rem;color:var(--text-soft);margin-top:4px;word-break:break-all"><%= customer.email %></div>
+
+        <%#
+          Photo upload for the customer's account. Its own form, because the
+          record form above posts urlencoded and a file needs multipart.
+        %>
+        <form method="post" action="<%= helpers.url('/' + adminPath + '/customers/' + customer.id + '/avatar') %>"
+              enctype="multipart/form-data" style="margin-top:16px">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="file" class="form-control" id="cust-avatar" name="upload"
+                 accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif,image/avif"
+                 data-preview="cust-avatar-preview" data-max-mb="<%= uploadLimits.avatars.maxMb %>">
+          <p class="form-hint" style="text-align:left">
+            Up to <%= uploadLimits.avatars.maxMb %> MB. Leave empty to keep the current photo.
+          </p>
+          <button type="submit" class="btn btn-outline btn-sm btn-block">
+            <svg><use href="#i-upload"/></svg> Update photo
+          </button>
+        </form>
+
+        <div style="display:flex;gap:9px;justify-content:center;margin-top:17px;flex-wrap:wrap">
+          <% if (customer.phone) { %>
+            <a href="https://wa.me/<%= String(customer.phone).replace(/\D/g, '') %>" target="_blank" rel="noopener" class="btn btn-outline btn-sm">
+              <svg><use href="#i-whatsapp"/></svg> WhatsApp
+            </a>
+          <% } %>
+          <a href="mailto:<%= customer.email %>" class="btn btn-ghost btn-sm">
+            <svg><use href="#i-mail"/></svg> Email
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-head">
+        <div><h3>Lifetime value</h3></div>
+      </div>
+      <div class="panel-body" style="font-size:.875rem">
+        <div class="row-between" style="padding:7px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text-soft)">Orders</span>
+          <span style="font-weight:700"><%= (orders || []).length %></span>
+        </div>
+        <div class="row-between" style="padding:7px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text-soft)">Approved payments</span>
+          <span style="font-weight:700;color:var(--success)"><%= money(paidTotal, cur) %></span>
+        </div>
+        <div class="row-between" style="padding:7px 0">
+          <span style="color:var(--text-soft)">Active subscriptions</span>
+          <span style="font-weight:700">
+            <%= (subscriptions || []).filter(function (s) { return s.status === 'active'; }).length %>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <% if (subscriptions && subscriptions.length) { %>
+      <div class="panel" style="margin-bottom:22px">
+        <div class="panel-head">
+          <div><h3>Subscriptions</h3></div>
+        </div>
+        <div class="panel-body">
+          <% subscriptions.forEach(function (sub, i) { %>
+            <div class="row-between" style="gap:9px;padding:<%= i ? '11px 0 0' : '0' %>">
+              <div style="min-width:0">
+                <div style="font-weight:600;font-size:.8438rem"><%= helpers.excerpt(sub.plan_name, 26) %></div>
+                <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px">
+                  <%= helpers.humanise(sub.billing_cycle) %>
+                  <% if (sub.next_billing_at) { %> · <%= helpers.formatDate(sub.next_billing_at) %><% } %>
+                </div>
+              </div>
+              <div style="text-align:right;flex-shrink:0">
+                <div style="font-weight:700;font-size:.8438rem"><%= money(sub.amount, cur) %></div>
+                <span class="pill pill-<%= helpers.statusTone(sub.status) %>"><%= helpers.humanise(sub.status) %></span>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+    <% } %>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div><h3>Account</h3></div>
+      </div>
+      <div class="panel-body" style="font-size:.875rem">
+        <div class="row-between" style="padding:7px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text-soft)">Customer ID</span>
+          <span style="font-family:ui-monospace,monospace">#<%= customer.id %></span>
+        </div>
+        <div class="row-between" style="padding:7px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text-soft)">Joined</span>
+          <span><%= helpers.formatDate(customer.created_at) %></span>
+        </div>
+        <div class="row-between" style="padding:7px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text-soft)">Sign-in</span>
+          <span><%= customer.google_id && !customer.password_hash ? 'Google' : 'Password' %></span>
+        </div>
+        <div class="row-between" style="padding:7px 0">
+          <span style="color:var(--text-soft)">Last seen</span>
+          <span><%= customer.last_login_at ? helpers.formatDateTime(customer.last_login_at) : '—' %></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

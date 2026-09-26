@@ -1,0 +1,77 @@
+<%# Customer dashboard sidebar. Expects `navActive` to highlight the current page. %>
+<aside class="dash-sidebar" id="dashSidebar">
+  <div class="dash-sidebar-head">
+    <a href="<%= helpers.url('/') %>" class="dash-brand">
+      <img src="<%= site.logoDark %>" alt="<%= site.name %>">
+    </a>
+    <button type="button" class="dash-sidebar-close" data-dash-toggle aria-label="Close menu">
+      <svg><use href="#i-x"/></svg>
+    </button>
+  </div>
+
+  <div class="dash-user">
+    <div class="dash-avatar">
+      <% if (customer.avatar) { %>
+        <img src="<%= helpers.url(customer.avatar) %>" alt="<%= customer.name %>">
+      <% } else { %>
+        <span><%= helpers.initials(customer.name) %></span>
+      <% } %>
+    </div>
+    <div class="dash-user-info">
+      <div class="dash-user-name"><%= customer.name %></div>
+      <div class="dash-user-email"><%= customer.email %></div>
+    </div>
+  </div>
+
+  <nav class="dash-nav" aria-label="Dashboard navigation">
+    <span class="dash-nav-label">Overview</span>
+    <a href="<%= helpers.url('/account') %>" class="dash-nav-link <%= navActive === 'dashboard' ? 'active' : '' %>">
+      <svg><use href="#i-grid"/></svg><span>Dashboard</span>
+    </a>
+
+    <span class="dash-nav-label">My Services</span>
+    <a href="<%= helpers.url('/account/orders') %>" class="dash-nav-link <%= navActive === 'orders' ? 'active' : '' %>">
+      <svg><use href="#i-package"/></svg><span>My Orders</span>
+      <% if (navCounts && navCounts.orders) { %><span class="dash-badge"><%= navCounts.orders %></span><% } %>
+    </a>
+    <a href="<%= helpers.url('/account/subscriptions') %>" class="dash-nav-link <%= navActive === 'subscriptions' ? 'active' : '' %>">
+      <svg><use href="#i-refresh"/></svg><span>Subscriptions</span>
+    </a>
+    <a href="<%= helpers.url('/account/invoices') %>" class="dash-nav-link <%= navActive === 'invoices' ? 'active' : '' %>">
+      <svg><use href="#i-file"/></svg><span>Invoices</span>
+    </a>
+    <a href="<%= helpers.url('/account/payments') %>" class="dash-nav-link <%= navActive === 'payments' ? 'active' : '' %>">
+      <svg><use href="#i-credit-card"/></svg><span>Payments</span>
+    </a>
+
+    <span class="dash-nav-label">Support</span>
+    <a href="<%= helpers.url('/account/tickets') %>" class="dash-nav-link <%= navActive === 'tickets' ? 'active' : '' %>">
+      <svg><use href="#i-ticket"/></svg><span>Support Tickets</span>
+      <% if (navCounts && navCounts.tickets) { %><span class="dash-badge"><%= navCounts.tickets %></span><% } %>
+    </a>
+    <a href="<%= helpers.url('/services') %>" class="dash-nav-link">
+      <svg><use href="#i-shopping-cart"/></svg><span>Browse Packages</span>
+    </a>
+
+    <span class="dash-nav-label">Account</span>
+    <a href="<%= helpers.url('/account/profile') %>" class="dash-nav-link <%= navActive === 'profile' ? 'active' : '' %>">
+      <svg><use href="#i-user"/></svg><span>Edit Profile</span>
+    </a>
+    <a href="<%= helpers.url('/account/security') %>" class="dash-nav-link <%= navActive === 'security' ? 'active' : '' %>">
+      <svg><use href="#i-shield"/></svg><span>Security</span>
+    </a>
+    <a href="<%= helpers.url('/account/logout') %>" class="dash-nav-link dash-nav-danger">
+      <svg><use href="#i-log-out"/></svg><span>Sign Out</span>
+    </a>
+  </nav>
+
+  <div class="dash-sidebar-foot">
+    <p style="font-size:.7813rem;color:var(--text-soft);line-height:1.6">
+      Need a hand?<br>
+      <a href="<%= site.whatsappLink %>" target="_blank" rel="noopener" style="font-weight:600">WhatsApp us</a> ·
+      <a href="tel:<%= site.phone.replace(/\s/g, '') %>" style="font-weight:600">Call</a>
+    </p>
+  </div>
+</aside>
+
+<div class="dash-sidebar-backdrop" data-dash-toggle></div>

@@ -1,0 +1,59 @@
+<%- include('../partials/page-hero', {
+  pageTitle: 'Our Portfolio',
+  lead: 'E-commerce stores, corporate websites and custom builds we have designed and delivered for Bangladeshi brands.',
+  crumbs: [{ label: 'Portfolio' }]
+}) %>
+
+<section class="section">
+  <div class="container">
+    <% if (categoryList.length) { %>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:44px">
+        <a href="<%= helpers.url('/portfolio') %>"
+           class="btn btn-sm <%= !activeCategory ? 'btn-primary' : 'btn-outline' %>">All work</a>
+        <% categoryList.forEach(function (category) { %>
+          <a href="<%= helpers.url('/portfolio?category=' + encodeURIComponent(category)) %>"
+             class="btn btn-sm <%= activeCategory === category ? 'btn-primary' : 'btn-outline' %>">
+            <%= category %>
+          </a>
+        <% }); %>
+      </div>
+    <% } %>
+
+    <% if (projects.length) { %>
+      <div class="grid grid-3">
+        <% projects.forEach(function (project) { %>
+          <a href="<%= helpers.url('/portfolio/' + project.slug) %>" class="portfolio-card" data-reveal>
+            <div class="card-media">
+              <% if (project.thumbnail) { %>
+                <img src="<%= helpers.url(project.thumbnail) %>" alt="<%= project.title %>" loading="lazy" width="400" height="300">
+              <% } else { %>
+                <div style="width:100%;height:100%;display:grid;place-items:center;background:var(--gradient-soft);color:var(--primary)">
+                  <svg style="width:46px;height:46px"><use href="#i-layout"/></svg>
+                </div>
+              <% } %>
+            </div>
+            <div class="overlay">
+              <h3><%= project.title %></h3>
+              <span class="meta">
+                <%= project.category || 'Web design' %><%= project.client_name ? ' · ' + project.client_name : '' %>
+              </span>
+            </div>
+          </a>
+        <% }); %>
+      </div>
+
+      <%- include('../partials/pagination', { pager: pager, baseUrl: '/portfolio' }) %>
+    <% } else { %>
+      <div class="card card-flat">
+        <div class="card-body-lg text-center">
+          <div class="feature-icon" style="margin:0 auto 20px"><svg><use href="#i-briefcase"/></svg></div>
+          <h3 class="mb-3">No projects to show yet</h3>
+          <p style="margin-bottom:24px">Our portfolio is being updated. Get in touch to see relevant examples.</p>
+          <a href="<%= helpers.url('/contact') %>" class="btn btn-primary">Request examples</a>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</section>
+
+<%- include('../partials/cta-band') %>

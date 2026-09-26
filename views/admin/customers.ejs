@@ -1,0 +1,113 @@
+<%
+  const cur = site.currency;
+  const money = helpers.money;
+%>
+
+<div class="panel">
+  <div class="panel-head">
+    <form class="toolbar" method="get" action="<%= helpers.url('/' + adminPath + '/customers') %>"
+          style="margin:0;padding:0;border:0;box-shadow:none;background:transparent">
+      <div class="search-box">
+        <svg><use href="#i-search"/></svg>
+        <input type="search" name="q" class="form-control" value="<%= search %>"
+               placeholder="Name, email or phone…" aria-label="Search customers">
+      </div>
+
+      <select name="status" class="form-control" aria-label="Filter by status">
+        <option value="">Any status</option>
+        <option value="active" <%= activeStatus === 'active' ? 'selected' : '' %>>Active</option>
+        <option value="suspended" <%= activeStatus === 'suspended' ? 'selected' : '' %>>Suspended</option>
+      </select>
+
+      <button type="submit" class="btn btn-outline btn-sm">Apply</button>
+      <% if (search || activeStatus) { %>
+        <a href="<%= helpers.url('/' + adminPath + '/customers') %>" class="btn btn-ghost btn-sm">Reset</a>
+      <% } %>
+    </form>
+  </div>
+
+  <% if (customers && customers.length) { %>
+    <div class="table-wrap">
+      <table class="dash-table">
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th>Phone</th>
+            <th>Joined</th>
+            <th>Sign-in</th>
+            <th>Status</th>
+            <th class="num">Orders</th>
+            <th class="num">Paid</th>
+            <th class="num">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% customers.forEach(function (customer) { %>
+            <tr>
+              <td>
+                <div class="table-product">
+                  <div class="dash-avatar dash-avatar-sm">
+                    <% if (customer.avatar) { %>
+                      <img src="<%= helpers.url(customer.avatar) %>" alt="">
+                    <% } else { %>
+                      <span><%= helpers.initials(customer.name) %></span>
+                    <% } %>
+                  </div>
+                  <div style="min-width:0">
+                    <div class="name"><%= customer.name %></div>
+                    <div class="meta" style="word-break:break-all"><%= customer.email %></div>
+                  </div>
+                </div>
+              </td>
+              <td style="font-size:.8438rem">
+                <% if (customer.phone) { %>
+                  <a href="tel:<%= String(customer.phone).replace(/\s/g, '') %>"><%= customer.phone %></a>
+                <% } else { %>
+                  <span style="color:var(--text-soft)">—</span>
+                <% } %>
+              </td>
+              <td style="font-size:.8125rem;white-space:nowrap;color:var(--text-soft)">
+                <%= helpers.formatDate(customer.created_at) %>
+              </td>
+              <td style="font-size:.8125rem;white-space:nowrap">
+                <% if (customer.google_id && !customer.password_hash) { %>
+                  <span class="pill pill-info">Google</span>
+                <% } else { %>
+                  <span style="color:var(--text-soft)">Password</span>
+                <% } %>
+                <% if (customer.last_login_at) { %>
+                  <div style="font-size:.72rem;color:var(--text-soft);margin-top:3px">
+                    <time data-relative datetime="<%= new Date(customer.last_login_at).toISOString() %>"><%= helpers.timeAgo(customer.last_login_at) %></time>
+                  </div>
+                <% } %>
+              </td>
+              <td><span class="pill pill-<%= helpers.statusTone(customer.status) %>"><%= helpers.humanise(customer.status) %></span></td>
+              <td class="num"><%= Number(customer.order_count || 0) %></td>
+              <td class="num strong"><%= money(customer.total_paid || 0, cur) %></td>
+              <td>
+                <div class="actions">
+                  <a href="<%= helpers.url('/' + adminPath + '/customers/' + customer.id) %>" class="btn btn-outline btn-sm">Open</a>
+                </div>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if (pager.totalPages > 1) { %>
+      <div class="panel-foot">
+        <%- include('../partials/pagination', { baseUrl: '/' + adminPath + '/customers' }) %>
+      </div>
+    <% } %>
+  <% } else { %>
+    <div class="empty-state">
+      <div class="ico"><svg><use href="#i-users"/></svg></div>
+      <h3>No customers <%= (search || activeStatus) ? 'match those filters' : 'yet' %></h3>
+      <p>Customers are created automatically when someone signs up on the public site.</p>
+      <% if (search || activeStatus) { %>
+        <a href="<%= helpers.url('/' + adminPath + '/customers') %>" class="btn btn-primary">Clear filters</a>
+      <% } %>
+    </div>
+  <% } %>
+</div>

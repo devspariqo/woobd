@@ -1,0 +1,167 @@
+<%
+  const cur = invoice.currency || site.currency;
+  const url = function (p) { return helpers.url('/' + adminPath + '/invoices/' + invoice.id + p); };
+  const statusTone = { draft: 'muted', unpaid: 'warning', paid: 'success', void: 'muted', refunded: 'info' };
+  const overdue = invoice.status === 'unpaid' && invoice.due_date && new Date(invoice.due_date) < new Date();
+
+  // `const items = items || []` is a temporal-dead-zone error: the declaration
+  // shadows the local it reads, so the whole page 500s. Bind to a new name.
+  const lineItems = items || [];
+%>
+
+<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px">
+  <span class="pill pill-<%= statusTone[invoice.status] || 'muted' %>"><%= helpers.humanise(invoice.status) %></span>
+  <% if (overdue) { %><span class="pill pill-danger">Overdue</span><% } %>
+  <% if (invoice.paid_at) { %>
+    <span style="font-size:.8125rem;color:var(--text-soft)">Paid <%= helpers.formatDateTime(invoice.paid_at) %></span>
+  <% } %>
+  <a href="<%= helpers.url('/' + adminPath + '/invoices') %>" class="btn btn-ghost btn-sm" style="margin-left:auto">Back to invoices</a>
+</div>
+
+<div class="two-col" style="align-items:start">
+  <div>
+    <%# Line items. Falls back to a single summary row when the invoice has no
+        itemised rows, which is the case for orders created without them. %>
+    <div class="panel" style="margin-bottom:20px">
+      <div class="panel-head">
+        <h2 style="font-size:.9375rem;font-weight:700;margin:0">Line items</h2>
+        <span style="font-size:.8125rem;color:var(--text-soft)"><%= invoice.invoice_number %></span>
+      </div>
+      <div class="table-wrap">
+        <table class="dash-table">
+          <thead>
+            <tr><th>Description</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Amount</th></tr>
+          </thead>
+          <tbody>
+            <% if (lineItems.length) { %>
+              <% lineItems.forEach(function (item) { %>
+                <tr>
+                  <td style="font-size:.875rem"><%= item.description %></td>
+                  <td class="num"><%= item.quantity %></td>
+                  <td class="num"><%= helpers.money(item.unit_price, cur) %></td>
+                  <td class="num strong"><%= helpers.money(item.amount, cur) %></td>
+                </tr>
+              <% }); %>
+            <% } else { %>
+              <tr>
+                <td style="font-size:.875rem">
+                  <%= order ? order.service_title : 'Services rendered' %>
+                  <% if (order) { %><div style="font-size:.75rem;color:var(--text-soft);margin-top:2px">Order <%= order.order_number %></div><% } %>
+                </td>
+                <td class="num">1</td>
+                <td class="num"><%= helpers.money(invoice.subtotal, cur) %></td>
+                <td class="num strong"><%= helpers.money(invoice.subtotal, cur) %></td>
+              </tr>
+            <% } %>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3" class="num" style="font-size:.8125rem;color:var(--text-soft)">Subtotal</td>
+              <td class="num"><%= helpers.money(invoice.subtotal, cur) %></td>
+            </tr>
+            <% if (Number(invoice.tax) > 0) { %>
+              <tr>
+                <td colspan="3" class="num" style="font-size:.8125rem;color:var(--text-soft)">Tax</td>
+                <td class="num"><%= helpers.money(invoice.tax, cur) %></td>
+              </tr>
+            <% } %>
+            <tr>
+              <td colspan="3" class="num strong">Total</td>
+              <td class="num strong" style="font-size:1.0625rem"><%= helpers.money(invoice.total, cur) %></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <%# Status controls %>
+    <div class="panel">
+      <div class="panel-head"><h2 style="font-size:.9375rem;font-weight:700;margin:0">Update invoice</h2></div>
+      <form method="post" action="<%= url('') %>">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="panel-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="inv-status">Status</label>
+              <select class="form-control" id="inv-status" name="status">
+                <% ['draft','unpaid','paid','void','refunded'].forEach(function (s) { %>
+                  <option value="<%= s %>" <%= invoice.status === s ? 'selected' : '' %>><%= helpers.humanise(s) %></option>
+                <% }); %>
+              </select>
+              <p class="form-hint">Setting this to paid stamps the payment date.</p>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="inv-due">Due date</label>
+              <input type="date" class="form-control" id="inv-due" name="due_date"
+                     value="<%= invoice.due_date ? String(invoice.due_date).slice(0,10) : '' %>">
+            </div>
+          </div>
+        </div>
+        <div class="panel-foot">
+          <button type="submit" class="btn btn-primary">
+            <svg><use href="#i-check"/></svg> Save invoice
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel" style="margin-bottom:20px">
+      <div class="panel-head"><h2 style="font-size:.9375rem;font-weight:700;margin:0">Billed to</h2></div>
+      <div class="panel-body">
+        <% if (customer) { %>
+          <div class="table-product" style="margin-bottom:14px">
+            <img src="<%= customer.avatar ? helpers.url(customer.avatar) : helpers.url('/assets/img/client-default.svg') %>" alt="">
+            <div>
+              <div class="strong"><%= customer.name %></div>
+              <div style="font-size:.75rem;color:var(--text-soft);word-break:break-all"><%= customer.email %></div>
+            </div>
+          </div>
+          <dl class="meta-list">
+            <% if (customer.phone) { %><div><dt>Phone</dt><dd><%= customer.phone %></dd></div><% } %>
+            <% if (customer.company) { %><div><dt>Company</dt><dd><%= customer.company %></dd></div><% } %>
+            <% if (customer.address) { %><div><dt>Address</dt><dd><%= customer.address %></dd></div><% } %>
+            <% if (customer.city) { %><div><dt>City</dt><dd><%= customer.city %></dd></div><% } %>
+          </dl>
+        <% } else { %>
+          <p style="font-size:.8438rem;color:var(--text-muted);margin:0">Customer record not found.</p>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:20px">
+      <div class="panel-head"><h2 style="font-size:.9375rem;font-weight:700;margin:0">Invoice details</h2></div>
+      <div class="panel-body">
+        <dl class="meta-list">
+          <div><dt>Number</dt><dd><code><%= invoice.invoice_number %></code></dd></div>
+          <div><dt>Issued</dt><dd><%= helpers.formatDate(invoice.issue_date) %></dd></div>
+          <div><dt>Due</dt><dd><%= invoice.due_date ? helpers.formatDate(invoice.due_date) : '—' %></dd></div>
+          <div><dt>Currency</dt><dd><%= cur %></dd></div>
+          <% if (order) { %>
+            <div><dt>Order</dt><dd><%= order.order_number %></dd></div>
+          <% } %>
+        </dl>
+
+        <%# A print-friendly copy, rendered by the chrome-free print layout. %>
+        <a href="<%= helpers.url('/account/invoices/' + invoice.id) %>" target="_blank" rel="noopener"
+           class="btn btn-outline btn-block" style="margin-top:14px">
+          <svg><use href="#i-external"/></svg> Open printable copy
+        </a>
+        <% if (order) { %>
+          <a href="<%= helpers.url('/' + adminPath + '/orders/' + order.id) %>"
+             class="btn btn-ghost btn-block" style="margin-top:8px">Open order</a>
+        <% } %>
+      </div>
+    </div>
+
+    <% if (invoice.notes) { %>
+      <div class="panel">
+        <div class="panel-head"><h2 style="font-size:.9375rem;font-weight:700;margin:0">Notes</h2></div>
+        <div class="panel-body">
+          <p style="font-size:.8438rem;color:var(--text-muted);margin:0;line-height:1.65"><%= invoice.notes %></p>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</div>

@@ -1,0 +1,36 @@
+<section class="section" style="padding:100px 0">
+  <div class="container container-narrow text-center">
+    <div style="font-family:var(--font-heading);font-size:7rem;font-weight:800;line-height:1;background:linear-gradient(135deg,var(--primary),var(--secondary));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-.04em">
+      404
+    </div>
+
+    <h1 style="margin:22px 0 16px;font-size:2rem">We could not find that page</h1>
+
+    <p style="font-size:1.0625rem;max-width:520px;margin:0 auto 34px">
+      <% if (typeof requestedPath !== 'undefined' && requestedPath) { %>
+        The page <code style="background:var(--bg-alt);padding:3px 8px;border-radius:5px;font-size:.875rem"><%= requestedPath %></code>
+        does not exist or has been moved.
+      <% } else { %>
+        The page you were looking for does not exist or has been moved.
+      <% } %>
+    </p>
+
+    <div style="display:flex;gap:13px;justify-content:center;flex-wrap:wrap">
+      <a href="<%= helpers.url('/') %>" class="btn btn-primary btn-lg">
+        <svg><use href="#i-arrow-right"/></svg>
+        Back to homepage
+      </a>
+      <a href="<%= helpers.url('/contact') %>" class="btn btn-outline btn-lg">Contact support</a>
+    </div>
+
+    <div style="margin-top:56px;padding-top:38px;border-top:1px solid var(--border)">
+      <p style="font-size:.875rem;margin-bottom:18px">You might be looking for one of these:</p>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+        <a href="<%= helpers.url('/services') %>" class="btn btn-sm btn-outline">Our packages</a>
+        <a href="<%= helpers.url('/portfolio') %>" class="btn btn-sm btn-outline">Portfolio</a>
+        <a href="<%= helpers.url('/about') %>" class="btn btn-sm btn-outline">About us</a>
+        <a href="<%= helpers.url('/contact') %>" class="btn btn-sm btn-outline">Contact</a>
+      </div>
+    </div>
+  </div>
+</section>

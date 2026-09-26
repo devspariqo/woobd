@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600" role="img" aria-label="Portfolio project placeholder">
+  <title>Portfolio placeholder</title>
+  <defs>
+    <linearGradient id="pf" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#5b21f0" stop-opacity=".18"/>
+      <stop offset="1" stop-color="#5b21f0" stop-opacity=".05"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="#eef0f8"/>
+  <rect width="800" height="600" fill="url(#pf)"/>
+  <!-- Stylised product grid: a storefront screenshot silhouette -->
+  <g transform="translate(150 150)">
+    <rect x="0" y="0" width="500" height="300" rx="18" fill="#ffffff" stroke="#dfe2ee" stroke-width="2"/>
+    <rect x="26" y="26" width="448" height="86" rx="12" fill="#5b21f0" opacity=".14"/>
+    <rect x="48" y="52" width="150" height="14" rx="7" fill="#5b21f0" opacity=".5"/>
+    <rect x="48" y="76" width="96" height="10" rx="5" fill="#5b21f0" opacity=".3"/>
+    <g fill="#f5f6fb" stroke="#e3e5f0">
+      <rect x="26" y="136" width="136" height="138" rx="12"/>
+      <rect x="182" y="136" width="136" height="138" rx="12"/>
+      <rect x="338" y="136" width="136" height="138" rx="12"/>
+    </g>
+    <g fill="#c9cde0">
+      <rect x="42" y="200" width="104" height="10" rx="5"/>
+      <rect x="198" y="200" width="104" height="10" rx="5"/>
+      <rect x="354" y="200" width="104" height="10" rx="5"/>
+      <rect x="42" y="220" width="56" height="10" rx="5"/>
+      <rect x="198" y="220" width="56" height="10" rx="5"/>
+      <rect x="354" y="220" width="56" height="10" rx="5"/>
+    </g>
+    <g fill="#ff6600" opacity=".8">
+      <rect x="42" y="158" width="42" height="26" rx="8"/>
+      <rect x="198" y="158" width="42" height="26" rx="8"/>
+      <rect x="354" y="158" width="42" height="26" rx="8"/>
+    </g>
+  </g>
+  <text x="400" y="540" text-anchor="middle"
+        font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="19" font-weight="600" fill="#8a90ad">Case study</text>
+</svg>

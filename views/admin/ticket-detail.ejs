@@ -1,0 +1,187 @@
+<%
+  const url = function (p) { return helpers.url('/' + adminPath + '/tickets/' + ticket.id + p); };
+  const listUrl = helpers.url('/' + adminPath + '/tickets');
+  const priorityTone = { urgent: 'danger', high: 'warning', medium: 'info', low: 'muted' };
+%>
+
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px">
+  <span class="pill pill-<%= helpers.statusTone(ticket.status) %>"><%= helpers.humanise(ticket.status) %></span>
+  <span class="pill pill-<%= priorityTone[ticket.priority] || 'muted' %>"><%= helpers.humanise(ticket.priority) %> priority</span>
+  <span class="pill pill-muted"><%= helpers.humanise(ticket.department) %></span>
+  <code style="font-size:.78rem;background:var(--bg-alt);padding:4px 9px;border-radius:6px"><%= ticket.ticket_number %></code>
+  <a href="<%= listUrl %>" class="btn btn-ghost btn-sm" style="margin-left:auto">Back to tickets</a>
+</div>
+
+<div class="two-col" style="align-items:start">
+  <div>
+    <%# The conversation. Customer messages align left, staff right, so the
+        thread reads like a chat rather than a wall of identical blocks. %>
+    <div class="panel" style="margin-bottom:20px">
+      <div class="panel-head">
+        <h2 style="font-size:.9375rem;font-weight:700;margin:0">Conversation</h2>
+        <span style="font-size:.8125rem;color:var(--text-soft)"><%= replies.length %> message<%= replies.length === 1 ? '' : 's' %></span>
+      </div>
+
+      <div class="panel-body">
+        <% if (replies.length) { %>
+          <% replies.forEach(function (reply) { %>
+            <%
+              const fromStaff = reply.author_type === 'staff';
+            %>
+            <div class="ticket-msg <%= fromStaff ? 'is-staff' : 'is-customer' %>">
+              <div class="ticket-msg-head">
+                <span class="avatar-sm"><%= helpers.initials(reply.author_name) %></span>
+                <strong><%= reply.author_name %></strong>
+                <span style="color:var(--text-soft);font-weight:400"><%= fromStaff ? 'Staff' : 'Customer' %></span>
+                <time data-relative datetime="<%= new Date(reply.created_at).toISOString() %>"
+                      style="margin-left:auto;font-size:.75rem;color:var(--text-soft)"><%= helpers.timeAgo(reply.created_at) %></time>
+              </div>
+              <div class="ticket-msg-body"><%= reply.message.replace(/\n/g, '<br>') %></div>
+              <% if (reply.attachment) { %>
+                <a href="<%= helpers.url(reply.attachment) %>" target="_blank" rel="noopener"
+                   style="font-size:.8125rem;font-weight:600;display:inline-flex;align-items:center;gap:5px;margin-top:8px">
+                  <svg style="width:14px;height:14px"><use href="#i-file"/></svg> View attachment
+                </a>
+              <% } %>
+            </div>
+          <% }); %>
+        <% } else { %>
+          <p style="font-size:.875rem;color:var(--text-muted);margin:0">
+            The customer has not added any detail yet. Reply below to start the thread.
+          </p>
+        <% } %>
+      </div>
+    </div>
+
+    <% if (ticket.status !== 'closed') { %>
+      <div class="panel">
+        <div class="panel-head">
+          <h2 style="font-size:.9375rem;font-weight:700;margin:0">Reply</h2>
+        </div>
+        <form method="post" action="<%= url('/reply') %>" enctype="multipart/form-data" data-validate>
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <div class="panel-body">
+            <div class="form-group">
+              <label class="form-label" for="reply-message">Your reply <span class="req">*</span></label>
+              <textarea class="form-control" id="reply-message" name="message" rows="7" required
+                        placeholder="Answer the customer's question…"></textarea>
+              <p class="form-hint">The customer is emailed this reply and it appears in their dashboard.</p>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="reply-file">Attachment <span class="optional">optional</span></label>
+              <input type="file" class="form-control" id="reply-file" name="upload" data-preview="reply-preview" data-max-mb="<%= uploadLimits.tickets.maxMb %>">
+              <img id="reply-preview" class="upload-preview" style="display:none;margin-top:10px" alt="">
+            </div>
+          </div>
+          <div class="panel-foot" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+            <button type="submit" class="btn btn-primary">
+              <svg><use href="#i-send"/></svg> Send reply
+            </button>
+            <span style="font-size:.8125rem;color:var(--text-soft)">
+              Sending marks the ticket as answered.
+            </span>
+          </div>
+        </form>
+      </div>
+    <% } else { %>
+      <div class="alert alert-info" role="status">
+        <svg><use href="#i-info"/></svg>
+        <div>
+          This ticket is closed. Reopen it from the panel on the right to reply.
+        </div>
+      </div>
+    <% } %>
+  </div>
+
+  <div>
+    <%# Customer card %>
+    <div class="panel" style="margin-bottom:20px">
+      <div class="panel-head"><h2 style="font-size:.9375rem;font-weight:700;margin:0">Customer</h2></div>
+      <div class="panel-body">
+        <% if (customer) { %>
+          <div class="table-product" style="margin-bottom:14px">
+            <img src="<%= customer.avatar ? helpers.url(customer.avatar) : helpers.url('/assets/img/client-default.svg') %>" alt="">
+            <div>
+              <div class="strong"><%= customer.name %></div>
+              <div style="font-size:.75rem;color:var(--text-soft);word-break:break-all"><%= customer.email %></div>
+            </div>
+          </div>
+          <dl class="meta-list">
+            <% if (customer.phone) { %><div><dt>Phone</dt><dd><%= customer.phone %></dd></div><% } %>
+            <% if (customer.company) { %><div><dt>Company</dt><dd><%= customer.company %></dd></div><% } %>
+            <div><dt>Status</dt><dd><%= helpers.humanise(customer.status) %></dd></div>
+          </dl>
+          <a href="<%= helpers.url('/' + adminPath + '/customers/' + customer.id) %>"
+             class="btn btn-outline btn-block" style="margin-top:14px">Open customer record</a>
+        <% } else { %>
+          <p style="font-size:.8438rem;color:var(--text-muted);margin:0">Customer record not found.</p>
+        <% } %>
+      </div>
+    </div>
+
+    <%# Ticket controls %>
+    <div class="panel" style="margin-bottom:20px">
+      <div class="panel-head"><h2 style="font-size:.9375rem;font-weight:700;margin:0">Ticket settings</h2></div>
+      <form method="post" action="<%= url('') %>">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="panel-body">
+          <div class="form-group">
+            <label class="form-label" for="t-status">Status</label>
+            <select class="form-control" id="t-status" name="status">
+              <% ['open','pending','answered','closed'].forEach(function (s) { %>
+                <option value="<%= s %>" <%= ticket.status === s ? 'selected' : '' %>><%= helpers.humanise(s) %></option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="t-priority">Priority</label>
+            <select class="form-control" id="t-priority" name="priority">
+              <% ['low','medium','high','urgent'].forEach(function (p) { %>
+                <option value="<%= p %>" <%= ticket.priority === p ? 'selected' : '' %>><%= helpers.humanise(p) %></option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="t-department">Department</label>
+            <select class="form-control" id="t-department" name="department">
+              <% ['general','billing','technical','sales'].forEach(function (d) { %>
+                <option value="<%= d %>" <%= ticket.department === d ? 'selected' : '' %>><%= helpers.humanise(d) %></option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="t-assignee">Assigned to</label>
+            <select class="form-control" id="t-assignee" name="assigned_to">
+              <option value="">Unassigned</option>
+              <% (staff || []).forEach(function (member) { %>
+                <option value="<%= member.id %>" <%= Number(ticket.assigned_to) === Number(member.id) ? 'selected' : '' %>>
+                  <%= member.name %> (<%= member.role %>)
+                </option>
+              <% }); %>
+            </select>
+          </div>
+        </div>
+        <div class="panel-foot">
+          <button type="submit" class="btn btn-primary btn-block">
+            <svg><use href="#i-check"/></svg> Update ticket
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <% if (order) { %>
+      <div class="panel">
+        <div class="panel-head"><h2 style="font-size:.9375rem;font-weight:700;margin:0">Related order</h2></div>
+        <div class="panel-body">
+          <dl class="meta-list">
+            <div><dt>Order</dt><dd><%= order.order_number %></dd></div>
+            <div><dt>Package</dt><dd><%= order.service_title %></dd></div>
+            <div><dt>Status</dt><dd><%= helpers.humanise(order.status) %></dd></div>
+          </dl>
+          <a href="<%= helpers.url('/' + adminPath + '/orders/' + order.id) %>"
+             class="btn btn-outline btn-block" style="margin-top:14px">Open order</a>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</div>

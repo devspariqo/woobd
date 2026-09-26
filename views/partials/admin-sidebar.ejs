@@ -1,0 +1,146 @@
+<%#
+  Admin sidebar.
+  Expects: `navActive` and optionally `badges` (pending counts).
+  Every link is built from `adminPath` so the panel works at any slug.
+%>
+<%
+  var base = '/' + adminPath;
+  var link = function (path) { return helpers.url(base + path); };
+  var isActive = function (key) { return navActive === key ? ' active' : ''; };
+  // Defensive: a controller that forgets to pass `badges` would otherwise throw
+  // a ReferenceError here and 500 the whole panel, since the sidebar renders on
+  // every admin page.
+  var badgeData = typeof badges !== 'undefined' && badges ? badges : {};
+  var badge = function (key) {
+    var value = badgeData[key] ? Number(badgeData[key]) : 0;
+    return value > 0 ? '<span class="dash-badge">' + value + '</span>' : '';
+  };
+%>
+<aside class="dash-sidebar" id="dashSidebar">
+  <div class="dash-sidebar-head">
+    <a href="<%= link('/dashboard') %>" class="dash-brand">
+      <img src="<%= site.logoDark %>" alt="<%= site.name %>">
+    </a>
+    <button type="button" class="dash-sidebar-close" data-dash-toggle aria-label="Close menu">
+      <svg><use href="#i-x"/></svg>
+    </button>
+  </div>
+
+  <div class="dash-user">
+    <div class="dash-avatar">
+      <% if (staff.avatar) { %>
+        <img src="<%= helpers.url(staff.avatar) %>" alt="<%= staff.name %>">
+      <% } else { %>
+        <span><%= helpers.initials(staff.name) %></span>
+      <% } %>
+    </div>
+    <div class="dash-user-info">
+      <div class="dash-user-name"><%= staff.name %></div>
+      <div class="dash-user-email"><%= helpers.humanise(staff.role) %></div>
+    </div>
+  </div>
+
+  <nav class="dash-nav" aria-label="Admin navigation">
+    <span class="dash-nav-label">Overview</span>
+    <a href="<%= link('/dashboard') %>" class="dash-nav-link<%= isActive('dashboard') %>">
+      <svg><use href="#i-grid"/></svg><span>Dashboard</span>
+    </a>
+    <a href="<%= link('/analytics') %>" class="dash-nav-link<%= isActive('analytics') %>">
+      <svg><use href="#i-bar-chart"/></svg><span>Analytics</span>
+    </a>
+
+    <span class="dash-nav-label">Operations</span>
+    <a href="<%= link('/orders') %>" class="dash-nav-link<%= isActive('orders') %>">
+      <svg><use href="#i-package"/></svg><span>Orders</span><%- badge('orders') %>
+    </a>
+    <a href="<%= link('/customers') %>" class="dash-nav-link<%= isActive('customers') %>">
+      <svg><use href="#i-users"/></svg><span>Customers</span>
+    </a>
+    <a href="<%= link('/payments') %>" class="dash-nav-link<%= isActive('payments') %>">
+      <svg><use href="#i-credit-card"/></svg><span>Payments</span><%- badge('payments') %>
+    </a>
+    <a href="<%= link('/invoices') %>" class="dash-nav-link<%= isActive('invoices') %>">
+      <svg><use href="#i-file"/></svg><span>Invoices</span>
+    </a>
+    <a href="<%= link('/subscriptions') %>" class="dash-nav-link<%= isActive('subscriptions') %>">
+      <svg><use href="#i-refresh"/></svg><span>Subscriptions</span>
+    </a>
+    <a href="<%= link('/tickets') %>" class="dash-nav-link<%= isActive('tickets') %>">
+      <svg><use href="#i-ticket"/></svg><span>Tickets</span><%- badge('tickets') %>
+    </a>
+    <a href="<%= link('/contacts') %>" class="dash-nav-link<%= isActive('contacts') %>">
+      <svg><use href="#i-inbox"/></svg><span>Messages</span><%- badge('contacts') %>
+    </a>
+
+    <span class="dash-nav-label">Content</span>
+    <a href="<%= link('/packages') %>" class="dash-nav-link<%= isActive('packages') %>">
+      <svg><use href="#i-shopping-cart"/></svg><span>Packages</span>
+    </a>
+    <a href="<%= link('/portfolio') %>" class="dash-nav-link<%= isActive('portfolio') %>">
+      <svg><use href="#i-briefcase"/></svg><span>Portfolio</span>
+    </a>
+    <a href="<%= link('/testimonials') %>" class="dash-nav-link<%= isActive('testimonials') %>">
+      <svg><use href="#i-star"/></svg><span>Testimonials</span>
+    </a>
+    <a href="<%= link('/faqs') %>" class="dash-nav-link<%= isActive('faqs') %>">
+      <svg><use href="#i-info"/></svg><span>FAQs</span>
+    </a>
+    <a href="<%= link('/clients') %>" class="dash-nav-link<%= isActive('clients') %>">
+      <svg><use href="#i-award"/></svg><span>Clients</span>
+    </a>
+    <a href="<%= link('/pages') %>" class="dash-nav-link<%= isActive('pages') %>">
+      <svg><use href="#i-file"/></svg><span>Pages</span>
+    </a>
+    <a href="<%= link('/menus') %>" class="dash-nav-link<%= isActive('menus') %>">
+      <svg><use href="#i-layout"/></svg><span>Menus</span>
+    </a>
+    <a href="<%= link('/media') %>" class="dash-nav-link<%= isActive('media') %>">
+      <svg><use href="#i-image"/></svg><span>Media Library</span>
+    </a>
+
+    <span class="dash-nav-label">Configuration</span>
+    <a href="<%= link('/settings') %>" class="dash-nav-link<%= isActive('settings') %>">
+      <svg><use href="#i-settings"/></svg><span>Settings</span>
+    </a>
+    <a href="<%= link('/staff') %>" class="dash-nav-link<%= isActive('staff') %>">
+      <svg><use href="#i-shield"/></svg><span>Staff</span>
+    </a>
+    <a href="<%= link('/activity') %>" class="dash-nav-link<%= isActive('activity') %>">
+      <svg><use href="#i-activity"/></svg><span>Activity Log</span>
+    </a>
+    <a href="<%= link('/reports') %>" class="dash-nav-link<%= isActive('reports') %>">
+      <svg><use href="#i-trending-up"/></svg><span>Reports</span>
+    </a>
+    <a href="<%= link('/backup') %>" class="dash-nav-link<%= isActive('backup') %>">
+      <svg><use href="#i-database"/></svg><span>Backup &amp; Migration</span>
+    </a>
+
+    <span class="dash-nav-label">Account</span>
+    <a href="<%= link('/profile') %>" class="dash-nav-link<%= isActive('profile') %>">
+      <svg><use href="#i-user"/></svg><span>My Profile</span>
+    </a>
+    <a href="<%= link('/logout') %>" class="dash-nav-link dash-nav-danger">
+      <svg><use href="#i-log-out"/></svg><span>Sign Out</span>
+    </a>
+  </nav>
+
+  <div class="dash-sidebar-foot">
+    <%# Two quick actions, as real buttons rather than a line of text links.
+        "View website" opens the public site in a new tab; "Settings" is the
+        screen an operator reaches for most often, so it gets the accent. %>
+    <div class="dash-foot-actions">
+      <a href="<%= helpers.url('/') %>" target="_blank" rel="noopener" class="dash-foot-btn"
+         title="Open the public website in a new tab">
+        <svg><use href="#i-external"/></svg>
+        <span>View website</span>
+      </a>
+      <a href="<%= link('/settings') %>" class="dash-foot-btn is-accent"
+         title="Site, branding, payments and security settings">
+        <svg><use href="#i-settings"/></svg>
+        <span>Settings</span>
+      </a>
+    </div>
+  </div>
+</aside>
+
+<div class="dash-sidebar-backdrop" data-dash-toggle></div>

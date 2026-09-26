@@ -1,0 +1,21 @@
+<%- include('../partials/page-hero', {
+  pageTitle: page.title,
+  lead: page.meta_description,
+  crumbs: [{ label: page.title }]
+}) %>
+
+<section class="section">
+  <div class="container container-narrow">
+    <%# Legal pages are authored by staff in the admin panel, so the content is
+        rendered as trusted HTML. %>
+    <div class="prose" style="font-size:1rem;line-height:1.8;color:var(--text-muted)">
+      <%- page.content %>
+    </div>
+
+    <p style="font-size:.875rem;color:var(--text-soft);margin-top:44px;padding-top:24px;border-top:1px solid var(--border)">
+      Last updated: <%= helpers.formatDate(page.updated_at) %>.
+      Questions about this page? Email
+      <a href="mailto:<%= site.email %>"><%= site.email %></a>.
+    </p>
+  </div>
+</section>

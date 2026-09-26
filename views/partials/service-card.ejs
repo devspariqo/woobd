@@ -1,0 +1,103 @@
+<%# Renders a single package/service card.
+    Expects `service`. Used by the homepage grid, the services listing, the
+    related-packages row and the dashboard upgrade panel. %>
+<%
+  var price = service.sale_price && Number(service.sale_price) > 0 ? service.sale_price : service.price;
+  var hasSale = service.sale_price && Number(service.sale_price) > 0 && Number(service.sale_price) < Number(service.price);
+  var features = helpers.parseJson(service.features, []);
+  var cycleLabels = { one_time: 'one-time', monthly: 'per month', yearly: 'per year' };
+
+  // A recurring package can carry a minimum commitment and a yearly discount.
+  // Both are worth showing on the card - they are the reason to pick one term
+  // over another, and hiding them until checkout costs conversions.
+  var minMonths = Number(service.min_months) || 1;
+  var yearlyDiscount = Number(service.yearly_discount_percent) || 0;
+  var isRecurring = service.billing_cycle !== 'one_time';
+  // What a full year costs after the discount, as a monthly equivalent.
+  var yearlyMonthly = yearlyDiscount > 0
+    ? (Number(price) * 12 * (1 - yearlyDiscount / 100)) / 12
+    : 0;
+%>
+<article class="card package-card" data-reveal>
+  <div class="card-media" style="aspect-ratio:16/10">
+    <% if (service.is_featured) { %><span class="badge-featured">Popular</span><% } %>
+    <% if (service.is_featured && yearlyDiscount > 0) { %>
+      <span class="badge-save">Save <%= yearlyDiscount %>% yearly</span>
+    <% } %>
+    <% if (service.image) { %>
+      <img src="<%= helpers.url(service.image) %>" alt="<%= service.title %>" loading="lazy" width="400" height="250">
+    <% } else { %>
+      <div style="width:100%;height:100%;display:grid;place-items:center;background:var(--gradient-soft);color:var(--primary)">
+        <svg style="width:52px;height:52px"><use href="#i-package"/></svg>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="card-body">
+    <% if (service.category_name) { %>
+      <span class="eyebrow" style="margin-bottom:12px"><%= service.category_name %></span>
+    <% } %>
+
+    <h3 class="card-title">
+      <a href="<%= helpers.url('/services/' + service.slug) %>"><%= service.title %></a>
+    </h3>
+
+    <p class="card-text"><%= helpers.excerpt(service.short_description || service.description, 108) %></p>
+
+    <div class="package-price">
+      <span class="amount"><%= helpers.money(price, site.currency) %></span>
+      <% if (hasSale) { %><span class="was"><%= helpers.money(service.price, site.currency) %></span><% } %>
+      <span class="cycle"><%= cycleLabels[service.billing_cycle] || 'one-time' %></span>
+    </div>
+
+    <% if (isRecurring && (minMonths > 1 || yearlyDiscount > 0)) { %>
+      <p class="package-terms">
+        <% if (minMonths > 1) { %>
+          Minimum <%= minMonths %>-month term
+        <% } %>
+        <% if (minMonths > 1 && yearlyDiscount > 0) { %> · <% } %>
+        <% if (yearlyDiscount > 0) { %>
+          <%= yearlyDiscount %>% off if you pay yearly
+          <span class="package-terms-note">
+            (<%= helpers.money(yearlyMonthly, site.currency) %>/month)
+          </span>
+        <% } %>
+      </p>
+    <% } %>
+
+    <% if (features.length) { %>
+      <ul class="feature-list">
+        <% features.slice(0, 4).forEach(function (feature) { %>
+          <li>
+            <svg><use href="#i-check"/></svg>
+            <span><%= feature %></span>
+          </li>
+        <% }); %>
+        <% if (features.length > 4) { %>
+          <li style="color:var(--primary);font-weight:600">
+            <svg style="color:var(--primary)"><use href="#i-plus"/></svg>
+            <span>+ <%= features.length - 4 %> more included</span>
+          </li>
+        <% } %>
+      </ul>
+    <% } %>
+
+    <div style="display:flex;gap:9px;margin-top:auto">
+      <a href="<%= helpers.url('/services/' + service.slug) %>" class="btn btn-outline btn-sm" style="flex:1">
+        Details
+      </a>
+      <a href="<%= isCustomer ? helpers.url('/account/checkout/' + service.id) : helpers.url('/signup?package=' + service.slug) %>"
+         class="btn btn-primary btn-sm" style="flex:1.3">
+        Order Now
+        <svg><use href="#i-arrow-right"/></svg>
+      </a>
+    </div>
+
+    <% if (service.delivery_days) { %>
+      <p style="display:flex;align-items:center;gap:7px;font-size:.8125rem;color:var(--text-soft);margin-top:14px">
+        <svg style="width:15px;height:15px"><use href="#i-clock"/></svg>
+        Delivered in <%= service.delivery_days %> days
+      </p>
+    <% } %>
+  </div>
+</article>

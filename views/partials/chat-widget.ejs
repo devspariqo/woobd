@@ -1,0 +1,48 @@
+<% if (chat.enabled && chat.showOnPublic && settings.chat_enabled === '1') { %>
+<div class="chat-widget <%= chat.position === 'left' ? 'left' : '' %>" id="chatWidget"
+     data-endpoint="<%= helpers.url('/api/chat') %>"
+     data-greeting="<%= chat.greeting %>"
+     aria-hidden="true">
+
+  <button type="button" class="chat-launcher" aria-label="Open the chat assistant">
+    <svg class="icon-chat"><use href="#i-chat"/></svg>
+    <svg class="icon-close"><use href="#i-x"/></svg>
+    <span class="chat-badge">1</span>
+  </button>
+
+  <div class="chat-panel" role="dialog" aria-label="Chat assistant">
+    <div class="chat-head">
+      <span class="avatar"><svg><use href="#i-chat"/></svg></span>
+      <div class="info">
+        <div class="name"><%= chat.title %></div>
+        <div class="status"><span class="dot"></span> <%= chat.subtitle %></div>
+      </div>
+      <button type="button" class="close-btn" aria-label="Close chat">
+        <svg><use href="#i-x"/></svg>
+      </button>
+    </div>
+
+    <div class="chat-body" role="log" aria-live="polite"></div>
+
+    <%# Suggested openers, so a first-time visitor is not staring at an empty box. %>
+    <div class="chat-quick">
+      <button type="button" data-chat-suggest="What packages do you offer?">Packages</button>
+      <button type="button" data-chat-suggest="How much does an e-commerce website cost?">Pricing</button>
+      <button type="button" data-chat-suggest="How long does delivery take?">Delivery time</button>
+      <button type="button" data-chat-suggest="What payment methods do you accept?">Payment</button>
+    </div>
+
+    <div class="chat-foot">
+      <form class="chat-form" autocomplete="off">
+        <textarea rows="1" placeholder="Ask us anything…" aria-label="Your message" maxlength="1000"></textarea>
+        <button type="submit" class="chat-send" aria-label="Send message">
+          <svg><use href="#i-send"/></svg>
+        </button>
+      </form>
+      <p class="chat-foot-note">
+        Powered by AI · Need a human? <a href="<%= site.whatsappLink %>" target="_blank" rel="noopener">WhatsApp us</a>
+      </p>
+    </div>
+  </div>
+</div>
+<% } %>

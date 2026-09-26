@@ -1,0 +1,35 @@
+<%# Reusable closing CTA band for inner pages. Keeps the message consistent
+    without repeating markup in every template. %>
+<section class="section cta-section">
+  <div class="container">
+    <div style="max-width:760px;margin:0 auto;text-align:center" data-reveal>
+      <h2><%= settings.cta_title %></h2>
+      <p style="margin-bottom:32px"><%= settings.cta_text %></p>
+
+      <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
+        <a href="<%= helpers.url('/contact') %>" class="btn btn-white btn-lg">
+          Get a free quote
+          <svg><use href="#i-arrow-right"/></svg>
+        </a>
+        <a href="<%= helpers.url('/services') %>" class="btn btn-light btn-lg">
+          Browse packages
+        </a>
+      </div>
+
+      <div style="display:flex;gap:26px;justify-content:center;flex-wrap:wrap;margin-top:34px">
+        <a href="tel:<%= site.phone.replace(/\s/g, '') %>" style="display:flex;align-items:center;gap:10px;color:#fff">
+          <svg style="width:18px;height:18px"><use href="#i-phone"/></svg>
+          <span style="font-weight:600"><%= site.phone %></span>
+        </a>
+        <a href="<%= site.whatsappLink %>" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:10px;color:#fff">
+          <svg style="width:18px;height:18px"><use href="#i-whatsapp"/></svg>
+          <span style="font-weight:600">WhatsApp us</span>
+        </a>
+        <a href="mailto:<%= site.email %>" style="display:flex;align-items:center;gap:10px;color:#fff">
+          <svg style="width:18px;height:18px"><use href="#i-mail"/></svg>
+          <span style="font-weight:600"><%= site.email %></span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>

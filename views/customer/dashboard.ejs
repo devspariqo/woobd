@@ -1,0 +1,237 @@
+<%
+  const s = orderStats || {};
+  const num = function (v) { return Number(v || 0); };
+  const money = helpers.money;
+  const cur = site.currency;
+%>
+
+<div class="stat-grid">
+  <div class="stat-tile">
+    <div class="ico tone-primary"><svg><use href="#i-package"/></svg></div>
+    <div>
+      <div class="value"><%= num(s.total) %></div>
+      <div class="label">Total orders</div>
+    </div>
+  </div>
+
+  <div class="stat-tile">
+    <div class="ico tone-warning"><svg><use href="#i-clock"/></svg></div>
+    <div>
+      <div class="value"><%= num(s.pending) + num(s.in_progress) %></div>
+      <div class="label">In progress</div>
+    </div>
+  </div>
+
+  <div class="stat-tile">
+    <div class="ico tone-success"><svg><use href="#i-globe"/></svg></div>
+    <div>
+      <div class="value"><%= num(s.active) %></div>
+      <div class="label">Live websites</div>
+    </div>
+  </div>
+
+  <div class="stat-tile">
+    <div class="ico tone-info"><svg><use href="#i-ticket"/></svg></div>
+    <div>
+      <div class="value"><%= num(ticketStats && ticketStats.open) + num(ticketStats && ticketStats.pending) %></div>
+      <div class="label">Open tickets</div>
+    </div>
+  </div>
+</div>
+
+<%# ------------------------------------------------------------------
+    Live sites with their handover credentials. This is the section the
+    admin fills by activating an order and attaching deliverables.
+    ------------------------------------------------------------------ %>
+<% if (liveOrders && liveOrders.length) { %>
+  <div class="panel" style="margin-bottom:24px">
+    <div class="panel-head">
+      <div>
+        <h2><svg style="width:17px;height:17px;vertical-align:-3px;color:var(--success)"><use href="#i-check-circle"/></svg>
+          Your live website<%= liveOrders.length > 1 ? 's' : '' %></h2>
+        <p>Everything you need to log in and manage your site. Keep these details private.</p>
+      </div>
+      <span class="pill pill-success"><%= liveOrders.length %> active</span>
+    </div>
+
+    <div class="panel-body">
+      <% liveOrders.forEach(function (order, index) { %>
+        <% var rows = index === 0 ? deliverables : []; %>
+
+        <div style="<%= index ? 'margin-top:26px;padding-top:26px;border-top:1px solid var(--border)' : '' %>">
+          <div class="row-between" style="gap:14px;flex-wrap:wrap;margin-bottom:14px">
+            <div>
+              <div style="font-weight:700;font-size:1rem"><%= order.service_title %></div>
+              <div style="font-size:.8125rem;color:var(--text-soft);margin-top:2px">
+                Order <a href="<%= helpers.url('/account/orders/' + order.id) %>" style="font-weight:600"><%= order.order_number %></a>
+                · activated <%= order.started_at ? helpers.formatDate(order.started_at) : helpers.formatDate(order.updated_at) %>
+              </div>
+            </div>
+            <a href="<%= helpers.url('/account/orders/' + order.id) %>" class="btn btn-outline btn-sm">Open order</a>
+          </div>
+
+          <% if (rows && rows.length) { %>
+            <% rows.filter(function (item) { return item.is_visible; }).forEach(function (item) { %>
+              <div class="cred-row">
+                <span class="label"><%= item.label %></span>
+                <span class="value"><%= item.value || '—' %></span>
+                <% if (item.value) { %>
+                  <button type="button" class="copy-btn" data-copy="<%= helpers.escapeHtml(item.value) %>">Copy</button>
+                <% } %>
+              </div>
+            <% }); %>
+          <% } else { %>
+            <div class="alert alert-info">
+              <svg><use href="#i-info"/></svg>
+              <div>Your site is live. Login details will appear here as soon as our team attaches them —
+                open the order and check back shortly, or message us on WhatsApp if you need them urgently.</div>
+            </div>
+          <% } %>
+        </div>
+      <% }); %>
+    </div>
+  </div>
+<% } %>
+
+<div class="two-col">
+  <%# ---- Recent orders ---- %>
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <h3>Recent orders</h3>
+        <p>Your last few projects and where they stand.</p>
+      </div>
+      <a href="<%= helpers.url('/account/orders') %>" class="btn btn-outline btn-sm">View all</a>
+    </div>
+
+    <% if (recentOrders && recentOrders.length) { %>
+      <div class="table-wrap">
+        <table class="dash-table">
+          <thead>
+            <tr>
+              <th>Order</th>
+              <th>Status</th>
+              <th>Payment</th>
+              <th class="num">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% recentOrders.forEach(function (order) { %>
+              <tr>
+                <td>
+                  <a href="<%= helpers.url('/account/orders/' + order.id) %>" class="strong"><%= order.order_number %></a>
+                  <div class="meta" style="font-size:.75rem;color:var(--text-soft)"><%= helpers.excerpt(order.service_title, 40) %></div>
+                </td>
+                <td><span class="pill pill-<%= helpers.statusTone(order.status) %>"><%= helpers.humanise(order.status) %></span></td>
+                <td><span class="pill pill-<%= helpers.statusTone(order.payment_status) %>"><%= helpers.humanise(order.payment_status) %></span></td>
+                <td class="num strong"><%= money(order.total, cur) %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } else { %>
+      <div class="empty-state">
+        <div class="ico"><svg><use href="#i-package"/></svg></div>
+        <h3>No orders yet</h3>
+        <p>Pick a package and we will get your e-commerce website built and online.</p>
+        <a href="<%= helpers.url('/services') %>" class="btn btn-primary">Browse packages</a>
+      </div>
+    <% } %>
+  </div>
+
+  <div>
+    <%# ---- Subscriptions ---- %>
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-head">
+        <div>
+          <h3>Active plans</h3>
+          <p>Recurring services on your account.</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        <% if (subscriptions && subscriptions.length) { %>
+          <% subscriptions.forEach(function (sub) { %>
+            <div class="row-between" style="gap:10px;padding-bottom:14px;margin-bottom:14px;border-bottom:1px solid var(--border)">
+              <div style="min-width:0">
+                <div style="font-weight:600;font-size:.9063rem"><%= helpers.excerpt(sub.plan_name, 34) %></div>
+                <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px">
+                  <%= helpers.humanise(sub.billing_cycle) %> · renews <%= sub.next_billing_at ? helpers.formatDate(sub.next_billing_at) : '—' %>
+                </div>
+              </div>
+              <div style="text-align:right;flex-shrink:0">
+                <div style="font-weight:700;font-size:.9063rem"><%= money(sub.amount, cur) %></div>
+                <span class="pill pill-<%= helpers.statusTone(sub.status) %>"><%= helpers.humanise(sub.status) %></span>
+              </div>
+            </div>
+          <% }); %>
+          <a href="<%= helpers.url('/account/subscriptions') %>" class="btn btn-outline btn-sm btn-block">Manage subscriptions</a>
+        <% } else { %>
+          <p style="font-size:.875rem;color:var(--text-soft);margin:0">
+            No recurring plans. Choose monthly or yearly billing on a package to see it here.
+          </p>
+        <% } %>
+      </div>
+    </div>
+
+    <%# ---- Recent payments ---- %>
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h3>Recent payments</h3>
+        </div>
+        <a href="<%= helpers.url('/account/payments') %>" class="btn btn-outline btn-sm">All</a>
+      </div>
+      <div class="panel-body">
+        <% if (payments && payments.length) { %>
+          <% payments.forEach(function (payment) { %>
+            <div class="row-between" style="gap:10px;padding-bottom:13px;margin-bottom:13px;border-bottom:1px solid var(--border)">
+              <div style="min-width:0">
+                <div style="font-weight:600;font-size:.875rem"><%= payment.method %></div>
+                <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px">
+                  <%= helpers.formatDate(payment.created_at) %><%= payment.order_number ? ' · ' + payment.order_number : '' %>
+                </div>
+              </div>
+              <div style="text-align:right;flex-shrink:0">
+                <div style="font-weight:700;font-size:.875rem"><%= money(payment.amount, cur) %></div>
+                <span class="pill pill-<%= helpers.statusTone(payment.status) %>"><%= helpers.humanise(payment.status) %></span>
+              </div>
+            </div>
+          <% }); %>
+        <% } else { %>
+          <p style="font-size:.875rem;color:var(--text-soft);margin:0">No payments submitted yet.</p>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# ---- Getting started, only while there is nothing in flight ---- %>
+<% if (!recentOrders || !recentOrders.length) { %>
+  <div class="panel" style="margin-top:24px">
+    <div class="panel-head">
+      <div>
+        <h3>How it works</h3>
+        <p>Four steps from order to a live store.</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="three-col">
+        <% [
+             ['1', 'Choose a package', 'Pick the plan that matches your catalogue and budget.'],
+             ['2', 'Send your payment', 'bKash, Nagad, Rocket or card — submit the reference and we verify within 24 hours.'],
+             ['3', 'We build it', 'Our team designs, develops and tests your store. You can track progress here.'],
+             ['4', 'Go live', 'We hand over your cPanel URL, website URL and password on this dashboard.']
+           ].forEach(function (step) { %>
+          <div style="display:flex;gap:12px">
+            <span style="flex-shrink:0;width:32px;height:32px;display:grid;place-items:center;border-radius:9px;background:rgba(91,33,240,.1);color:var(--primary);font-weight:800;font-size:.875rem"><%= step[0] %></span>
+            <div>
+              <div style="font-weight:600;font-size:.9063rem"><%= step[1] %></div>
+              <div style="font-size:.8125rem;color:var(--text-soft);margin-top:3px;line-height:1.6"><%= step[2] %></div>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+  </div>
+<% } %>

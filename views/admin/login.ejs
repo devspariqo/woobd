@@ -1,0 +1,56 @@
+<%
+  // Rendering only the body: layouts/admin-auth.ejs already draws the card,
+  // the brand lockup and the flash block.
+  var c = captcha || {};
+%>
+
+<%# The login body is intentionally thin - the surrounding layout owns all of
+    the chrome so this view can be reused if the panel ever gets a second
+    sign-in screen. %>
+<p style="font-size:.8125rem;color:var(--text-soft);text-align:center;margin:0 0 20px;line-height:1.7">
+  <%= settings.admin_login_notice || 'This panel is separate from your customer account.' %>
+</p>
+
+<form method="post" action="<%= helpers.url('/' + adminPath + '/login') %>" data-validate novalidate>
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <% if (query && query.next) { %>
+    <input type="hidden" name="next" value="<%= query.next %>">
+  <% } %>
+
+  <div class="form-group">
+    <label class="form-label" for="username">Username or email <span class="req">*</span></label>
+    <div class="input-group">
+      <svg class="input-icon"><use href="#i-user"/></svg>
+      <input type="text" id="username" name="username" class="form-control"
+             value="<%= form && form.username ? form.username : '' %>"
+             autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label" for="password">Password <span class="req">*</span></label>
+    <div class="input-group">
+      <svg class="input-icon"><use href="#i-lock"/></svg>
+      <input type="password" id="password" name="password" class="form-control has-action"
+             autocomplete="current-password" required>
+      <button type="button" class="input-action" data-toggle-password="password" aria-label="Show password">
+        <svg style="width:17px;height:17px"><use href="#i-eye"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <% if (showCaptcha) { %>
+    <div class="recaptcha-wrap">
+      <div class="g-recaptcha" data-sitekey="<%= c.siteKey %>"></div>
+    </div>
+  <% } %>
+
+  <button type="submit" class="btn btn-primary btn-block btn-lg">
+    Sign in
+    <svg><use href="#i-log-in"/></svg>
+  </button>
+</form>
+
+<div class="admin-auth-foot">
+  <a href="<%= helpers.url('/') %>">Back to the website</a>
+</div>

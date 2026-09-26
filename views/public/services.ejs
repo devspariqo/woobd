@@ -1,0 +1,109 @@
+<%- include('../partials/page-hero', {
+  pageTitle: 'Our Packages',
+  lead: 'Fixed-price website packages designed and built in Bangladesh. Order online and track progress from your dashboard.',
+  crumbs: [{ label: 'Packages' }]
+}) %>
+
+<section class="section">
+  <div class="container">
+    <%- include('../partials/flash') %>
+
+    <div class="row-between mb-5" style="margin-bottom:38px">
+      <div>
+        <h2 style="margin-bottom:6px">Choose your package</h2>
+        <p>Every package includes design, development, mobile optimisation and a handover walkthrough.</p>
+      </div>
+
+      <%# Category filter. Plain links, so it works without JavaScript and each
+          filtered view is a crawlable URL. %>
+      <% if (categories.length) { %>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <a href="<%= helpers.url('/services') %>"
+             class="btn btn-sm <%= !activeCategory ? 'btn-primary' : 'btn-outline' %>">All</a>
+          <% categories.forEach(function (category) { %>
+            <a href="<%= helpers.url('/services?category=' + category.slug) %>"
+               class="btn btn-sm <%= activeCategory === category.slug ? 'btn-primary' : 'btn-outline' %>">
+              <%= category.name %>
+            </a>
+          <% }); %>
+        </div>
+      <% } %>
+    </div>
+
+    <% if (services.length) { %>
+      <div class="grid grid-3">
+        <% services.forEach(function (service) { %>
+          <%- include('../partials/service-card', { service: service }) %>
+        <% }); %>
+      </div>
+
+      <%- include('../partials/pagination', { pager: pager, baseUrl: '/services' }) %>
+    <% } else { %>
+      <div class="card card-flat">
+        <div class="card-body-lg text-center">
+          <div class="feature-icon" style="margin:0 auto 20px"><svg><use href="#i-search"/></svg></div>
+          <h3 class="mb-3">No packages found</h3>
+          <p style="margin-bottom:24px">
+            <%= search ? 'Nothing matched your search.' : 'Our package list is being updated.' %>
+            Tell us what you need and we will quote it directly.
+          </p>
+          <a href="<%= helpers.url('/contact') %>" class="btn btn-primary">Request a custom quote</a>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</section>
+
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-head" data-reveal>
+      <span class="eyebrow">What's Included</span>
+      <h2>Standard on every project</h2>
+      <p>These are not upsells. If you buy any package from us, you get all of the following.</p>
+    </div>
+
+    <div class="grid grid-3">
+      <% [
+        { icon: 'smartphone', title: 'Mobile-first design', text: 'Designed for the phone first, because that is where most of your customers are.' },
+        { icon: 'zap', title: 'Page-speed optimisation', text: 'Compressed assets, no bloated plugins, tested on slow connections.' },
+        { icon: 'search', title: 'On-page SEO', text: 'Meta tags, semantic markup, sitemap and schema configured at launch.' },
+        { icon: 'credit-card', title: 'Payment integration', text: 'bKash, Nagad, Rocket and card checkout wired up and tested.' },
+        { icon: 'shield', title: 'Security hardening', text: 'HTTPS, hardened admin access, CSRF protection and rate limiting.' },
+        { icon: 'life-buoy', title: 'Post-launch support', text: 'A real person to call when something needs changing.' }
+      ].forEach(function (item) { %>
+        <div class="feature-card" data-reveal>
+          <div class="feature-icon"><svg><use href="#i-<%= item.icon %>"/></svg></div>
+          <h3><%= item.title %></h3>
+          <p><%= item.text %></p>
+        </div>
+      <% }); %>
+    </div>
+  </div>
+</section>
+
+<% if (faqs.length) { %>
+<section class="section">
+  <div class="container container-narrow">
+    <div class="section-head" data-reveal>
+      <span class="eyebrow">Questions</span>
+      <h2>Before you order</h2>
+    </div>
+
+    <div class="accordion" data-single="1">
+      <% faqs.forEach(function (faq, index) { %>
+        <div class="accordion-item <%= index === 0 ? 'is-open' : '' %>">
+          <button type="button" class="accordion-trigger" aria-expanded="<%= index === 0 ? 'true' : 'false' %>">
+            <span><%= faq.question %></span>
+            <span class="accordion-icon"><svg><use href="#i-plus"/></svg></span>
+          </button>
+          <div class="accordion-panel">
+            <div><p><%= faq.answer %></p></div>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+  </div>
+</section>
+<% } %>
+
+<%- include('../partials/cta-band') %>

@@ -1,0 +1,231 @@
+<%
+  const cur = site.currency;
+  const money = helpers.money;
+  const f = form || {};
+  const errs = errors || {};
+%>
+
+<form method="post" action="<%= helpers.url('/account/checkout') %>" data-validate novalidate>
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <input type="hidden" name="service_id" value="<%= service.id %>">
+
+  <div class="two-col">
+    <div>
+      <div class="panel" style="margin-bottom:22px">
+        <div class="panel-head">
+          <div>
+            <h2>Tell us about your project</h2>
+            <p>The more detail you give now, the faster we can start.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="form-group">
+            <label for="requirements" class="form-label">What are you selling? <span class="req">*</span></label>
+            <textarea id="requirements" name="requirements" data-count-target="requirements-count" rows="6" class="form-control <%= errs.requirements ? 'is-invalid' : '' %>"
+                      placeholder="e.g. I sell women's clothing — about 120 products across 6 categories. I need bKash and cash-on-delivery checkout, and delivery inside Dhaka within 48 hours."
+                      maxlength="4000" required><%= f.requirements || '' %></textarea>
+            <% if (errs.requirements) { %><div class="form-error"><%= errs.requirements %></div><% } %>
+            <div class="form-hint"><span id="requirements-count"></span> characters (max 4000)</div>
+          </div>
+
+          <div class="form-group">
+            <label for="domain_name" class="form-label">Preferred domain <span class="optional">(optional)</span></label>
+            <input type="text" id="domain_name" name="domain_name" class="form-control"
+                   value="<%= f.domain_name || '' %>" placeholder="mystore.com" maxlength="191">
+            <div class="form-hint">Already own one? Enter it and we will connect it. Otherwise we can register one for you.</div>
+          </div>
+
+          <div class="form-group">
+            <label for="notes" class="form-label">Anything else? <span class="optional">(optional)</span></label>
+            <textarea id="notes" name="notes" rows="3" class="form-control"
+                      placeholder="Reference websites you like, brand colours, deadline, existing catalogue…"
+                      maxlength="2000"><%= f.notes || '' %></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h3>Billing cycle</h3>
+            <p>Choose how you would like to be billed for this package.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <% if (!isRecurring) { %>
+            <p style="font-size:.875rem;color:var(--text-muted);margin:0">
+              This is a one-time payment. You own the finished work outright.
+            </p>
+          <% } else { %>
+            <%
+              // Price every term up front so the customer can compare without
+              // submitting the form. Same arithmetic the server uses.
+              var priced = termOptions.map(function (months) {
+                var gross = rate * months;
+                var pct = months >= 12 ? yearlyDiscount : 0;
+                var discount = Math.round(gross * pct / 100);
+                return {
+                  months: months,
+                  gross: gross,
+                  discount: discount,
+                  percent: pct,
+                  total: gross - discount,
+                  perMonth: (gross - discount) / months
+                };
+              });
+              var selected = priced.filter(function (p) { return p.months === term; })[0] || priced[0];
+            %>
+            <div style="display:grid;gap:11px">
+              <% priced.forEach(function (option) { %>
+                <label class="term-option <%= option.months === term ? 'is-selected' : '' %>"
+                       data-term-option
+                       data-months="<%= option.months %>"
+                       data-gross="<%= option.gross %>"
+                       data-discount="<%= option.discount %>"
+                       data-total="<%= option.total %>"
+                       data-gross-label="<%= money(option.gross, cur) %>"
+                       data-discount-label="<%= money(option.discount, cur) %>"
+                       data-total-label="<%= money(option.total, cur) %>">
+                  <input type="radio" name="term_months" value="<%= option.months %>"
+                         style="margin-top:4px;flex-shrink:0"
+                         <%= option.months === term ? 'checked' : '' %>>
+                  <span style="flex:1;min-width:0">
+                    <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                      <span style="font-weight:600;font-size:.9375rem">
+                        <%= option.months %> month<%= option.months === 1 ? '' : 's' %>
+                      </span>
+                      <% if (option.months === minMonths && minMonths > 1) { %>
+                        <span class="pill pill-info" style="font-size:.68rem">Minimum term</span>
+                      <% } %>
+                      <% if (option.discount > 0) { %>
+                        <span class="pill pill-success" style="font-size:.68rem">Save <%= option.percent %>%</span>
+                      <% } %>
+                    </span>
+                    <span style="display:block;font-size:.8125rem;color:var(--text-soft);margin-top:3px">
+                      <%= money(option.perMonth, cur) %> per month
+                      <% if (option.discount > 0) { %>
+                        · <span style="text-decoration:line-through"><%= money(option.gross, cur) %></span>
+                        <strong style="color:var(--success)"><%= money(option.total, cur) %></strong>
+                        <span class="pill pill-success" style="font-size:.68rem">you save <%= money(option.discount, cur) %></span>
+                      <% } %>
+                    </span>
+                  </span>
+                </label>
+              <% }); %>
+            </div>
+
+            <% if (minMonths > 1) { %>
+              <p class="form-hint" style="margin-top:11px">
+                This package has a <strong>minimum term of <%= minMonths %> months</strong>.
+                Pay for a full year and <%= yearlyDiscount %>% is taken off the total.
+              </p>
+            <% } %>
+            <% if (errors && errors.term_months) { %>
+              <p class="form-error"><%= errors.term_months %></p>
+            <% } %>
+          <% } %>
+        </div>
+      </div>
+    </div>
+
+    <%# ---- Order summary rail ---- %>
+    <div>
+      <div class="panel" style="margin-bottom:22px;position:sticky;top:20px">
+        <div class="panel-head">
+          <div><h3>Order summary</h3></div>
+        </div>
+        <div class="panel-body">
+          <div class="table-product" style="margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid var(--border)">
+            <% if (service.image) { %>
+              <img class="table-thumb" src="<%= helpers.url(service.image) %>" alt="" style="width:58px;height:58px">
+            <% } %>
+            <div>
+              <div class="name"><%= service.title %></div>
+              <div class="meta">
+                <% if (isRecurring) { %>
+                  <%= money(rate, cur) %> per month
+                <% } else { %>
+                  One-time payment
+                <% } %>
+              </div>
+            </div>
+          </div>
+
+          <% if (isRecurring) { %>
+            <div class="row-between" style="font-size:.9063rem;padding:7px 0">
+              <span style="color:var(--text-soft)">
+                <%= money(rate, cur) %> × <span data-summary-months><%= quote.term %></span> month<%= quote.term === 1 ? '' : 's' %>
+              </span>
+              <span data-summary-gross><%= money(quote.gross, cur) %></span>
+            </div>
+
+            <div class="row-between" style="font-size:.9063rem;padding:7px 0"
+                 <%= quote.discount > 0 ? '' : 'hidden' %> data-summary-discount-row>
+              <span style="color:var(--text-soft)">Yearly discount (<%= quote.percent %>%)</span>
+              <span style="color:var(--success);font-weight:600" data-summary-discount>
+                −<%= money(quote.discount, cur) %>
+              </span>
+            </div>
+          <% } else { %>
+            <div class="row-between" style="font-size:.9063rem;padding:7px 0">
+              <span style="color:var(--text-soft)">Package price</span>
+              <span><%= money(quote.gross, cur) %></span>
+            </div>
+          <% } %>
+
+          <% if (taxPercent > 0) { %>
+            <div class="row-between" style="font-size:.9063rem;padding:7px 0">
+              <span style="color:var(--text-soft)">VAT (<%= taxPercent %>%)</span>
+              <span><%= money(tax, cur) %></span>
+            </div>
+          <% } %>
+
+          <div class="row-between" style="padding:15px 0 0;border-top:2px solid var(--border);margin-top:9px">
+            <span style="font-weight:600">Total due</span>
+            <span style="font-size:1.375rem;font-weight:800;color:var(--primary)" data-summary-total>
+              <%= money(total, cur) %>
+            </span>
+          </div>
+
+          <% if (isRecurring && quote.term >= 12 && quote.discount > 0) { %>
+            <p class="form-hint" style="text-align:center;margin-top:10px">
+              You are saving <strong><%= money(quote.discount, cur) %></strong> by paying for a year up front.
+            </p>
+          <% } %>
+
+          <label style="display:flex;gap:11px;align-items:flex-start;margin:20px 0 16px;font-size:.8438rem;line-height:1.6;cursor:pointer">
+            <input type="checkbox" name="agree" value="1" style="margin-top:3px;flex-shrink:0" <%= f.agree ? 'checked' : '' %>>
+            <span>
+              I confirm the package and details above are correct and I agree to the
+              <a href="<%= helpers.url('/terms-conditions') %>" target="_blank" rel="noopener">Terms &amp; Conditions</a>.
+            </span>
+          </label>
+          <% if (errs.agree) { %><div class="form-error" style="margin-top:-10px;margin-bottom:14px"><%= errs.agree %></div><% } %>
+
+          <button type="submit" class="btn btn-primary btn-block btn-lg">
+            <svg><use href="#i-check-circle"/></svg> Place order
+          </button>
+
+          <p style="font-size:.78rem;color:var(--text-soft);text-align:center;margin:13px 0 0;line-height:1.6">
+            You will not be charged now. We generate an invoice and you pay by
+            bKash, Nagad, Rocket or card.
+          </p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div><h3>What happens next</h3></div>
+        </div>
+        <div class="panel-body" style="font-size:.8438rem;color:var(--text-soft);line-height:1.8">
+          <ol style="margin:0;padding-left:17px">
+            <li>Your order and invoice are created instantly.</li>
+            <li>Send payment and submit the transaction ID on the order page.</li>
+            <li>We verify within 24 hours and start building.</li>
+            <li>Your site login details appear on your dashboard when it goes live.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>

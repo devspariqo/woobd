@@ -1,0 +1,185 @@
+<%- include('../partials/page-hero', { pageTitle: 'About Us', lead: 'A Rangpur-based studio building e-commerce websites that Bangladeshi businesses can actually run.', crumbs: [{ label: 'About' }] }) %>
+
+<section class="section">
+  <div class="container">
+    <div class="split">
+      <div data-reveal>
+        <span class="eyebrow">Who We Are</span>
+        <h2 class="mb-4"><%= settings.about_title %></h2>
+        <p style="font-size:1.0625rem;line-height:1.78;margin-bottom:20px"><%= settings.about_text %></p>
+        <p style="line-height:1.78;margin-bottom:20px">
+          We started <%= site.name %> because too many Bangladeshi businesses were paying for websites that looked
+          fine in a portfolio and then failed at the one job that matters — turning a visitor into an order. Slow
+          loading on mobile data, a checkout that does not accept bKash, no way to update a product without calling
+          a developer.
+        </p>
+        <p style="line-height:1.78">
+          So we built our process around the opposite: pages that load in under two seconds on a 3G connection,
+          payment options people here actually use, and an admin panel simple enough that you can add a product
+          yourself in a minute.
+        </p>
+      </div>
+
+      <div data-reveal>
+        <% if (settings.about_image) { %>
+          <img src="<%= helpers.url(settings.about_image) %>" alt="<%= site.name %> team" loading="lazy"
+               style="border-radius:var(--radius-lg);box-shadow:var(--shadow-lg)" width="600" height="450">
+        <% } else { %>
+          <img src="<%= helpers.url('/assets/img/about-default.svg') %>" alt="<%= site.name %> team" loading="lazy"
+               style="border-radius:var(--radius-lg);box-shadow:var(--shadow-lg)" width="600" height="450">
+        <% } %>
+      </div>
+    </div>
+
+    <div class="grid grid-4 mt-6" style="margin-top:64px">
+      <div class="stat-card" data-reveal>
+        <div class="stat-value"><%= settings.about_years %></div>
+        <div class="stat-label">Years in business</div>
+      </div>
+      <div class="stat-card" data-reveal>
+        <div class="stat-value"><%= settings.about_projects %></div>
+        <div class="stat-label">Projects delivered</div>
+      </div>
+      <div class="stat-card" data-reveal>
+        <div class="stat-value"><%= settings.about_clients %></div>
+        <div class="stat-label">Clients served</div>
+      </div>
+      <div class="stat-card" data-reveal>
+        <div class="stat-value"><%= settings.about_rating %></div>
+        <div class="stat-label">Average rating</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-head" data-reveal>
+      <span class="eyebrow">How We Work</span>
+      <h2>A process with no surprises</h2>
+      <p>Four stages, each with a clear deliverable and a point where you approve before we move on.</p>
+    </div>
+
+    <div class="grid grid-4">
+      <% [
+        { n: '01', icon: 'message-square', title: 'Discovery', text: 'We learn your products, margins, competitors and who your customers actually are. No design work starts until this is settled.' },
+        { n: '02', icon: 'palette', title: 'Design', text: 'You get a mobile-first design to review. We revise until you are happy — the price does not change.' },
+        { n: '03', icon: 'code', title: 'Build', text: 'We develop, integrate bKash / Nagad / Rocket, load your catalogue and test on real low-bandwidth connections.' },
+        { n: '04', icon: 'life-buoy', title: 'Launch & Support', text: 'We deploy, hand over your admin credentials and stay available for support after you go live.' }
+      ].forEach(function (step) { %>
+        <div class="feature-card" data-reveal>
+          <div class="feature-icon" style="font-weight:800;font-size:1.125rem;font-family:var(--font-heading)">
+            <%= step.n %>
+          </div>
+          <h3><%= step.title %></h3>
+          <p><%= step.text %></p>
+        </div>
+      <% }); %>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="split">
+      <div data-reveal>
+        <span class="eyebrow">Why Us</span>
+        <h2 class="mb-4">What you get that most agencies charge extra for</h2>
+        <ul class="check-list">
+          <% [
+            'Page-speed optimisation built in — not a separate line item',
+            'On-page SEO, schema markup and sitemaps configured before launch',
+            'Mobile-first design tested on real devices and real networks',
+            'Payment integration for the methods your customers already use',
+            'An admin panel you can operate without training',
+            'A named contact in Rangpur who answers your messages'
+          ].forEach(function (item) { %>
+            <li>
+              <span class="tick"><svg><use href="#i-check"/></svg></span>
+              <span><%= item %></span>
+            </li>
+          <% }); %>
+        </ul>
+      </div>
+
+      <div data-reveal>
+        <div class="card card-flat">
+          <div class="card-body-lg">
+            <h3 class="mb-4">Office details</h3>
+            <ul class="footer-contact" style="color:var(--text-muted)">
+              <li>
+                <span class="ico" style="background:rgba(91,33,240,.08)"><svg><use href="#i-map-pin"/></svg></span>
+                <span>
+                  <span class="label">Address</span>
+                  <%= site.address %>
+                </span>
+              </li>
+              <li>
+                <span class="ico" style="background:rgba(91,33,240,.08)"><svg><use href="#i-phone"/></svg></span>
+                <span>
+                  <span class="label">Phone</span>
+                  <a href="tel:<%= site.phone.replace(/\s/g, '') %>" style="color:var(--text-muted)"><%= site.phone %></a>
+                </span>
+              </li>
+              <li>
+                <span class="ico" style="background:rgba(91,33,240,.08)"><svg><use href="#i-mail"/></svg></span>
+                <span>
+                  <span class="label">Email</span>
+                  <a href="mailto:<%= site.email %>" style="color:var(--text-muted)"><%= site.email %></a>
+                </span>
+              </li>
+              <li>
+                <span class="ico" style="background:rgba(91,33,240,.08)"><svg><use href="#i-clock"/></svg></span>
+                <span>
+                  <span class="label">Opening hours</span>
+                  <%= site.hours %>
+                </span>
+              </li>
+            </ul>
+
+            <a href="<%= helpers.url('/contact') %>" class="btn btn-primary btn-block mt-5">
+              Start a conversation
+              <svg><use href="#i-arrow-right"/></svg>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<% if (testimonials.length) { %>
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-head" data-reveal>
+      <span class="eyebrow">Client Reviews</span>
+      <h2>Trusted by brands across Bangladesh</h2>
+    </div>
+    <div class="grid grid-3">
+      <% testimonials.slice(0, 6).forEach(function (review) { %>
+        <div class="review-card" data-reveal>
+          <div class="review-stars">
+            <% for (var i = 1; i <= 5; i += 1) { %>
+              <svg class="<%= i <= review.rating ? '' : 'empty' %>"><use href="#i-star"/></svg>
+            <% } %>
+          </div>
+          <p class="review-text">"<%= review.message %>"</p>
+          <div class="review-author">
+            <% if (review.avatar) { %>
+              <img src="<%= helpers.url(review.avatar) %>" alt="<%= review.customer_name %>" class="review-avatar" loading="lazy" width="46" height="46">
+            <% } else { %>
+              <span class="review-avatar-fallback"><%= helpers.initials(review.customer_name) %></span>
+            <% } %>
+            <span>
+              <span class="review-name"><%= review.customer_name %></span>
+              <span class="review-role"><%= review.designation %></span>
+            </span>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+  </div>
+</section>
+<% } %>
+
+<%- include('../partials/cta-band') %>

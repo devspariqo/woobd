@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="<%= defaultColorMode %>">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title><%= pageTitle %> - <%= site.name %></title>
+  <meta name="description" content="<%= seo.description %>">
+  <meta name="robots" content="<%= seo.robots %>">
+  <link rel="icon" type="image/svg+xml" href="<%= site.favicon %>">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=<%= encodeURIComponent(fonts.heading).replace(/%20/g, '+') %>:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="<%= helpers.url('/assets/css/theme.css') %>">
+
+  <style>
+    :root {
+      --primary: <%= theme.primary %>;
+      --primary-dark: <%= theme.primaryDark %>;
+      --secondary: <%= theme.secondary %>;
+      --success: <%= theme.success %>;
+      --danger: <%= theme.danger %>;
+      --bg: <%= theme.bgLight %>;
+      --bg-alt: <%= theme.bgLightAlt %>;
+      --text: <%= theme.textLight %>;
+      --radius: <%= theme.radius %>;
+      --font-heading: '<%= fonts.heading %>', system-ui, sans-serif;
+      --font-body: '<%= fonts.body %>', system-ui, sans-serif;
+    }
+    [data-theme='dark'] { --bg: <%= theme.bgDark %>; --bg-alt: <%= theme.bgDarkAlt %>; --text: <%= theme.textDark %>; }
+
+    /* Two-column shell: brand panel on the left, form on the right. Collapses
+       to a single column on mobile, where the panel becomes a slim header. */
+    .auth-shell { display: grid; grid-template-columns: 1fr 1fr; min-height: 100vh; }
+    .auth-aside {
+      position: relative; padding: 56px 52px; color: #fff;
+      background: linear-gradient(150deg, <%= theme.primary %> 0%, <%= theme.primaryDark %> 55%, #2b0f8a 100%);
+      display: flex; flex-direction: column; justify-content: space-between; overflow: hidden;
+    }
+    .auth-aside::before {
+      content: ''; position: absolute; top: -180px; right: -140px; width: 480px; height: 480px;
+      background: radial-gradient(circle, rgba(255,255,255,.14) 0%, transparent 68%); pointer-events: none;
+    }
+    .auth-aside::after {
+      content: ''; position: absolute; bottom: -200px; left: -120px; width: 420px; height: 420px;
+      background: radial-gradient(circle, rgba(255,255,255,.1) 0%, transparent 70%); pointer-events: none;
+    }
+    .auth-aside > * { position: relative; z-index: 1; }
+    .auth-aside h2 { color: #fff; font-size: 1.875rem; margin-bottom: 16px; }
+    .auth-aside p { color: rgba(255,255,255,.86); font-size: .9688rem; line-height: 1.72; }
+    .auth-aside .brand img { max-height: 42px; }
+    .auth-points { display: flex; flex-direction: column; gap: 16px; margin-top: 34px; }
+    .auth-points li { display: flex; align-items: flex-start; gap: 12px; font-size: .9375rem; color: rgba(255,255,255,.92); }
+    .auth-points .tick {
+      width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%;
+      background: rgba(255,255,255,.18); flex-shrink: 0; margin-top: 1px;
+    }
+    .auth-points .tick svg { width: 13px; height: 13px; }
+
+    .auth-main {
+      display: flex; flex-direction: column; padding: 40px 52px;
+      background: var(--bg); overflow-y: auto;
+    }
+    .auth-main-inner { margin: auto; width: 100%; max-width: 460px; }
+    .auth-head { margin-bottom: 30px; }
+    .auth-head h1 { font-size: 1.75rem; margin-bottom: 9px; }
+    .auth-head p { font-size: .9375rem; }
+    .auth-top { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 34px; }
+    .auth-back { display: inline-flex; align-items: center; gap: 7px; font-size: .875rem; color: var(--text-muted); }
+    .auth-back:hover { color: var(--primary); }
+    .auth-back svg { width: 16px; height: 16px; }
+
+    .divider {
+      display: flex; align-items: center; gap: 14px; margin: 24px 0;
+      font-size: .8125rem; color: var(--text-soft); text-transform: uppercase; letter-spacing: .06em;
+    }
+    .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    .google-btn {
+      display: flex; align-items: center; justify-content: center; gap: 11px; width: 100%;
+      padding: 13px 20px; font-size: .9375rem; font-weight: 600; color: var(--text);
+      background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+      transition: border-color var(--t-fast), background var(--t-fast), transform var(--t-fast);
+    }
+    .google-btn:hover { border-color: var(--border-strong); background: var(--bg-alt); color: var(--text); transform: translateY(-1px); }
+    .google-btn svg { width: 19px; height: 19px; }
+
+    .auth-foot { margin-top: 28px; text-align: center; font-size: .9063rem; color: var(--text-muted); }
+    .auth-foot a { font-weight: 600; }
+    .auth-meta { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+
+    .strength { display: flex; gap: 5px; margin-top: 9px; }
+    .strength-bar { flex: 1; height: 4px; border-radius: 2px; background: var(--border); transition: background var(--t-fast); }
+    .strength-bar.weak { background: var(--danger); }
+    .strength-bar.fair { background: var(--warning); }
+    .strength-bar.good { background: var(--success); }
+    .strength-text { font-size: .75rem; color: var(--text-soft); margin-top: 6px; display: block; }
+
+    @media (max-width: 900px) {
+      .auth-shell { grid-template-columns: 1fr; }
+      .auth-aside { padding: 30px 26px; }
+      .auth-aside h2 { font-size: 1.375rem; }
+      .auth-aside .auth-points { display: none; }
+      .auth-main { padding: 30px 22px 44px; }
+    }
+  </style>
+
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('woobd-theme');
+        document.documentElement.setAttribute('data-theme', saved || '<%= defaultColorMode %>');
+      } catch (e) { /* ignore */ }
+    })();
+  </script>
+</head>
+<body>
+  <div class="auth-shell">
+    <aside class="auth-aside">
+      <a href="<%= helpers.url('/') %>" class="brand" style="display:inline-flex">
+        <img src="<%= site.logoDark %>" alt="<%= site.name %>">
+      </a>
+
+      <div>
+        <h2><%= typeof asideTitle !== 'undefined' && asideTitle ? asideTitle : 'Manage your website project in one place' %></h2>
+        <p>
+          <%= typeof asideText !== 'undefined' && asideText
+              ? asideText
+              : 'Order a package, upload payment proof, track delivery progress and grab your site credentials — all from your dashboard.' %>
+        </p>
+
+        <ul class="auth-points">
+          <li><span class="tick"><svg><use href="#i-check"/></svg></span><span>Order packages and pay by bKash, Nagad, Rocket or card</span></li>
+          <li><span class="tick"><svg><use href="#i-check"/></svg></span><span>Track your project status in real time</span></li>
+          <li><span class="tick"><svg><use href="#i-check"/></svg></span><span>Raise support tickets and get answers fast</span></li>
+          <li><span class="tick"><svg><use href="#i-check"/></svg></span><span>Access your website credentials whenever you need them</span></li>
+        </ul>
+      </div>
+
+      <p style="font-size:.8125rem;color:rgba(255,255,255,.62)">
+        <%= site.address %><br>
+        <a href="tel:<%= site.phone.replace(/\s/g, '') %>" style="color:rgba(255,255,255,.82)"><%= site.phone %></a> ·
+        <a href="mailto:<%= site.email %>" style="color:rgba(255,255,255,.82)"><%= site.email %></a>
+      </p>
+    </aside>
+
+    <main class="auth-main">
+      <div class="auth-top">
+        <a href="<%= helpers.url('/') %>" class="auth-back">
+          <svg><use href="#i-chevron-left"/></svg>
+          Back to website
+        </a>
+        <% if (showThemeToggle) { %>
+          <button type="button" class="theme-toggle" data-theme-toggle aria-label="Switch colour theme">
+            <svg class="icon-sun"><use href="#i-sun"/></svg>
+            <svg class="icon-moon"><use href="#i-moon"/></svg>
+          </button>
+        <% } %>
+      </div>
+
+      <div class="auth-main-inner">
+        <%- body %>
+      </div>
+    </main>
+  </div>
+
+  <%- include('../partials/icons') %>
+  <script src="<%= helpers.url('/assets/js/main.js') %>" defer></script>
+  <script>
+    // Live password strength meter on the sign-up and reset forms.
+    (function () {
+      var input = document.querySelector('[data-strength-source]');
+      if (!input) return;
+      var bars = document.querySelectorAll('.strength-bar');
+      var text = document.querySelector('.strength-text');
+
+      input.addEventListener('input', function () {
+        var value = input.value;
+        var score = 0;
+        if (value.length >= 8) score++;
+        if (value.length >= 12) score++;
+        if (/[A-Z]/.test(value) && /[a-z]/.test(value)) score++;
+        if (/\d/.test(value)) score++;
+        if (/[^A-Za-z0-9]/.test(value)) score++;
+
+        var level = score <= 2 ? 'weak' : score <= 3 ? 'fair' : score <= 4 ? 'good' : 'good';
+        var label = score <= 2 ? 'Weak' : score <= 3 ? 'Fair' : score <= 4 ? 'Good' : 'Strong';
+
+        bars.forEach(function (bar, index) {
+          bar.className = 'strength-bar' + (index < score ? ' ' + level : '');
+        });
+        if (text) text.textContent = value ? label + ' password' : '';
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+<%# Shared breadcrumb + page hero for inner pages.
+    Expects: pageTitle, lead (optional), crumbs = [{label, url}] %>
+<section class="page-hero">
+  <div class="container">
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="<%= helpers.url('/') %>">Home</a>
+      <% (typeof crumbs !== 'undefined' ? crumbs : []).forEach(function (crumb) { %>
+        <span class="sep">/</span>
+        <% if (crumb.url) { %>
+          <a href="<%= helpers.url(crumb.url) %>"><%= crumb.label %></a>
+        <% } else { %>
+          <span class="current"><%= crumb.label %></span>
+        <% } %>
+      <% }); %>
+    </nav>
+
+    <h1><%= pageTitle %></h1>
+
+    <% if (typeof lead !== 'undefined' && lead) { %>
+      <p class="lead"><%= lead %></p>
+    <% } %>
+  </div>
+</section>

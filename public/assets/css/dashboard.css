@@ -1,0 +1,1365 @@
+/* ==========================================================================
+   Dashboard shell - shared by the customer area and the admin panel.
+   Loaded after theme.css so it can build on the same tokens.
+   ========================================================================== */
+
+.dash-body { background: var(--bg-alt); min-height: 100vh; }
+
+/* --------------------------------------------------------------------------
+   Sidebar
+   -------------------------------------------------------------------------- */
+.dash-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 264px;
+  z-index: 960;
+  display: flex;
+  flex-direction: column;
+  background: #0e1122;
+  color: rgba(255, 255, 255, .72);
+  transition: transform var(--t);
+}
+
+[data-theme='dark'] .dash-sidebar { background: #080a14; border-right: 1px solid var(--border); }
+
+.dash-sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 22px 22px 18px;
+  flex-shrink: 0;
+}
+
+.dash-brand img { max-height: 36px; width: auto; }
+
+.dash-sidebar-close {
+  display: none;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  color: rgba(255, 255, 255, .7);
+}
+
+.dash-sidebar-close:hover { background: rgba(255, 255, 255, .1); color: #fff; }
+.dash-sidebar-close svg { width: 18px; height: 18px; }
+
+/* Current user block */
+.dash-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 22px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+  flex-shrink: 0;
+}
+
+.dash-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  background: var(--gradient);
+  color: #fff;
+  font-weight: 700;
+  font-size: .9375rem;
+}
+
+.dash-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.dash-avatar-sm { width: 36px; height: 36px; font-size: .8125rem; }
+
+.dash-user-info { min-width: 0; flex: 1; }
+
+.dash-user-name {
+  font-size: .9063rem;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dash-user-email {
+  font-size: .75rem;
+  color: rgba(255, 255, 255, .48);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Navigation */
+.dash-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 14px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dash-nav-label {
+  display: block;
+  padding: 16px 12px 8px;
+  font-size: .6875rem;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, .34);
+}
+
+.dash-nav-label:first-child { padding-top: 4px; }
+
+.dash-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 13px;
+  font-size: .9063rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, .72);
+  border-radius: var(--radius-sm);
+  transition: background var(--t-fast), color var(--t-fast);
+}
+
+.dash-nav-link:hover { background: rgba(255, 255, 255, .08); color: #fff; }
+
+.dash-nav-link.active {
+  background: var(--gradient);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(91, 33, 240, .32);
+}
+
+.dash-nav-link svg { width: 18px; height: 18px; flex-shrink: 0; opacity: .82; }
+.dash-nav-link.active svg { opacity: 1; }
+
+.dash-nav-danger:hover { background: rgba(224, 43, 43, .18); color: #ff9f9f; }
+
+.dash-badge {
+  margin-left: auto;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  display: grid;
+  place-items: center;
+  font-size: .6875rem;
+  font-weight: 700;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, .16);
+  color: #fff;
+}
+
+.dash-nav-link.active .dash-badge { background: rgba(255, 255, 255, .26); }
+
+.dash-sidebar-foot {
+  padding: 14px 16px 18px;
+  border-top: 1px solid rgba(255, 255, 255, .08);
+  flex-shrink: 0;
+}
+
+/* Two quick actions. Previously a single line of small text links, which read
+   as boilerplate and were an awkward tap target on a phone. */
+.dash-foot-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.dash-foot-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 11px 6px;
+  border-radius: var(--radius-sm);
+  font-size: .75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  color: rgba(255, 255, 255, .82);
+  background: rgba(255, 255, 255, .06);
+  border: 1px solid rgba(255, 255, 255, .1);
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+}
+
+.dash-foot-btn svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+}
+
+.dash-foot-btn:hover {
+  background: rgba(255, 255, 255, .13);
+  border-color: rgba(255, 255, 255, .22);
+  color: #fff;
+}
+
+/* Settings is the screen an operator opens most, so it carries the accent. */
+.dash-foot-btn.is-accent {
+  color: #fff;
+  background: rgba(124, 92, 255, .24);
+  border-color: rgba(124, 92, 255, .45);
+}
+
+.dash-foot-btn.is-accent:hover {
+  background: rgba(124, 92, 255, .38);
+  border-color: rgba(124, 92, 255, .7);
+}
+
+.dash-foot-btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+@media (max-width: 380px) {
+  .dash-foot-actions { grid-template-columns: 1fr; }
+  .dash-foot-btn { flex-direction: row; gap: 9px; padding: 11px 12px; }
+}
+
+.dash-sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 955;
+  background: rgba(8, 9, 18, .55);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--t), visibility var(--t);
+}
+
+/* --------------------------------------------------------------------------
+   Shell / topbar
+   -------------------------------------------------------------------------- */
+.dash-shell {
+  margin-left: 264px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 30px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.dash-menu-btn {
+  display: none;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border);
+  color: var(--text);
+  flex-shrink: 0;
+}
+
+.dash-menu-btn svg { width: 20px; height: 20px; }
+
+.dash-topbar-title { flex: 1; min-width: 0; }
+.dash-topbar-title h1 { font-size: 1.25rem; margin-bottom: 2px; }
+.dash-topbar-title p { font-size: .8438rem; color: var(--text-soft); }
+
+.dash-topbar-actions { display: flex; align-items: center; gap: 11px; flex-shrink: 0; }
+
+.dash-main { flex: 1; padding: 28px 0 44px; }
+.dash-container { width: 100%; max-width: 1400px; margin: 0 auto; padding: 0 30px; }
+
+.dash-footer {
+  padding: 22px 0;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  font-size: .8438rem;
+  color: var(--text-soft);
+}
+
+.dash-footer a { color: var(--text-muted); }
+.dash-footer a:hover { color: var(--primary); }
+
+/* --------------------------------------------------------------------------
+   Cards & grids
+   -------------------------------------------------------------------------- */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-head h2, .panel-head h3 { font-size: 1.0313rem; margin: 0; }
+.panel-head p { font-size: .8125rem; color: var(--text-soft); margin-top: 3px; }
+.panel-body { padding: 22px; }
+.panel-body-flush { padding: 0; }
+.panel-foot { padding: 16px 22px; border-top: 1px solid var(--border); background: var(--bg-alt); }
+
+/* Stat tiles */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.stat-tile {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: border-color var(--t), box-shadow var(--t), transform var(--t);
+}
+
+.stat-tile:hover { border-color: var(--border-strong); box-shadow: var(--shadow-sm); transform: translateY(-2px); }
+
+.stat-tile .ico {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.stat-tile .ico svg { width: 21px; height: 21px; }
+.stat-tile .ico.tone-primary { background: rgba(91, 33, 240, .11); color: var(--primary); }
+.stat-tile .ico.tone-success { background: rgba(15, 157, 88, .12); color: var(--success); }
+.stat-tile .ico.tone-warning { background: rgba(240, 160, 32, .14); color: var(--warning); }
+.stat-tile .ico.tone-danger { background: rgba(224, 43, 43, .11); color: var(--danger); }
+.stat-tile .ico.tone-info { background: rgba(56, 132, 255, .12); color: #3884ff; }
+
+.stat-tile .value {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--text);
+  letter-spacing: -.025em;
+}
+
+.stat-tile .label { font-size: .8125rem; color: var(--text-soft); margin-top: 2px; }
+
+.stat-tile .delta { font-size: .75rem; font-weight: 600; margin-top: 6px; display: inline-flex; align-items: center; gap: 4px; }
+.stat-tile .delta.up { color: var(--success); }
+.stat-tile .delta.down { color: var(--danger); }
+
+.two-col { display: grid; grid-template-columns: 1.6fr 1fr; gap: 22px; align-items: start; }
+.three-col { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
+
+/* --------------------------------------------------------------------------
+   Tables
+   -------------------------------------------------------------------------- */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+.dash-table { width: 100%; font-size: .9063rem; min-width: 640px; }
+
+.dash-table thead th {
+  padding: 13px 18px;
+  text-align: left;
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  background: var(--bg-alt);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.dash-table tbody td {
+  padding: 15px 18px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  vertical-align: middle;
+}
+
+.dash-table tbody tr:last-child td { border-bottom: none; }
+.dash-table tbody tr:hover { background: var(--bg-alt); }
+.dash-table td.strong { color: var(--text); font-weight: 600; }
+.dash-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dash-table .actions { display: flex; gap: 7px; justify-content: flex-end; }
+
+.table-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 9px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.table-product { display: flex; align-items: center; gap: 13px; min-width: 200px; }
+.table-product .name { font-weight: 600; color: var(--text); line-height: 1.35; }
+.table-product .meta { font-size: .75rem; color: var(--text-soft); }
+
+/* --------------------------------------------------------------------------
+   Toolbar (search + filters)
+   -------------------------------------------------------------------------- */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex-wrap: wrap;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.toolbar .search-box { position: relative; flex: 1; min-width: 200px; max-width: 340px; }
+
+.toolbar .search-box svg {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 17px;
+  height: 17px;
+  color: var(--text-soft);
+  pointer-events: none;
+}
+
+.toolbar .search-box input { padding-left: 40px; }
+.toolbar .form-control { height: 42px; padding-top: 0; padding-bottom: 0; }
+.toolbar select.form-control { min-width: 150px; }
+
+/* --------------------------------------------------------------------------
+   Empty state
+   -------------------------------------------------------------------------- */
+.empty-state { padding: 62px 26px; text-align: center; }
+
+.empty-state .ico {
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 20px;
+  background: var(--gradient-soft);
+  color: var(--primary);
+}
+
+.empty-state .ico svg { width: 30px; height: 30px; }
+.empty-state h3 { margin-bottom: 9px; }
+.empty-state p { max-width: 400px; margin: 0 auto 24px; font-size: .9375rem; }
+
+/* --------------------------------------------------------------------------
+   Tabs & pills
+   -------------------------------------------------------------------------- */
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  padding: 5px;
+  background: var(--bg-alt);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tab-bar a, .tab-bar button {
+  padding: 10px 17px;
+  font-size: .875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-radius: 7px;
+  white-space: nowrap;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+
+.tab-bar a:hover, .tab-bar button:hover { color: var(--primary); background: var(--surface); }
+.tab-bar a.active, .tab-bar button.active { background: var(--surface); color: var(--primary); box-shadow: var(--shadow-xs); }
+
+/* The settings screen has 16 tabs, which overflow. A slim, always-visible
+   scrollbar is the only cue that there are more tabs off-screen. */
+.tab-bar { scrollbar-width: thin; }
+.tab-bar::-webkit-scrollbar { height: 5px; }
+.tab-bar::-webkit-scrollbar-track { background: transparent; }
+.tab-bar::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: var(--radius-pill); }
+.tab-bar::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+
+.tab-count {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 1px 7px;
+  font-size: .6875rem;
+  border-radius: var(--radius-pill);
+  background: var(--border);
+  color: var(--text-muted);
+}
+
+.tab-bar .active .tab-count { background: rgba(91, 33, 240, .14); color: var(--primary); }
+
+/* --------------------------------------------------------------------------
+   Timeline
+   -------------------------------------------------------------------------- */
+.timeline { position: relative; padding-left: 30px; }
+
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: var(--border);
+}
+
+.timeline-item { position: relative; padding-bottom: 24px; }
+.timeline-item:last-child { padding-bottom: 0; }
+
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: -30px;
+  top: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 3px solid var(--border-strong);
+}
+
+.timeline-item.done::before { border-color: var(--success); background: var(--success); }
+.timeline-item.current::before { border-color: var(--primary); background: var(--primary); box-shadow: 0 0 0 4px rgba(91, 33, 240, .15); }
+
+.timeline-item .title { font-weight: 600; color: var(--text); font-size: .9375rem; }
+.timeline-item .desc { font-size: .8438rem; color: var(--text-soft); margin-top: 3px; }
+
+/* --------------------------------------------------------------------------
+   Credentials / copy rows
+   -------------------------------------------------------------------------- */
+.cred-row {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 14px 16px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.cred-row + .cred-row { margin-top: 10px; }
+
+.cred-row .label {
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  min-width: 130px;
+  flex-shrink: 0;
+}
+
+.cred-row .value {
+  flex: 1;
+  font-size: .9375rem;
+  color: var(--text);
+  word-break: break-all;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.cred-row .copy-btn {
+  padding: 7px 13px;
+  font-size: .8125rem;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  flex-shrink: 0;
+  transition: all var(--t-fast);
+}
+
+.cred-row .copy-btn:hover { border-color: var(--primary); background: rgba(91, 33, 240, .07); }
+
+/* --------------------------------------------------------------------------
+   Settings: toggle switch + field rows
+
+   A boolean setting renders as a switch, not a checkbox, because the label is
+   "On / Off" and the state has to be readable at a glance without reading the
+   surrounding sentence. The real <input type="checkbox"> stays in the DOM
+   (visually hidden, not display:none) so it remains focusable, keyboard
+   operable and submitted with the form.
+   -------------------------------------------------------------------------- */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  /* Keep it in the layout flow for focus management but out of sight. */
+  pointer-events: none;
+}
+
+.switch .track {
+  position: relative;
+  width: 46px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+  transition: background var(--t-fast) var(--ease);
+}
+
+.switch .track::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: var(--shadow-xs);
+  transition: transform var(--t-fast) var(--ease);
+}
+
+.switch input:checked + .track { background: var(--success); }
+.switch input:checked + .track::after { transform: translateX(20px); }
+
+/* Focus ring must be visible for keyboard users, since the input itself is not. */
+.switch input:focus-visible + .track {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.switch input:disabled + .track { opacity: .5; cursor: not-allowed; }
+
+.switch .switch-state {
+  font-size: .8125rem;
+  font-weight: 700;
+  min-width: 30px;
+  color: var(--text-soft);
+}
+
+.switch input:checked ~ .switch-state { color: var(--success); }
+
+/* A settings row: label + help on the left, control on the right. */
+.setting-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 26px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.setting-row:last-child { border-bottom: 0; padding-bottom: 4px; }
+.setting-row:first-child { padding-top: 4px; }
+
+.setting-row .setting-text { flex: 1; min-width: 0; }
+
+.setting-row .setting-label {
+  font-size: .9375rem;
+  font-weight: 600;
+  color: var(--text);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.setting-row .setting-help {
+  font-size: .8125rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+  margin: 0;
+  max-width: 62ch;
+}
+
+.setting-row .setting-help code {
+  font-size: .78rem;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.setting-row .setting-control { flex-shrink: 0; width: 300px; max-width: 42%; }
+.setting-row .setting-control .form-control { width: 100%; }
+
+/* A group of related toggles gets a heading inside the panel. */
+.setting-group-title {
+  font-size: .75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-soft);
+  padding: 22px 0 10px;
+}
+
+.setting-group-title:first-child { padding-top: 0; }
+
+/* Secrets: shown masked with a "leave blank to keep" affordance. */
+.setting-row .secret-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--success);
+  margin-bottom: 6px;
+}
+
+.setting-row .secret-state.is-missing { color: var(--warning); }
+.setting-row .secret-state.is-env { color: #2b7de0; }
+
+/* A masked preview: enough to recognise the credential, not enough to use it. */
+.setting-row .secret-mask {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .72rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1px 6px;
+  letter-spacing: .04em;
+}
+
+@media (max-width: 720px) {
+  .setting-row { flex-direction: column; align-items: stretch; gap: 12px; }
+  .setting-row .setting-control { width: 100%; max-width: 100%; }
+}
+
+/* --------------------------------------------------------------------------
+   CMS forms: definition list, image upload, star rating
+   -------------------------------------------------------------------------- */
+.meta-list {
+  margin: 0;
+  font-size: .8125rem;
+}
+
+.meta-list > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.meta-list > div:last-child { border-bottom: 0; padding-bottom: 0; }
+.meta-list > div:first-child { padding-top: 0; }
+
+.meta-list dt {
+  color: var(--text-soft);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.meta-list dd {
+  margin: 0;
+  color: var(--text);
+  text-align: right;
+  word-break: break-word;
+}
+
+.meta-list dd code {
+  font-size: .75rem;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1px 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Image picker: preview beside the file input, so the operator sees what is
+   currently saved before choosing a replacement. */
+.upload-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.upload-preview {
+  width: 96px;
+  height: 96px;
+  flex-shrink: 0;
+  object-fit: contain;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px;
+}
+
+/* Star rating in a table cell. */
+.rating {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+}
+
+@media (max-width: 560px) {
+  .upload-field { flex-direction: column; gap: 12px; }
+  .upload-preview { width: 100%; height: 150px; }
+  .meta-list dd { text-align: left; }
+  .meta-list > div { flex-direction: column; gap: 2px; }
+}
+
+/* Brand asset picker (Settings → Branding).
+   Shows the file currently in use - or the bundled default - beside the input,
+   so the operator can see what is live before replacing it. */
+.brand-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.brand-preview {
+  width: 108px;
+  height: 72px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  padding: 7px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.brand-preview img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* Shown when a file setting has neither a stored value nor a bundled default,
+   so the empty box is explained rather than just blank. */
+.brand-empty {
+  font-size: .6875rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  text-align: center;
+  line-height: 1.3;
+}
+
+/* --------------------------------------------------------------------------
+   Checkout term selector
+   -------------------------------------------------------------------------- */
+.term-option {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  background: var(--surface);
+  transition: border-color var(--t-fast), background var(--t-fast), box-shadow var(--t-fast);
+}
+
+.term-option:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-alt);
+}
+
+/* :has() highlights the card from the checked input, so the state is driven by
+   the radio itself rather than a class the script has to keep in sync. */
+.term-option:has(input:checked),
+.term-option.is-selected {
+  border-color: var(--primary);
+  background: rgba(91, 33, 240, .05);
+  box-shadow: 0 0 0 3px rgba(91, 33, 240, .1);
+}
+
+.term-option:focus-within {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   Rich text editor (CMS "html" fields)
+
+   A contenteditable surface with a toolbar, syncing into the textarea that
+   carries the field name. No editor library - the project ships no CDN.
+   -------------------------------------------------------------------------- */
+.html-editor {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface);
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+
+.html-editor:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(91, 33, 240, .1);
+}
+
+.html-editor-bar {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: wrap;
+  padding: 7px 8px;
+  background: var(--bg-alt);
+  border-bottom: 1px solid var(--border);
+}
+
+.he-btn {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: .8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+}
+
+.he-btn:hover {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.he-btn.is-active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.he-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.he-btn svg { width: 15px; height: 15px; }
+
+.he-btn-wide { padding: 0 12px; font-size: .75rem; }
+
+.he-sep {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--border);
+}
+
+/* The editing surface. Sized in min-height rather than rows, since it is a div. */
+.html-editor-surface {
+  min-height: 240px;
+  max-height: 620px;
+  overflow-y: auto;
+  padding: 16px 18px;
+  font-size: .9375rem;
+  line-height: 1.75;
+  color: var(--text);
+  outline: none;
+}
+
+.html-editor-surface:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-soft);
+}
+
+/* Content typed into the surface - match the public site's typography so the
+   admin sees roughly what the page will render. */
+.html-editor-surface h2 { font-size: 1.25rem; font-weight: 700; margin: 20px 0 10px; }
+.html-editor-surface h3 { font-size: 1.0625rem; font-weight: 700; margin: 18px 0 8px; }
+.html-editor-surface p { margin: 0 0 13px; }
+.html-editor-surface ul,
+.html-editor-surface ol { margin: 0 0 13px 22px; }
+.html-editor-surface li { margin-bottom: 6px; }
+.html-editor-surface a { color: var(--primary); text-decoration: underline; }
+.html-editor-surface blockquote {
+  margin: 0 0 13px;
+  padding: 10px 16px;
+  border-left: 3px solid var(--primary);
+  background: var(--bg-alt);
+  color: var(--text-muted);
+}
+
+/* Source mode: a monospace view of the raw HTML. */
+.html-editor-surface[data-source-mode] {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .8125rem;
+  white-space: pre-wrap;
+  background: var(--bg-alt);
+}
+
+/* The real form field. Off-screen rather than display:none, because a hidden
+   control that fails validation cannot be focused and Chrome then refuses to
+   submit the form at all. */
+.html-editor-store {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .html-editor-surface { min-height: 200px; padding: 13px 14px; }
+  .he-btn { min-width: 30px; height: 30px; padding: 0 7px; }
+  .he-btn-wide { padding: 0 9px; }
+}
+
+/* The default control column is 300px, which is tight for a preview plus a file
+   input. Let brand rows use more of the available width. */
+.setting-row:has(.brand-field) .setting-control {
+  width: 420px;
+  max-width: 56%;
+}
+
+@media (max-width: 720px) {
+  .brand-field { flex-direction: column; }
+  .brand-preview { width: 100%; height: 96px; }
+  .setting-row:has(.brand-field) .setting-control { width: 100%; max-width: 100%; }
+}
+
+/* --------------------------------------------------------------------------
+   Horizontal bar chart
+   Built from divs rather than a charting library: the project ships no CDN and
+   no third-party JS, and a labelled bar list is more readable than a canvas for
+   a handful of periods.
+   -------------------------------------------------------------------------- */
+.bar-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 62px 1fr 84px;
+  align-items: center;
+  gap: 11px;
+}
+
+.bar-label {
+  font-size: .75rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bar-track {
+  height: 9px;
+  background: var(--bg-alt);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--primary);
+  min-width: 2px;
+  transition: width var(--t) var(--ease);
+}
+
+.bar-fill.tone-primary { background: var(--primary); }
+.bar-fill.tone-success { background: var(--success); }
+.bar-fill.tone-secondary { background: var(--secondary); }
+.bar-fill.tone-info { background: #2b7de0; }
+.bar-fill.tone-warning { background: var(--warning); }
+
+.bar-value {
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .bar-row { grid-template-columns: 52px 1fr 70px; gap: 8px; }
+}
+
+/* --------------------------------------------------------------------------
+   Media library grid
+   -------------------------------------------------------------------------- */
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 16px;
+}
+
+.media-card {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+}
+
+.media-thumb {
+  display: block;
+  aspect-ratio: 4 / 3;
+  background: var(--bg-alt);
+  border-bottom: 1px solid var(--border);
+}
+
+.media-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 8px;
+}
+
+.media-card figcaption { padding: 11px 12px 12px; }
+
+.media-name {
+  font-size: .8125rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 7px;
+  /* Long filenames must not stretch the card. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: .6875rem;
+  color: var(--text-soft);
+  margin-bottom: 10px;
+}
+
+.media-actions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.media-actions .btn { font-size: .72rem; padding: 5px 9px; }
+
+/* --------------------------------------------------------------------------
+   Inline staff editor - revealed by the Edit button on the staff list
+   -------------------------------------------------------------------------- */
+.staff-edit {
+  border-top: 1px solid var(--border);
+  margin-top: 14px;
+  padding-top: 4px;
+}
+
+.staff-edit[hidden] { display: none; }
+
+/* --------------------------------------------------------------------------
+   Contact messages - one card per enquiry, message body always visible
+   -------------------------------------------------------------------------- */
+.contact-msg {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.contact-msg:last-child { border-bottom: 0; }
+.contact-msg:hover { background: var(--bg-alt); }
+
+.contact-msg-body {
+  margin: 12px 0 14px;
+  padding: 13px 15px;
+  background: var(--bg-alt);
+  border-left: 3px solid var(--border-strong);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: .875rem;
+  line-height: 1.7;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.contact-msg-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* --------------------------------------------------------------------------
+   Activity log - grouped by day, with a tone dot per actor
+   -------------------------------------------------------------------------- */
+.activity-day {
+  font-size: .75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-soft);
+  padding: 20px 0 10px;
+}
+
+.activity-day:first-child { padding-top: 0; }
+
+.activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.activity-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.activity-list li:last-child { border-bottom: 0; }
+
+.activity-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 6px;
+  background: var(--border-strong);
+}
+
+.activity-dot.tone-primary { background: var(--primary); }
+.activity-dot.tone-info { background: #2b7de0; }
+.activity-dot.tone-muted { background: var(--border-strong); }
+
+.activity-list code {
+  font-size: .72rem;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* --------------------------------------------------------------------------
+   Support ticket thread
+   Staff replies sit on the right, customer messages on the left, so the
+   conversation reads as a back-and-forth rather than identical blocks.
+   -------------------------------------------------------------------------- */
+.ticket-msg {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  max-width: 88%;
+}
+
+.ticket-msg + .ticket-msg { margin-top: 14px; }
+
+.ticket-msg.is-customer {
+  background: var(--bg-alt);
+  border-top-left-radius: 3px;
+}
+
+.ticket-msg.is-staff {
+  margin-left: auto;
+  border-color: rgba(91, 33, 240, .3);
+  background: rgba(91, 33, 240, .05);
+  border-top-right-radius: 3px;
+}
+
+.ticket-msg-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: .8125rem;
+  margin-bottom: 9px;
+  flex-wrap: wrap;
+}
+
+.ticket-msg-head .avatar-sm {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: .6875rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  background: var(--border);
+  color: var(--text-muted);
+}
+
+.ticket-msg.is-staff .ticket-msg-head .avatar-sm {
+  background: var(--primary);
+  color: #fff;
+}
+
+.ticket-msg-body {
+  font-size: .875rem;
+  line-height: 1.7;
+  color: var(--text);
+  word-break: break-word;
+}
+
+@media (max-width: 640px) {
+  .ticket-msg { max-width: 100%; }
+}
+
+/* --------------------------------------------------------------------------
+   Responsive
+   -------------------------------------------------------------------------- */
+@media (max-width: 1100px) {
+  .two-col, .three-col { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 1024px) {
+  .dash-sidebar { transform: translateX(-100%); }
+  .dash-sidebar.is-open { transform: translateX(0); box-shadow: 12px 0 40px rgba(0, 0, 0, .28); }
+  .dash-sidebar-close { display: grid; }
+  .dash-sidebar.is-open ~ .dash-sidebar-backdrop { opacity: 1; visibility: visible; }
+  .dash-shell { margin-left: 0; }
+  .dash-menu-btn { display: grid; }
+}
+
+@media (max-width: 768px) {
+  .dash-container { padding: 0 18px; }
+  .dash-topbar { padding: 13px 18px; gap: 13px; }
+  .dash-topbar-title h1 { font-size: 1.0625rem; }
+  .dash-topbar-actions .btn:not(.theme-toggle) span { display: none; }
+  .dash-main { padding: 20px 0 36px; }
+  .stat-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 13px; }
+  .stat-tile { padding: 16px; gap: 12px; }
+  .stat-tile .value { font-size: 1.25rem; }
+  .panel-head, .panel-body { padding: 16px; }
+  .cred-row { flex-direction: column; align-items: stretch; gap: 8px; }
+  .cred-row .label { min-width: 0; }
+  .cred-row .copy-btn { align-self: flex-start; }
+}
+
+@media (max-width: 480px) {
+  .dash-topbar-title p { display: none; }
+  .stat-tile .ico { width: 40px; height: 40px; }
+}

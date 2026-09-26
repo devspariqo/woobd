@@ -1,0 +1,430 @@
+<%
+  const cur = site.currency;
+  const money = helpers.money;
+  const paidApproved = (payments || []).filter(function (p) { return p.status === 'approved'; })
+    .reduce(function (sum, p) { return sum + Number(p.amount); }, 0);
+  const balance = Math.max(0, Number(order.total) - paidApproved);
+  const visibleCount = (deliverables || []).filter(function (d) { return d.is_visible; }).length;
+%>
+
+<div class="two-col">
+  <div>
+    <%# ==================================================================
+        Handover credentials.
+
+        This is the block the whole product exists to produce: whatever an
+        operator saves here is what the customer sees on their dashboard.
+        The per-row "visible" switch is what separates internal notes from
+        customer-facing details.
+        ================================================================== %>
+    <form method="post" action="<%= helpers.url('/' + adminPath + '/orders/' + order.id) %>" data-validate novalidate>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+      <div class="panel" style="margin-bottom:22px;border-color:<%= order.status === 'active' ? 'var(--success)' : 'var(--border)' %>">
+        <div class="panel-head" style="<%= order.status === 'active' ? 'background:rgba(15,157,88,.06)' : '' %>">
+          <div>
+            <h2><svg style="width:17px;height:17px;vertical-align:-3px;color:var(--success)"><use href="#i-lock"/></svg>
+              Customer handover details</h2>
+            <p>
+              These appear on the customer's dashboard once the order status is
+              <strong>Active</strong>.
+              <% if (visibleCount) { %>
+                <span style="color:var(--success);font-weight:600"><%= visibleCount %> visible to the customer.</span>
+              <% } else { %>
+                <span style="color:var(--warning);font-weight:600">Nothing is visible to the customer yet.</span>
+              <% } %>
+            </p>
+          </div>
+        </div>
+
+        <div class="panel-body">
+          <div class="alert alert-info" style="margin-bottom:20px">
+            <svg><use href="#i-info"/></svg>
+            <div>
+              Tick <strong>Visible</strong> for anything the customer should see (cPanel URL, website URL,
+              admin password). Leave it unticked for internal notes such as hosting provider or DNS records.
+            </div>
+          </div>
+
+          <div data-repeatable>
+            <div data-repeat-list>
+              <% if (deliverables && deliverables.length) { %>
+                <% deliverables.forEach(function (item, index) { %>
+                  <div data-repeat-row style="display:grid;grid-template-columns:1fr 1.6fr auto auto;gap:11px;align-items:end;margin-bottom:12px">
+                    <div>
+                      <% if (index === 0) { %><label class="form-label">Label</label><% } %>
+                      <input type="text" name="deliverable_label" class="form-control" value="<%= item.label %>"
+                             placeholder="Website admin cPanel URL" maxlength="150">
+                    </div>
+                    <div>
+                      <% if (index === 0) { %><label class="form-label">Value</label><% } %>
+                      <input type="text" name="deliverable_value" class="form-control" value="<%= item.value || '' %>"
+                             placeholder="https://cpanel.hostinger.com or the password" maxlength="4000">
+                    </div>
+                    <label style="display:flex;flex-direction:column;align-items:center;gap:5px;font-size:.75rem;color:var(--text-soft);font-weight:600;padding-bottom:11px;cursor:pointer">
+                      <% if (index === 0) { %><span>Visible</span><% } else { %><span>&nbsp;</span><% } %>
+                      <input type="checkbox" name="deliverable_visible" value="<%= index %>" <%= item.is_visible ? 'checked' : '' %>>
+                    </label>
+                    <button type="button" class="btn btn-ghost btn-sm" data-repeat-remove aria-label="Remove row"
+                            style="height:42px;padding:0 13px">
+                      <svg><use href="#i-trash"/></svg>
+                    </button>
+                  </div>
+                <% }); %>
+              <% } else { %>
+                <%# Seed the empty form with the credential set this business
+                    actually hands over, so the first save is one click. %>
+                <% [
+                     ['Website admin cPanel URL', ''],
+                     ['Website URL', ''],
+                     ['Admin username', ''],
+                     ['Admin password', ''],
+                     ['Database name', '']
+                   ].forEach(function (preset, index) { %>
+                  <div data-repeat-row style="display:grid;grid-template-columns:1fr 1.6fr auto auto;gap:11px;align-items:end;margin-bottom:12px">
+                    <div>
+                      <% if (index === 0) { %><label class="form-label">Label</label><% } %>
+                      <input type="text" name="deliverable_label" class="form-control" value="<%= preset[0] %>" maxlength="150">
+                    </div>
+                    <div>
+                      <% if (index === 0) { %><label class="form-label">Value</label><% } %>
+                      <input type="text" name="deliverable_value" class="form-control" value="<%= preset[1] %>"
+                             placeholder="Fill this in before activating" maxlength="4000">
+                    </div>
+                    <label style="display:flex;flex-direction:column;align-items:center;gap:5px;font-size:.75rem;color:var(--text-soft);font-weight:600;padding-bottom:11px;cursor:pointer">
+                      <% if (index === 0) { %><span>Visible</span><% } else { %><span>&nbsp;</span><% } %>
+                      <input type="checkbox" name="deliverable_visible" value="<%= index %>" checked>
+                    </label>
+                    <button type="button" class="btn btn-ghost btn-sm" data-repeat-remove aria-label="Remove row"
+                            style="height:42px;padding:0 13px">
+                      <svg><use href="#i-trash"/></svg>
+                    </button>
+                  </div>
+                <% }); %>
+              <% } %>
+            </div>
+
+            <%# Template cloned by dashboard.js initRepeatable(). __INDEX__ is
+                replaced with a fresh row number on each add. %>
+            <template data-repeat-template>
+              <div data-repeat-row style="display:grid;grid-template-columns:1fr 1.6fr auto auto;gap:11px;align-items:end;margin-bottom:12px">
+                <div>
+                  <input type="text" name="deliverable_label" class="form-control" value="" placeholder="Label" maxlength="150">
+                </div>
+                <div>
+                  <input type="text" name="deliverable_value" class="form-control" value="" placeholder="Value" maxlength="4000">
+                </div>
+                <label style="display:flex;flex-direction:column;align-items:center;gap:5px;font-size:.75rem;color:var(--text-soft);font-weight:600;padding-bottom:11px;cursor:pointer">
+                  <span>&nbsp;</span>
+                  <input type="checkbox" name="deliverable_visible" value="__INDEX__" checked>
+                </label>
+                <button type="button" class="btn btn-ghost btn-sm" data-repeat-remove aria-label="Remove row"
+                        style="height:42px;padding:0 13px">
+                  <svg><use href="#i-trash"/></svg>
+                </button>
+              </div>
+            </template>
+
+            <button type="button" class="btn btn-outline btn-sm" data-repeat-add>
+              <svg><use href="#i-plus"/></svg> Add another detail
+            </button>
+          </div>
+
+          <p style="font-size:.78rem;color:var(--text-soft);margin:16px 0 0;line-height:1.7">
+            Rows with an empty label are discarded on save. Removing every row deletes
+            all handover details for this order.
+          </p>
+        </div>
+      </div>
+
+      <%# ---- Status & schedule ---- %>
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h3>Status &amp; schedule</h3>
+            <p>Only legal transitions are offered — the state machine in the model rejects anything else.</p>
+          </div>
+          <span class="pill pill-<%= helpers.statusTone(order.status) %>"><%= helpers.humanise(order.status) %></span>
+        </div>
+
+        <div class="panel-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="status" class="form-label">Order status</label>
+              <select id="status" name="status" class="form-control">
+                <option value="<%= order.status %>"><%= helpers.humanise(order.status) %> (current)</option>
+                <% nextStatuses.forEach(function (state) { %>
+                  <option value="<%= state %>"><%= helpers.humanise(state) %></option>
+                <% }); %>
+              </select>
+              <div class="form-hint">
+                <% if (nextStatuses.length) { %>
+                  Moving to <strong>Active</strong> publishes the handover details above to the customer.
+                <% } else { %>
+                  No further transitions are defined from this state.
+                <% } %>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="due_at" class="form-label">Due / renewal date</label>
+              <input type="date" id="due_at" name="due_at" class="form-control"
+                     value="<%= order.due_at ? new Date(order.due_at).toISOString().slice(0, 10) : '' %>">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="total" class="form-label">Order total</label>
+              <input type="number" id="total" name="total" class="form-control" step="0.01" min="0"
+                     value="<%= order.total %>">
+            </div>
+
+            <div class="form-group">
+              <label for="payment_status" class="form-label">Payment status</label>
+              <select id="payment_status" name="payment_status" class="form-control">
+                <% ['unpaid', 'partial', 'paid', 'refunded'].forEach(function (state) { %>
+                  <option value="<%= state %>" <%= order.payment_status === state ? 'selected' : '' %>><%= helpers.humanise(state) %></option>
+                <% }); %>
+              </select>
+              <div class="form-hint">Normally set automatically when you approve a payment.</div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="domain_name" class="form-label">Domain</label>
+            <input type="text" id="domain_name" name="domain_name" class="form-control"
+                   value="<%= order.domain_name || '' %>" maxlength="191" placeholder="customer-store.com">
+          </div>
+
+          <div class="form-group">
+            <label for="note" class="form-label">Activity note <span class="optional">(optional)</span></label>
+            <input type="text" id="note" name="note" class="form-control" maxlength="500"
+                   placeholder="Recorded against this status change in the activity log">
+          </div>
+
+          <div class="form-group" style="margin-bottom:0">
+            <label for="notes" class="form-label">Internal notes</label>
+            <textarea id="notes" name="notes" rows="3" class="form-control" maxlength="4000"
+                      placeholder="Visible only to staff."><%= order.notes || '' %></textarea>
+          </div>
+        </div>
+
+        <div class="panel-foot">
+          <div class="row-between" style="gap:13px;flex-wrap:wrap">
+            <a href="<%= helpers.url('/' + adminPath + '/orders') %>" class="btn btn-ghost">Back to orders</a>
+            <button type="submit" class="btn btn-primary">
+              <svg><use href="#i-save"/></svg> Save order
+            </button>
+          </div>
+        </div>
+      </div>
+    </form>
+
+    <%# ---- What the customer asked for ---- %>
+    <div class="panel" style="margin-top:22px">
+      <div class="panel-head">
+        <div>
+          <h3>Customer requirements</h3>
+          <p>Submitted with the order.</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div style="font-size:.9375rem;line-height:1.75;white-space:pre-wrap"><%= order.requirements || 'No requirements recorded.' %></div>
+      </div>
+    </div>
+  </div>
+
+  <%# ---- Summary rail ---- %>
+  <div>
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-head">
+        <div><h3>Customer</h3></div>
+      </div>
+      <div class="panel-body" style="font-size:.875rem">
+        <div style="display:flex;gap:13px;align-items:center;margin-bottom:16px">
+          <div class="dash-avatar dash-avatar-sm">
+            <span><%= helpers.initials(order.customer_name) %></span>
+          </div>
+          <div style="min-width:0">
+            <div style="font-weight:600"><%= order.customer_name %></div>
+            <div style="font-size:.78rem;color:var(--text-soft);word-break:break-all"><%= order.customer_email %></div>
+          </div>
+        </div>
+
+        <% if (order.customer_phone) { %>
+          <div class="row-between" style="padding:7px 0;border-bottom:1px solid var(--border)">
+            <span style="color:var(--text-soft)">Phone</span>
+            <a href="tel:<%= String(order.customer_phone).replace(/\s/g, '') %>" style="font-weight:600"><%= order.customer_phone %></a>
+          </div>
+        <% } %>
+        <% if (order.customer_company) { %>
+          <div class="row-between" style="padding:7px 0;border-bottom:1px solid var(--border)">
+            <span style="color:var(--text-soft)">Business</span>
+            <span style="font-weight:600;text-align:right;max-width:60%"><%= order.customer_company %></span>
+          </div>
+        <% } %>
+
+        <div style="display:flex;gap:9px;margin-top:16px;flex-wrap:wrap">
+          <a href="<%= helpers.url('/' + adminPath + '/customers/' + order.customer_id) %>" class="btn btn-outline btn-sm">Full profile</a>
+          <% if (order.customer_phone) { %>
+            <a href="https://wa.me/<%= String(order.customer_phone).replace(/\D/g, '') %>" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">
+              <svg><use href="#i-whatsapp"/></svg> WhatsApp
+            </a>
+          <% } %>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-head">
+        <div><h3>Payment</h3></div>
+      </div>
+      <div class="panel-body">
+        <div class="row-between" style="font-size:.875rem;padding:5px 0">
+          <span style="color:var(--text-soft)">Order total</span>
+          <span style="font-weight:600"><%= money(order.total, cur) %></span>
+        </div>
+        <div class="row-between" style="font-size:.875rem;padding:5px 0;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:12px">
+          <span style="color:var(--text-soft)">Approved payments</span>
+          <span style="color:var(--success);font-weight:600"><%= money(paidApproved, cur) %></span>
+        </div>
+        <div class="row-between" style="padding:2px 0 14px">
+          <span style="font-weight:600">Balance</span>
+          <span style="font-size:1.25rem;font-weight:800;color:<%= balance > 0 ? 'var(--warning)' : 'var(--success)' %>"><%= money(balance, cur) %></span>
+        </div>
+        <span class="pill pill-<%= helpers.statusTone(order.payment_status) %>"><%= helpers.humanise(order.payment_status) %></span>
+      </div>
+    </div>
+
+    <%# ---- Payment verification queue for this order ---- %>
+    <% if (payments && payments.length) { %>
+      <div class="panel" style="margin-bottom:22px">
+        <div class="panel-head">
+          <div><h3>Submitted payments</h3></div>
+        </div>
+        <div class="panel-body">
+          <% payments.forEach(function (payment) { %>
+            <div style="padding:13px 0;border-bottom:1px solid var(--border)">
+              <div class="row-between" style="gap:9px">
+                <span style="font-weight:600;font-size:.875rem"><%= payment.method %></span>
+                <span style="font-weight:700;font-size:.875rem"><%= money(payment.amount, cur) %></span>
+              </div>
+              <div style="font-size:.75rem;color:var(--text-soft);margin-top:3px">
+                <%= helpers.formatDateTime(payment.created_at) %>
+              </div>
+              <% if (payment.transaction_id) { %>
+                <div style="font-size:.75rem;color:var(--text-soft);font-family:ui-monospace,monospace;margin-top:2px">
+                  TrxID <%= payment.transaction_id %>
+                </div>
+              <% } %>
+              <div style="margin-top:7px;display:flex;gap:7px;align-items:center;flex-wrap:wrap">
+                <span class="pill pill-<%= helpers.statusTone(payment.status) %>"><%= helpers.humanise(payment.status) %></span>
+                <% if (payment.screenshot) { %>
+                  <a href="<%= helpers.url(payment.screenshot) %>" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">View proof</a>
+                <% } %>
+              </div>
+
+              <% if (payment.status === 'pending') { %>
+                <div class="actions" style="justify-content:flex-start;margin-top:9px">
+                  <form method="post" action="<%= helpers.url('/' + adminPath + '/payments/' + payment.id + '/approve') %>" style="display:inline">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button type="submit" class="btn btn-primary btn-sm">Approve</button>
+                  </form>
+                  <form method="post" action="<%= helpers.url('/' + adminPath + '/payments/' + payment.id + '/reject') %>" style="display:inline">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <input type="hidden" name="note" value="">
+                    <button type="submit" class="btn btn-outline btn-sm"
+                            data-confirm="Reject this payment? The customer will be emailed.">Reject</button>
+                  </form>
+                </div>
+              <% } %>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+    <% } %>
+
+    <%# ---- Order metadata ---- %>
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-head">
+        <div><h3>Details</h3></div>
+      </div>
+      <div class="panel-body" style="font-size:.875rem">
+        <div class="row-between" style="padding:7px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text-soft)">Order number</span>
+          <span style="font-weight:600"><%= order.order_number %></span>
+        </div>
+        <div class="row-between" style="padding:7px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text-soft)">Billing</span>
+          <span style="font-weight:600"><%= helpers.humanise(order.billing_cycle) %></span>
+        </div>
+        <div class="row-between" style="padding:7px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text-soft)">Created</span>
+          <span><%= helpers.formatDateTime(order.created_at) %></span>
+        </div>
+        <% if (order.started_at) { %>
+          <div class="row-between" style="padding:7px 0;border-bottom:1px solid var(--border)">
+            <span style="color:var(--text-soft)">Started</span>
+            <span><%= helpers.formatDate(order.started_at) %></span>
+          </div>
+        <% } %>
+        <% if (order.completed_at) { %>
+          <div class="row-between" style="padding:7px 0;border-bottom:1px solid var(--border)">
+            <span style="color:var(--text-soft)">Completed</span>
+            <span><%= helpers.formatDate(order.completed_at) %></span>
+          </div>
+        <% } %>
+        <% if (order.service_slug) { %>
+          <div class="row-between" style="padding:7px 0">
+            <span style="color:var(--text-soft)">Package page</span>
+            <a href="<%= helpers.url('/services/' + order.service_slug) %>" target="_blank" rel="noopener" style="font-weight:600">View</a>
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+    <%# ---- Invoices ---- %>
+    <% if (invoices && invoices.length) { %>
+      <div class="panel" style="margin-bottom:22px">
+        <div class="panel-head">
+          <div><h3>Invoices</h3></div>
+        </div>
+        <div class="panel-body">
+          <% invoices.forEach(function (invoice, i) { %>
+            <div class="row-between" style="gap:9px;padding:<%= i ? '11px 0 0' : '0' %>">
+              <span style="font-weight:600;font-size:.8438rem"><%= invoice.invoice_number %></span>
+              <div style="text-align:right">
+                <div style="font-weight:700;font-size:.8438rem"><%= money(invoice.total, cur) %></div>
+                <span class="pill pill-<%= helpers.statusTone(invoice.status) %>"><%= helpers.humanise(invoice.status) %></span>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+    <% } %>
+
+    <%# ---- Activity ---- %>
+    <% if (timeline && timeline.length) { %>
+      <div class="panel">
+        <div class="panel-head">
+          <div><h3>Activity</h3></div>
+        </div>
+        <div class="panel-body">
+          <div class="timeline">
+            <% timeline.forEach(function (entry) { %>
+              <div class="timeline-item done">
+                <div class="title" style="font-size:.875rem"><%= helpers.humanise(String(entry.action || '').replace(/[._]/g, ' ')) %></div>
+                <div class="desc">
+                  <time data-relative datetime="<%= new Date(entry.created_at).toISOString() %>"><%= helpers.timeAgo(entry.created_at) %></time>
+                  <% if (entry.actor_name) { %> · <%= entry.actor_name %><% } %>
+                  <% if (entry.description) { %><br><%= helpers.excerpt(entry.description, 130) %><% } %>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</div>

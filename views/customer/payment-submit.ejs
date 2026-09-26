@@ -1,0 +1,183 @@
+<%
+  const cur = site.currency;
+  const money = helpers.money;
+  const f = form || {};
+  const errs = errors || {};
+
+  // Only the payment methods the admin has switched on.
+  const methods = [];
+  if (payments.bkash.enabled)  methods.push({ name: 'bKash',  number: payments.bkash.number,  type: payments.bkash.type,  tone: 'danger' });
+  if (payments.nagad.enabled)  methods.push({ name: 'Nagad',  number: payments.nagad.number,  type: payments.nagad.type,  tone: 'warning' });
+  if (payments.rocket.enabled) methods.push({ name: 'Rocket', number: payments.rocket.number, type: payments.rocket.type, tone: 'info' });
+  if (payments.card.enabled)   methods.push({ name: 'Card',   number: null,                   type: payments.card.note,   tone: 'primary' });
+
+  // The controller passes the order but not its payment rows, so derive the
+  // outstanding balance from the order's own payment_status rather than
+  // guessing at an amount that may overstate what is still owed.
+  var outstanding = order.payment_status === 'paid' ? 0
+    : order.payment_status === 'partial' ? Number(order.total) / 2
+    : Number(order.total);
+%>
+
+<div class="two-col">
+  <div>
+    <form method="post" action="<%= helpers.url('/account/payments') %>" enctype="multipart/form-data" data-validate novalidate>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="order_id" value="<%= order.id %>">
+
+      <div class="panel" style="margin-bottom:22px">
+        <div class="panel-head">
+          <div>
+            <h2>How did you pay?</h2>
+            <p>Send the amount to one of the numbers below, then record the transfer here.</p>
+          </div>
+        </div>
+
+        <div class="panel-body">
+          <% if (methods.length) { %>
+            <div class="form-group">
+              <label class="form-label">Payment method <span class="req">*</span></label>
+              <div style="display:grid;gap:11px">
+                <% methods.forEach(function (method) { %>
+                  <label style="display:flex;gap:13px;align-items:center;padding:14px 16px;border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer">
+                    <input type="radio" name="method" value="<%= method.name %>"
+                           style="flex-shrink:0" <%= f.method === method.name ? 'checked' : '' %> required>
+                    <span style="flex:1;min-width:0">
+                      <span style="display:block;font-weight:600;font-size:.9375rem"><%= method.name %></span>
+                      <% if (method.number) { %>
+                        <span style="display:block;font-size:.8438rem;color:var(--text-soft);margin-top:2px">
+                          Send to <strong data-copy-target><%= method.number %></strong>
+                          <% if (method.type) { %> (<%= method.type %>)<% } %>
+                        </span>
+                      <% } else if (method.type) { %>
+                        <span style="display:block;font-size:.8438rem;color:var(--text-soft);margin-top:2px"><%= method.type %></span>
+                      <% } %>
+                    </span>
+                  </label>
+                <% }); %>
+              </div>
+              <% if (errs.method) { %><div class="form-error"><%= errs.method %></div><% } %>
+            </div>
+          <% } else { %>
+            <div class="alert alert-error">
+              <svg><use href="#i-alert"/></svg>
+              <div>No payment methods are currently enabled. Please contact us directly and we will arrange payment.</div>
+            </div>
+          <% } %>
+
+          <% if (payments.instructions) { %>
+            <div class="doc-note" style="border-left-color:var(--primary)">
+              <strong>Payment instructions</strong>
+              <div style="font-size:.875rem;line-height:1.75;white-space:pre-wrap"><%= payments.instructions %></div>
+            </div>
+          <% } %>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:22px">
+        <div class="panel-head">
+          <div>
+            <h3>Transfer details</h3>
+            <p>Copy these from your payment receipt exactly as shown.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="amount" class="form-label">Amount sent <span class="req">*</span></label>
+              <input type="number" id="amount" name="amount" class="form-control <%= errs.amount ? 'is-invalid' : '' %>"
+                     step="0.01" min="0.01"
+                     value="<%= f.amount !== undefined && f.amount !== null ? f.amount : order.total %>" required>
+              <% if (errs.amount) { %><div class="form-error"><%= errs.amount %></div><% } %>
+            </div>
+
+            <div class="form-group">
+              <label for="sender_number" class="form-label">Your account number <span class="optional">(optional)</span></label>
+              <input type="tel" id="sender_number" name="sender_number" class="form-control"
+                     value="<%= f.sender_number || '' %>" placeholder="01XXXXXXXXX" maxlength="30">
+              <div class="form-hint">The wallet or card number you paid from.</div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="transaction_id" class="form-label">Transaction ID <span class="req">*</span></label>
+            <input type="text" id="transaction_id" name="transaction_id"
+                   class="form-control <%= errs.transaction_id ? 'is-invalid' : '' %>"
+                   value="<%= f.transaction_id || '' %>" placeholder="e.g. 9F2K1L7XM3" maxlength="120" required>
+            <% if (errs.transaction_id) { %><div class="form-error"><%= errs.transaction_id %></div><% } %>
+            <div class="form-hint">Found in the confirmation SMS or on your payment app receipt.</div>
+          </div>
+
+          <div class="form-group">
+            <label for="screenshot" class="form-label">Payment screenshot <span class="optional">(recommended)</span></label>
+            <input type="file" id="screenshot" name="screenshot" class="form-control" accept="image/*" data-max-mb="<%= uploadLimits.payments.maxMb %>"
+                   data-preview="payment-preview">
+            <div class="form-hint">PNG or JPG, up to 5 MB. Speeds up verification considerably.</div>
+            <div id="payment-preview" style="margin-top:11px"></div>
+          </div>
+
+          <div class="form-group" style="margin-bottom:0">
+            <label for="note" class="form-label">Note for our team <span class="optional">(optional)</span></label>
+            <textarea id="note" name="note" rows="3" class="form-control" maxlength="500"
+                      placeholder="Anything we should know about this payment…"><%= f.note || '' %></textarea>
+          </div>
+        </div>
+
+        <div class="panel-foot">
+          <div class="row-between" style="gap:13px;flex-wrap:wrap">
+            <a href="<%= helpers.url('/account/orders/' + order.id) %>" class="btn btn-ghost">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+              <svg><use href="#i-upload"/></svg> Submit payment
+            </button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div>
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-head">
+        <div><h3>Paying for</h3></div>
+      </div>
+      <div class="panel-body">
+        <div class="table-product" style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)">
+          <% if (order.service_image) { %>
+            <img class="table-thumb" src="<%= helpers.url(order.service_image) %>" alt="" style="width:54px;height:54px">
+          <% } %>
+          <div>
+            <div class="name"><%= helpers.excerpt(order.service_title, 34) %></div>
+            <div class="meta">Order <%= order.order_number %></div>
+          </div>
+        </div>
+
+        <div class="row-between" style="font-size:.9063rem;padding:7px 0">
+          <span style="color:var(--text-soft)">Order total</span>
+          <span style="font-weight:600"><%= money(order.total, cur) %></span>
+        </div>
+        <div class="row-between" style="font-size:.9063rem;padding:7px 0;border-bottom:1px solid var(--border);padding-bottom:13px;margin-bottom:13px">
+          <span style="color:var(--text-soft)">Payment status</span>
+          <span class="pill pill-<%= helpers.statusTone(order.payment_status) %>"><%= helpers.humanise(order.payment_status) %></span>
+        </div>
+        <div class="row-between">
+          <span style="font-weight:600">Outstanding</span>
+          <span style="font-size:1.25rem;font-weight:800;color:var(--primary)"><%= money(outstanding, cur) %></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div><h3>Before you submit</h3></div>
+      </div>
+      <div class="panel-body" style="font-size:.8438rem;color:var(--text-soft);line-height:1.8">
+        <ul style="margin:0;padding-left:17px">
+          <li>Double-check the transaction ID — a wrong one delays approval.</li>
+          <li>Payment must match the amount shown, or we will follow up.</li>
+          <li>We verify manual transfers within 24 hours on business days.</li>
+          <li>You can submit more than one payment if you are paying in instalments.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>

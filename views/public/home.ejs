@@ -1,0 +1,433 @@
+<%# Homepage. Section order follows the brief: hero -> trust bar -> services ->
+    portfolio -> about -> why choose -> reviews -> FAQ (with schema) -> CTA.
+    Backgrounds alternate between --bg and --bg-alt so the page visibly breaks. %>
+
+<%# ---------------------------------------------------------------- HERO %>
+<section class="hero">
+  <div class="container">
+    <div class="hero-grid">
+      <div class="hero-content">
+        <% if (settings.hero_badge) { %>
+          <span class="hero-badge"><span class="dot"></span> <%= settings.hero_badge %></span>
+        <% } %>
+
+        <h1>
+          <%= settings.hero_title %>
+          <span class="typed-wrap">
+            <span class="typed-text" data-typing="<%= settings.hero_typing_text %>">sell more</span><span class="typed-caret"></span>
+          </span>
+        </h1>
+
+        <% if (settings.hero_subtitle) { %>
+          <p class="hero-subtitle"><%= settings.hero_subtitle %></p>
+        <% } %>
+
+        <p class="hero-text"><%= settings.hero_paragraph %></p>
+
+        <div class="hero-cta">
+          <a href="<%= helpers.url(settings.hero_primary_cta_link) %>" class="btn btn-primary btn-lg">
+            <%= settings.hero_primary_cta_text %>
+            <svg><use href="#i-arrow-right"/></svg>
+          </a>
+          <a href="<%= helpers.url(settings.hero_secondary_cta_link) %>" class="btn btn-outline btn-lg">
+            <svg><use href="#i-headphones"/></svg>
+            <%= settings.hero_secondary_cta_text %>
+          </a>
+        </div>
+
+        <ul class="hero-bullets">
+          <% helpers.clean_list(settings.hero_bullets).forEach(function (bullet) { %>
+            <li>
+              <span class="tick"><svg><use href="#i-check"/></svg></span>
+              <%= bullet %>
+            </li>
+          <% }); %>
+        </ul>
+      </div>
+
+      <div class="hero-visual">
+        <div class="frame">
+          <% if (settings.hero_image) { %>
+            <img src="<%= helpers.url(settings.hero_image) %>" alt="<%= site.name %> - e-commerce website design" width="640" height="480" fetchpriority="high">
+          <% } else { %>
+            <img src="<%= helpers.url('/assets/img/hero-default.svg') %>" alt="E-commerce website design by <%= site.name %>" width="640" height="480" fetchpriority="high">
+          <% } %>
+        </div>
+
+        <div class="hero-float hero-float-a">
+          <span class="ico"><svg><use href="#i-trending-up"/></svg></span>
+          <span>
+            <span class="value"><%= settings.about_projects %></span>
+            <span class="label">Projects delivered</span>
+          </span>
+        </div>
+
+        <div class="hero-float hero-float-b">
+          <span class="ico"><svg><use href="#i-star"/></svg></span>
+          <span>
+            <span class="value"><%= settings.about_rating %>/5</span>
+            <span class="label">Client rating</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<%# ---------------------------------------------------- TRUST BAR %>
+<% if (clients.length) { %>
+<section class="trustbar">
+  <div class="container">
+    <p class="trustbar-title"><%= settings.trustbar_title %></p>
+  </div>
+  <div class="marquee">
+    <div class="marquee-track" data-marquee>
+      <% clients.forEach(function (client) { %>
+        <div class="marquee-item">
+          <img src="<%= helpers.url(client.logo) %>" alt="<%= client.name %>" loading="lazy" height="46">
+        </div>
+      <% }); %>
+    </div>
+  </div>
+</section>
+<% } %>
+
+<%# ---------------------------------------------------- SERVICES %>
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-head" data-reveal>
+      <span class="eyebrow">Our Packages</span>
+      <h2>Everything you need to start selling online</h2>
+      <p>Fixed-price packages built for Bangladeshi businesses — no surprise invoices, no hidden extras.</p>
+    </div>
+
+    <% if (services.length) { %>
+      <div class="grid grid-3">
+        <% services.forEach(function (service) { %>
+          <%- include('../partials/service-card', { service: service }) %>
+        <% }); %>
+      </div>
+
+      <div class="text-center mt-6" data-reveal>
+        <a href="<%= helpers.url('/services') %>" class="btn btn-primary btn-lg">
+          View all packages
+          <svg><use href="#i-arrow-right"/></svg>
+        </a>
+      </div>
+    <% } else { %>
+      <p class="text-center">Our package list is being updated. <a href="<%= helpers.url('/contact') %>">Contact us</a> for a custom quote.</p>
+    <% } %>
+  </div>
+</section>
+
+<%# ---------------------------------------------------- PORTFOLIO %>
+<% if (portfolio.length) { %>
+<section class="section">
+  <div class="container">
+    <div class="section-head" data-reveal>
+      <span class="eyebrow">Recent Work</span>
+      <h2>Stores we have launched</h2>
+      <p>Real e-commerce websites built for real Bangladeshi brands — browse the results.</p>
+    </div>
+
+    <div class="grid grid-3">
+      <% portfolio.forEach(function (project) { %>
+        <a href="<%= helpers.url('/portfolio/' + project.slug) %>" class="portfolio-card" data-reveal>
+          <div class="card-media">
+            <% if (project.thumbnail) { %>
+              <img src="<%= helpers.url(project.thumbnail) %>" alt="<%= project.title %>" loading="lazy" width="400" height="300">
+            <% } else { %>
+              <div style="width:100%;height:100%;display:grid;place-items:center;background:var(--gradient-soft);color:var(--primary)">
+                <svg style="width:46px;height:46px"><use href="#i-layout"/></svg>
+              </div>
+            <% } %>
+          </div>
+          <div class="overlay">
+            <h3><%= project.title %></h3>
+            <span class="meta"><%= project.category || project.client_name || 'Web design' %></span>
+          </div>
+        </a>
+      <% }); %>
+    </div>
+
+    <div class="text-center mt-6" data-reveal>
+      <a href="<%= helpers.url('/portfolio') %>" class="btn btn-outline btn-lg">
+        Browse full portfolio
+        <svg><use href="#i-arrow-right"/></svg>
+      </a>
+    </div>
+  </div>
+</section>
+<% } %>
+
+<%# ---------------------------------------------------- ABOUT %>
+<section class="section section-alt">
+  <div class="container">
+    <div class="split">
+      <div data-reveal>
+        <span class="eyebrow">About <%= site.name %></span>
+        <h2 class="mb-4"><%= settings.about_title %></h2>
+        <p style="font-size:1.0625rem;line-height:1.75;margin-bottom:26px"><%= settings.about_text %></p>
+
+        <ul class="check-list mb-5">
+          <li><span class="tick"><svg><use href="#i-check"/></svg></span><span>Mobile-first design tested on real Bangladeshi networks</span></li>
+          <li><span class="tick"><svg><use href="#i-check"/></svg></span><span>bKash, Nagad, Rocket and card payments integrated</span></li>
+          <li><span class="tick"><svg><use href="#i-check"/></svg></span><span>SEO and page-speed work included, not sold as an add-on</span></li>
+          <li><span class="tick"><svg><use href="#i-check"/></svg></span><span>Ongoing support from a team in Rangpur, not a ticket queue abroad</span></li>
+        </ul>
+
+        <a href="<%= helpers.url('/about') %>" class="btn btn-primary">
+          More about us
+          <svg><use href="#i-arrow-right"/></svg>
+        </a>
+      </div>
+
+      <div data-reveal>
+        <% if (settings.about_image) { %>
+          <img src="<%= helpers.url(settings.about_image) %>" alt="About <%= site.name %>" loading="lazy"
+               style="border-radius:var(--radius-lg);box-shadow:var(--shadow-lg)" width="600" height="450">
+        <% } else { %>
+          <img src="<%= helpers.url('/assets/img/about-default.svg') %>" alt="About <%= site.name %>" loading="lazy"
+               style="border-radius:var(--radius-lg);box-shadow:var(--shadow-lg)" width="600" height="450">
+        <% } %>
+
+        <div class="grid grid-2 mt-5" style="gap:18px">
+          <div class="stat-card">
+            <div class="stat-value"><%= settings.about_years %></div>
+            <div class="stat-label">Years experience</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value"><%= settings.about_clients %></div>
+            <div class="stat-label">Happy clients</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<%# ---------------------------------------------------- WHY CHOOSE %>
+<section class="section">
+  <div class="container">
+    <div class="section-head" data-reveal>
+      <span class="eyebrow">Why Choose Us</span>
+      <h2>Built for how Bangladeshi shoppers actually buy</h2>
+      <p>Speed, trust and a checkout that works on a 3G connection are what turn a visitor into a customer.</p>
+    </div>
+
+    <div class="grid grid-3">
+      <% whyChoose.forEach(function (item) { %>
+        <div class="feature-card" data-reveal>
+          <div class="feature-icon"><svg><use href="#i-<%= item.icon %>"/></svg></div>
+          <h3><%= item.title %></h3>
+          <p><%= item.text %></p>
+        </div>
+      <% }); %>
+    </div>
+  </div>
+</section>
+
+<%# ---------------------------------------------------- REVIEWS %>
+<% if (testimonials.length) { %>
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-head" data-reveal>
+      <span class="eyebrow">Client Reviews</span>
+      <h2>What our clients say</h2>
+      <p>We measure success by what our clients sell, not by how the site looks in a design tool.</p>
+    </div>
+
+    <%#
+      Carousel. The track is a native horizontal scroller with scroll-snap, so
+      it works by swiping on touch and with a trackpad on desktop even if the
+      script never runs. The arrows are an enhancement on top of that.
+      Arrows are only rendered when there is more than one card to move through.
+    %>
+    <div class="reviews-carousel" data-carousel>
+      <% if (testimonials.length > 1) { %>
+        <button type="button" class="carousel-arrow carousel-arrow-prev" data-carousel-prev
+                aria-label="Previous reviews" aria-controls="reviews-track">
+          <svg><use href="#i-chevron-left"/></svg>
+        </button>
+      <% } %>
+
+      <div class="carousel-track" id="reviews-track" data-carousel-track
+           tabindex="0" role="region" aria-label="Client reviews">
+        <% testimonials.forEach(function (review) { %>
+          <figure class="review-card" data-carousel-item>
+            <div class="review-stars" aria-label="<%= review.rating %> out of 5">
+              <% for (var i = 1; i <= 5; i += 1) { %>
+                <svg class="<%= i <= review.rating ? '' : 'empty' %>"><use href="#i-star"/></svg>
+              <% } %>
+            </div>
+            <blockquote class="review-text"><%= review.message %></blockquote>
+            <figcaption class="review-author">
+              <% if (review.avatar) { %>
+                <img src="<%= helpers.url(review.avatar) %>" alt="<%= review.customer_name %>" class="review-avatar" loading="lazy" width="46" height="46">
+              <% } else { %>
+                <span class="review-avatar-fallback"><%= helpers.initials(review.customer_name) %></span>
+              <% } %>
+              <span>
+                <span class="review-name"><%= review.customer_name %></span>
+                <span class="review-role">
+                  <%= review.designation %><%= review.designation && review.company ? ', ' : '' %><%= review.company %>
+                </span>
+              </span>
+            </figcaption>
+          </figure>
+        <% }); %>
+      </div>
+
+      <% if (testimonials.length > 1) { %>
+        <button type="button" class="carousel-arrow carousel-arrow-next" data-carousel-next
+                aria-label="Next reviews" aria-controls="reviews-track">
+          <svg><use href="#i-chevron-right"/></svg>
+        </button>
+      <% } %>
+    </div>
+
+    <% if (testimonials.length > 1) { %>
+      <div class="carousel-dots" data-carousel-dots role="tablist" aria-label="Choose a review"></div>
+    <% } %>
+  </div>
+</section>
+<% } %>
+
+<%# ---------------------------------------------------- FAQ + schema %>
+<% if (faqs.length) { %>
+<section class="section">
+  <div class="container">
+    <%#
+      Single column. The heading sits above and the accordion runs full width
+      beneath it, capped at a readable measure - a two-column split squeezed the
+      answers into a narrow strip and made long ones hard to scan.
+    %>
+    <div class="section-head" data-reveal>
+      <span class="eyebrow">Questions</span>
+      <h2>Frequently asked questions</h2>
+      <p>Cannot find what you are looking for? Our team replies within one business day.</p>
+    </div>
+
+    <div class="faq-column" data-reveal>
+      <div class="accordion" data-single="1">
+        <% faqs.forEach(function (faq, index) { %>
+          <div class="accordion-item <%= index === 0 ? 'is-open' : '' %>">
+            <button type="button" class="accordion-trigger" aria-expanded="<%= index === 0 ? 'true' : 'false' %>">
+              <span><%= faq.question %></span>
+              <span class="accordion-icon"><svg><use href="#i-plus"/></svg></span>
+            </button>
+            <div class="accordion-panel">
+              <div><p><%= faq.answer %></p></div>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+
+      <div class="faq-cta">
+        <a href="<%= helpers.url('/contact') %>" class="btn btn-primary">
+          <svg><use href="#i-message-square"/></svg>
+          Ask a question
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<%# FAQPage structured data, emitted server-side from the same rows the page
+    renders so the two can never drift apart.
+    helpers.jsonLd escapes < > & inside the JSON so an admin-authored answer
+    containing "</script>" cannot break out of this block. %>
+<script type="application/ld+json">
+<%- helpers.jsonLd({
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: faqs.map(function (faq) {
+    return {
+      '@type': 'Question',
+      name: faq.question,
+      acceptedAnswer: { '@type': 'Answer', text: faq.answer }
+    };
+  })
+}) %>
+</script>
+<% } %>
+
+<%# ---------------------------------------------------- CTA + form %>
+<section class="section cta-section" id="quote">
+  <div class="container">
+    <div class="cta-grid">
+      <div data-reveal>
+        <h2><%= settings.cta_title %></h2>
+        <p><%= settings.cta_text %></p>
+
+        <ul class="cta-points">
+          <li><span class="tick"><svg><use href="#i-check"/></svg></span> Free consultation — no obligation</li>
+          <li><span class="tick"><svg><use href="#i-check"/></svg></span> Fixed price quoted before we start</li>
+          <li><span class="tick"><svg><use href="#i-check"/></svg></span> Reply within one business day</li>
+        </ul>
+
+        <div style="display:flex;gap:22px;flex-wrap:wrap;margin-top:32px">
+          <a href="tel:<%= site.phone.replace(/\s/g, '') %>" style="display:flex;align-items:center;gap:11px;color:#fff">
+            <svg style="width:19px;height:19px"><use href="#i-phone"/></svg>
+            <span style="font-weight:600"><%= site.phone %></span>
+          </a>
+          <a href="<%= site.whatsappLink %>" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:11px;color:#fff">
+            <svg style="width:19px;height:19px"><use href="#i-whatsapp"/></svg>
+            <span style="font-weight:600">WhatsApp</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="cta-form-card" data-reveal>
+        <h3>Request a free quote</h3>
+        <p class="sub">Tell us about your business and we will send pricing and a timeline.</p>
+
+        <%- include('../partials/flash') %>
+
+        <form action="<%= helpers.url('/contact') %>" method="POST" data-validate>
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="source" value="homepage_cta">
+          <%# Honeypot - hidden by CSS, only a bot fills it. %>
+          <div class="hp-field"><input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true"></div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="cta-name">Your name <span class="req">*</span></label>
+              <input type="text" id="cta-name" name="name" class="form-control" required maxlength="120" placeholder="Md Shojib Miya">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="cta-phone">Phone / WhatsApp</label>
+              <input type="tel" id="cta-phone" name="phone" class="form-control" maxlength="30" placeholder="01789668276">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="cta-email">Email address <span class="req">*</span></label>
+            <input type="email" id="cta-email" name="email" class="form-control" required maxlength="191" placeholder="you@yourbusiness.com">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="cta-message">What do you need? <span class="req">*</span></label>
+            <textarea id="cta-message" name="message" class="form-control" required maxlength="4000" style="min-height:104px" placeholder="I sell clothing online and need a store with bKash checkout…"></textarea>
+          </div>
+
+          <% if (captcha.enabled && settings.captcha_on_contact === '1') { %>
+            <div class="form-group">
+              <div class="g-recaptcha" data-sitekey="<%= captcha.siteKey %>"></div>
+            </div>
+            <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+          <% } %>
+
+          <button type="submit" class="btn btn-primary btn-block btn-lg">
+            Send my request
+            <svg><use href="#i-send"/></svg>
+          </button>
+
+          <p style="font-size:.7813rem;color:var(--text-soft);text-align:center;margin-top:13px">
+            We never share your details. Read our <a href="<%= helpers.url('/privacy-policy') %>">privacy policy</a>.
+          </p>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>

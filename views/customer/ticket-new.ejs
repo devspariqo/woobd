@@ -1,0 +1,118 @@
+<%
+  const f = form || {};
+  const errs = errors || {};
+  const selectedOrder = f.order_id || Number(query.order_id) || '';
+%>
+
+<div class="two-col">
+  <div>
+    <form method="post" action="<%= helpers.url('/account/tickets') %>" data-validate novalidate>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>What do you need help with?</h2>
+            <p>Give us enough detail to solve it on the first reply.</p>
+          </div>
+        </div>
+
+        <div class="panel-body">
+          <div class="form-group">
+            <label for="subject" class="form-label">Subject <span class="req">*</span></label>
+            <input type="text" id="subject" name="subject" class="form-control <%= errs.subject ? 'is-invalid' : '' %>"
+                   value="<%= f.subject || '' %>" placeholder="Short summary, e.g. Payment not showing as approved"
+                   maxlength="250" required>
+            <% if (errs.subject) { %><div class="form-error"><%= errs.subject %></div><% } %>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="department" class="form-label">Department</label>
+              <select id="department" name="department" class="form-control">
+                <% ['general', 'billing', 'technical', 'sales'].forEach(function (dept) { %>
+                  <option value="<%= dept %>" <%= (f.department || 'general') === dept ? 'selected' : '' %>>
+                    <%= helpers.humanise(dept) %>
+                  </option>
+                <% }); %>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="priority" class="form-label">Priority</label>
+              <select id="priority" name="priority" class="form-control">
+                <% [['low','Low'],['medium','Medium'],['high','High'],['urgent','Urgent']].forEach(function (p) { %>
+                  <option value="<%= p[0] %>" <%= (f.priority || 'medium') === p[0] ? 'selected' : '' %>><%= p[1] %></option>
+                <% }); %>
+              </select>
+            </div>
+          </div>
+
+          <% if (orders && orders.length) { %>
+            <div class="form-group">
+              <label for="order_id" class="form-label">Related order <span class="optional">(optional)</span></label>
+              <select id="order_id" name="order_id" class="form-control">
+                <option value="">Not about a specific order</option>
+                <% orders.forEach(function (order) { %>
+                  <option value="<%= order.id %>" <%= Number(selectedOrder) === Number(order.id) ? 'selected' : '' %>>
+                    <%= order.order_number %> — <%= helpers.excerpt(order.service_title, 40) %>
+                  </option>
+                <% }); %>
+              </select>
+              <div class="form-hint">Attaching the order lets us pull up your project straight away.</div>
+            </div>
+          <% } %>
+
+          <div class="form-group" style="margin-bottom:0">
+            <label for="message" class="form-label">Message <span class="req">*</span></label>
+            <textarea id="message" name="message" data-count-target="message-count" rows="8" class="form-control <%= errs.message ? 'is-invalid' : '' %>"
+                      placeholder="Tell us what happened, what you expected, and any error message you saw."
+                      maxlength="8000" required><%= f.message || '' %></textarea>
+            <% if (errs.message) { %><div class="form-error"><%= errs.message %></div><% } %>
+            <div class="form-hint"><span id="message-count"></span> characters (max 8000)</div>
+          </div>
+        </div>
+
+        <div class="panel-foot">
+          <div class="row-between" style="gap:13px;flex-wrap:wrap">
+            <a href="<%= helpers.url('/account/tickets') %>" class="btn btn-ghost">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+              <svg><use href="#i-send"/></svg> Submit ticket
+            </button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div>
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-head">
+        <div><h3>Faster answers</h3></div>
+      </div>
+      <div class="panel-body" style="font-size:.8438rem;color:var(--text-soft);line-height:1.8">
+        <p style="margin:0 0 12px">Most issues fall into one of these:</p>
+        <ul style="margin:0;padding-left:17px">
+          <li><strong style="color:var(--text)">Payment pending?</strong> Verification can take up to 24 hours on business days.</li>
+          <li><strong style="color:var(--text)">Need your site login?</strong> It appears on the order page once the site goes live.</li>
+          <li><strong style="color:var(--text)">Renewal or billing question?</strong> Pick the Billing department.</li>
+          <li><strong style="color:var(--text)">Site down or broken?</strong> Choose Technical and mark it High or Urgent.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div><h3>Prefer to talk?</h3></div>
+      </div>
+      <div class="panel-body">
+        <a href="<%= site.whatsappLink %>" target="_blank" rel="noopener" class="btn btn-outline btn-block btn-sm" style="margin-bottom:10px">
+          <svg><use href="#i-whatsapp"/></svg> WhatsApp us
+        </a>
+        <a href="mailto:<%= site.email %>" class="btn btn-outline btn-block btn-sm">
+          <svg><use href="#i-mail"/></svg> <%= site.email %>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>

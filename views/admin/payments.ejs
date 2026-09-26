@@ -1,0 +1,179 @@
+<%
+  const c = counts || {};
+  const num = function (v) { return Number(v || 0); };
+  const cur = site.currency;
+  const money = helpers.money;
+  const tabs = [
+    ['', 'All', num(c.total)],
+    ['pending', 'Pending', num(c.pending)],
+    ['approved', 'Approved', num(c.approved)],
+    ['rejected', 'Rejected', num(c.rejected)]
+  ];
+%>
+
+<div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">
+  <div class="stat-tile">
+    <div class="ico tone-success"><svg><use href="#i-dollar"/></svg></div>
+    <div>
+      <div class="value"><%= money(c.collected, cur) %></div>
+      <div class="label">Collected</div>
+    </div>
+  </div>
+  <div class="stat-tile">
+    <div class="ico tone-warning"><svg><use href="#i-clock"/></svg></div>
+    <div>
+      <div class="value"><%= money(c.awaiting, cur) %></div>
+      <div class="label">Awaiting review</div>
+    </div>
+  </div>
+  <div class="stat-tile">
+    <div class="ico tone-primary"><svg><use href="#i-credit-card"/></svg></div>
+    <div>
+      <div class="value"><%= num(c.total) %></div>
+      <div class="label">Total payments</div>
+    </div>
+  </div>
+  <div class="stat-tile">
+    <div class="ico tone-danger"><svg><use href="#i-alert"/></svg></div>
+    <div>
+      <div class="value"><%= num(c.rejected) %></div>
+      <div class="label">Rejected</div>
+    </div>
+  </div>
+</div>
+
+<div class="tab-bar" style="margin-bottom:20px">
+  <% tabs.forEach(function (tab) { %>
+    <a href="<%= helpers.url('/' + adminPath + '/payments' + (tab[0] ? '?status=' + tab[0] : '')) %>"
+       class="<%= (activeStatus || '') === tab[0] ? 'active' : '' %>">
+      <%= tab[1] %>
+      <% if (tab[2]) { %><span class="tab-count"><%= tab[2] %></span><% } %>
+    </a>
+  <% }); %>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <form class="toolbar" method="get" action="<%= helpers.url('/' + adminPath + '/payments') %>"
+          style="margin:0;padding:0;border:0;box-shadow:none;background:transparent">
+      <% if (activeStatus) { %><input type="hidden" name="status" value="<%= activeStatus %>"><% } %>
+      <div class="search-box">
+        <svg><use href="#i-search"/></svg>
+        <input type="search" name="q" class="form-control" value="<%= search %>"
+               placeholder="Transaction ID, sender, customer or order…" aria-label="Search payments">
+      </div>
+      <button type="submit" class="btn btn-outline btn-sm">Search</button>
+      <% if (search) { %>
+        <a href="<%= helpers.url('/' + adminPath + '/payments' + (activeStatus ? '?status=' + activeStatus : '')) %>" class="btn btn-ghost btn-sm">Clear</a>
+      <% } %>
+    </form>
+  </div>
+
+  <% if (payments && payments.length) { %>
+    <div class="table-wrap">
+      <table class="dash-table">
+        <thead>
+          <tr>
+            <th>Submitted</th>
+            <th>Customer</th>
+            <th>Method</th>
+            <th>Transaction</th>
+            <th>Order</th>
+            <th>Status</th>
+            <th class="num">Amount</th>
+            <th class="num">Decision</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% payments.forEach(function (payment) { %>
+            <tr>
+              <td style="font-size:.8125rem;white-space:nowrap">
+                <%= helpers.formatDate(payment.created_at) %>
+                <div style="color:var(--text-soft);font-size:.75rem;margin-top:2px">
+                  <time data-relative datetime="<%= new Date(payment.created_at).toISOString() %>"><%= helpers.timeAgo(payment.created_at) %></time>
+                </div>
+              </td>
+              <td style="font-size:.8438rem">
+                <%= payment.customer_name %>
+                <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px;word-break:break-all"><%= payment.customer_email %></div>
+              </td>
+              <td style="font-size:.8438rem">
+                <span class="strong"><%= payment.method %></span>
+                <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px"><%= helpers.humanise(payment.method_type) %></div>
+              </td>
+              <td>
+                <div style="font-family:ui-monospace,monospace;font-size:.8125rem;word-break:break-all">
+                  <%= payment.transaction_id || '—' %>
+                </div>
+                <% if (payment.sender_number) { %>
+                  <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px">from <%= payment.sender_number %></div>
+                <% } %>
+                <% if (payment.screenshot) { %>
+                  <a href="<%= helpers.url(payment.screenshot) %>" target="_blank" rel="noopener"
+                     style="font-size:.75rem;font-weight:600;display:inline-block;margin-top:3px">View proof</a>
+                <% } %>
+              </td>
+              <td style="font-size:.8438rem">
+                <% if (payment.order_id && payment.order_number) { %>
+                  <a href="<%= helpers.url('/' + adminPath + '/orders/' + payment.order_id) %>" style="font-weight:600"><%= payment.order_number %></a>
+                <% } else { %>
+                  <span style="color:var(--text-soft)">—</span>
+                <% } %>
+              </td>
+              <td>
+                <span class="pill pill-<%= helpers.statusTone(payment.status) %>"><%= helpers.humanise(payment.status) %></span>
+                <% if (payment.admin_note) { %>
+                  <div style="font-size:.72rem;color:var(--text-soft);margin-top:4px;max-width:170px">
+                    <%= helpers.excerpt(payment.admin_note, 60) %>
+                  </div>
+                <% } %>
+              </td>
+              <td class="num strong"><%= money(payment.amount, cur) %></td>
+              <td>
+                <% if (payment.status === 'pending') { %>
+                  <div class="actions">
+                    <form method="post" action="<%= helpers.url('/' + adminPath + '/payments/' + payment.id + '/approve') %>" style="display:inline">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <button type="submit" class="btn btn-primary btn-sm">Approve</button>
+                    </form>
+                    <form method="post" action="<%= helpers.url('/' + adminPath + '/payments/' + payment.id + '/reject') %>" style="display:inline">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <input type="hidden" name="note" value="Could not be verified.">
+                      <button type="submit" class="btn btn-outline btn-sm"
+                              data-confirm="Reject this payment? The customer will be emailed with the reason.">Reject</button>
+                    </form>
+                  </div>
+                <% } else { %>
+                  <div style="font-size:.75rem;color:var(--text-soft);text-align:right">
+                    <%= payment.reviewed_at ? helpers.formatDate(payment.reviewed_at) : '—' %>
+                  </div>
+                <% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if (pager.totalPages > 1) { %>
+      <div class="panel-foot">
+        <%- include('../partials/pagination', { baseUrl: '/' + adminPath + '/payments' }) %>
+      </div>
+    <% } %>
+  <% } else { %>
+    <div class="empty-state">
+      <div class="ico"><svg><use href="#i-credit-card"/></svg></div>
+      <h3>No payments <%= (search || activeStatus) ? 'match those filters' : 'yet' %></h3>
+      <p>
+        <% if (search || activeStatus) { %>
+          Try a different status or clear the search.
+        <% } else { %>
+          Customer payment submissions appear here for verification.
+        <% } %>
+      </p>
+      <% if (search) { %>
+        <a href="<%= helpers.url('/' + adminPath + '/payments') %>" class="btn btn-primary">Clear search</a>
+      <% } %>
+    </div>
+  <% } %>
+</div>

@@ -1,0 +1,101 @@
+<%
+  const cur = site.currency;
+  const money = helpers.money;
+  const tabs = [
+    ['', 'All'],
+    ['pending', 'Awaiting review'],
+    ['approved', 'Approved'],
+    ['rejected', 'Rejected']
+  ];
+%>
+
+<div class="tab-bar" style="margin-bottom:20px">
+  <% tabs.forEach(function (tab) { %>
+    <a href="<%= helpers.url('/account/payments' + (tab[0] ? '?status=' + tab[0] : '')) %>"
+       class="<%= (activeStatus || '') === tab[0] ? 'active' : '' %>"><%= tab[1] %></a>
+  <% }); %>
+</div>
+
+<div class="panel">
+  <% if (payments && payments.length) { %>
+    <div class="table-wrap">
+      <table class="dash-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Method</th>
+            <th>Transaction</th>
+            <th>Order</th>
+            <th>Status</th>
+            <th class="num">Amount</th>
+            <th class="num">Proof</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% payments.forEach(function (payment) { %>
+            <tr>
+              <td style="white-space:nowrap;font-size:.8438rem">
+                <%= helpers.formatDate(payment.created_at) %>
+                <div style="color:var(--text-soft);font-size:.75rem;margin-top:2px"><%= helpers.timeAgo(payment.created_at) %></div>
+              </td>
+              <td>
+                <span class="strong"><%= payment.method %></span>
+                <% if (payment.method_type && payment.method_type !== 'manual') { %>
+                  <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px"><%= helpers.humanise(payment.method_type) %></div>
+                <% } %>
+              </td>
+              <td>
+                <div style="font-family:ui-monospace,monospace;font-size:.8125rem;word-break:break-all">
+                  <%= payment.transaction_id || '—' %>
+                </div>
+                <% if (payment.sender_number) { %>
+                  <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px">from <%= payment.sender_number %></div>
+                <% } %>
+              </td>
+              <td>
+                <% if (payment.order_id && payment.order_number) { %>
+                  <a href="<%= helpers.url('/account/orders/' + payment.order_id) %>" style="font-weight:600;font-size:.8438rem"><%= payment.order_number %></a>
+                <% } else { %>
+                  <span style="color:var(--text-soft)">—</span>
+                <% } %>
+              </td>
+              <td>
+                <span class="pill pill-<%= helpers.statusTone(payment.status) %>"><%= helpers.humanise(payment.status) %></span>
+                <% if (payment.status === 'rejected' && payment.admin_note) { %>
+                  <div style="font-size:.75rem;color:var(--danger);margin-top:4px;max-width:190px"><%= helpers.excerpt(payment.admin_note, 70) %></div>
+                <% } %>
+              </td>
+              <td class="num strong"><%= money(payment.amount, cur) %></td>
+              <td class="num">
+                <% if (payment.screenshot) { %>
+                  <a href="<%= helpers.url(payment.screenshot) %>" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">View</a>
+                <% } else { %>
+                  <span style="color:var(--text-soft);font-size:.8125rem">—</span>
+                <% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if (pager.totalPages > 1) { %>
+      <div class="panel-foot">
+        <%- include('../partials/pagination', { baseUrl: '/account/payments' }) %>
+      </div>
+    <% } %>
+  <% } else { %>
+    <div class="empty-state">
+      <div class="ico"><svg><use href="#i-credit-card"/></svg></div>
+      <h3>No payments <%= activeStatus ? 'with that status' : 'yet' %></h3>
+      <p>
+        <% if (activeStatus) { %>
+          Nothing here matches that filter.
+        <% } else { %>
+          Once you submit a payment for an order it will be listed here with its verification status.
+        <% } %>
+      </p>
+      <a href="<%= helpers.url('/account/orders') %>" class="btn btn-primary">Go to my orders</a>
+    </div>
+  <% } %>
+</div>

@@ -1,0 +1,133 @@
+<%
+  const cur = invoice.currency === 'BDT' ? site.currency : (invoice.currency + ' ');
+  const money = helpers.money;
+  const subtotal = Number(invoice.subtotal);
+  const tax = Number(invoice.tax);
+  // Prefer the stored line items; fall back to the header totals so the
+  // document is never blank if items were not written.
+  const rows = (items && items.length)
+    ? items
+    : [{ description: 'Website package', quantity: 1, unit_price: subtotal, amount: subtotal }];
+%>
+
+<div class="doc-head">
+  <div class="brand">
+    <img src="<%= site.logoDark %>" alt="<%= site.name %>">
+    <address>
+      <%= site.address %><br>
+      <%= site.email %><br>
+      <%= site.phone %>
+    </address>
+  </div>
+
+  <div class="doc-meta">
+    <h1>Invoice</h1>
+    <dl>
+      <dt>Invoice number</dt>
+      <dd><%= invoice.invoice_number %></dd>
+      <dt>Issue date</dt>
+      <dd><%= helpers.formatDate(invoice.issue_date) %></dd>
+      <% if (invoice.due_date) { %>
+        <dt>Due date</dt>
+        <dd><%= helpers.formatDate(invoice.due_date) %></dd>
+      <% } %>
+      <dt>Status</dt>
+      <dd><span class="stamp <%= invoice.status %>"><%= helpers.humanise(invoice.status) %></span></dd>
+    </dl>
+  </div>
+</div>
+
+<div class="parties">
+  <div>
+    <h2>Billed to</h2>
+    <p class="name"><%= invoice.customer_name %></p>
+    <% if (invoice.customer_company) { %><p class="soft"><%= invoice.customer_company %></p><% } %>
+    <p class="soft"><%= invoice.customer_email %></p>
+    <% if (invoice.customer_phone) { %><p class="soft"><%= invoice.customer_phone %></p><% } %>
+    <% if (invoice.customer_address) { %>
+      <p class="soft">
+        <%= invoice.customer_address %><% if (invoice.customer_city) { %>, <%= invoice.customer_city %><% } %>
+        <% if (invoice.customer_country) { %><br><%= invoice.customer_country %><% } %>
+      </p>
+    <% } %>
+  </div>
+
+  <div>
+    <h2>From</h2>
+    <p class="name"><%= site.name %></p>
+    <p class="soft"><%= site.address %></p>
+    <p class="soft"><%= site.email %></p>
+    <p class="soft"><%= site.phone %></p>
+    <% if (site.whatsapp) { %><p class="soft">WhatsApp <%= site.whatsapp %></p><% } %>
+  </div>
+</div>
+
+<% if (invoice.order_number) { %>
+  <p style="font-size:.875rem;margin:0 0 20px">
+    <strong>Project reference:</strong> Order <%= invoice.order_number %>
+  </p>
+<% } %>
+
+<table class="items">
+  <thead>
+    <tr>
+      <th style="width:54%">Description</th>
+      <th class="num" style="width:13%">Qty</th>
+      <th class="num" style="width:16%">Unit price</th>
+      <th class="num" style="width:17%">Amount</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% rows.forEach(function (item) { %>
+      <tr>
+        <td><%= item.description %></td>
+        <td class="num"><%= item.quantity %></td>
+        <td class="num"><%= money(item.unit_price, cur) %></td>
+        <td class="num"><%= money(item.amount, cur) %></td>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>
+
+<div class="totals">
+  <table>
+    <tr>
+      <td style="color:var(--muted)">Subtotal</td>
+      <td><%= money(subtotal, cur) %></td>
+    </tr>
+    <% if (tax > 0) { %>
+      <tr>
+        <td style="color:var(--muted)">VAT</td>
+        <td><%= money(tax, cur) %></td>
+      </tr>
+    <% } %>
+    <tr class="grand">
+      <td>Total due</td>
+      <td><%= money(invoice.total, cur) %></td>
+    </tr>
+  </table>
+</div>
+
+<% if (invoice.notes) { %>
+  <div class="doc-note">
+    <strong>Notes</strong>
+    <div style="white-space:pre-wrap"><%= invoice.notes %></div>
+  </div>
+<% } %>
+
+<% if (invoice.status === 'unpaid') { %>
+  <div class="doc-note">
+    <strong>How to pay</strong>
+    <div>
+      Send the total to one of our mobile wallet numbers and submit the transaction ID
+      from your account dashboard. Your website will begin production as soon as the
+      payment is verified.
+    </div>
+  </div>
+<% } %>
+
+<div class="doc-foot">
+  Thank you for choosing <%= site.name %>.<br>
+  Questions about this invoice? Email <a href="mailto:<%= site.email %>"><%= site.email %></a>
+  or call <a href="tel:<%= String(site.phone).replace(/\s/g, '') %>"><%= site.phone %></a>.
+</div>

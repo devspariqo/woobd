@@ -1,0 +1,33 @@
+node_modules/
+.env
+.env.local
+*.local.md
+npm-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+coverage/
+tmp/
+temp/
+# Runtime uploads are user content, not source. On Hostinger these live in a
+# persistent folder outside the versioned build dir - see docs/DEPLOY-HOSTINGER.md
+uploads/*
+!uploads/.gitkeep
+!uploads/README.md
+backups/
+*.sql.gz
+*.sql
+!database/*.sql
+
+# Generated UI previews (npm run preview) - build output, not source.
+preview/
+
+# Private operator notes. Contains live credentials (admin passwords, API
+# keys) written down for convenience - never source, never publishable.
+WooBD Info.txt
+
+# Assistant working memory: session notes that quote customer emails, order
+# details and credentials seen during debugging.
+.workbuddy-ai/

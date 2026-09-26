@@ -1,0 +1,174 @@
+<%- include('../partials/page-hero', {
+  pageTitle: 'Contact Us',
+  lead: 'Tell us about your project and we will send pricing and a timeline within one business day.',
+  crumbs: [{ label: 'Contact' }]
+}) %>
+
+<section class="section">
+  <div class="container">
+    <div class="split" style="align-items:start">
+      <div data-reveal>
+        <span class="eyebrow">Get In Touch</span>
+        <h2 class="mb-4">Let's talk about your business</h2>
+        <p style="font-size:1.0313rem;line-height:1.75;margin-bottom:34px">
+          Whether you need a full store from scratch or improvements to an existing one, send us the details.
+          No sales pressure, no obligation — we will tell you honestly what it takes.
+        </p>
+
+        <ul class="footer-contact" style="color:var(--text-muted)">
+          <li>
+            <span class="ico" style="background:rgba(91,33,240,.08)"><svg><use href="#i-map-pin"/></svg></span>
+            <span>
+              <span class="label">Office address</span>
+              <%= site.address %>
+            </span>
+          </li>
+          <li>
+            <span class="ico" style="background:rgba(91,33,240,.08)"><svg><use href="#i-phone"/></svg></span>
+            <span>
+              <span class="label">Phone</span>
+              <a href="tel:<%= site.phone.replace(/\s/g, '') %>" style="color:var(--text-muted)"><%= site.phone %></a>
+            </span>
+          </li>
+          <li>
+            <span class="ico" style="background:rgba(15,157,88,.1);color:var(--success)"><svg><use href="#i-whatsapp"/></svg></span>
+            <span>
+              <span class="label">WhatsApp</span>
+              <a href="<%= site.whatsappLink %>" target="_blank" rel="noopener" style="color:var(--text-muted)"><%= site.whatsapp %></a>
+            </span>
+          </li>
+          <li>
+            <span class="ico" style="background:rgba(91,33,240,.08)"><svg><use href="#i-mail"/></svg></span>
+            <span>
+              <span class="label">Email</span>
+              <a href="mailto:<%= site.email %>" style="color:var(--text-muted)"><%= site.email %></a>
+            </span>
+          </li>
+          <li>
+            <span class="ico" style="background:rgba(91,33,240,.08)"><svg><use href="#i-clock"/></svg></span>
+            <span>
+              <span class="label">Opening hours</span>
+              <%= site.hours %>
+            </span>
+          </li>
+        </ul>
+
+        <div style="display:flex;gap:11px;margin-top:30px;flex-wrap:wrap">
+          <a href="<%= site.whatsappLink %>" target="_blank" rel="noopener" class="btn btn-primary">
+            <svg><use href="#i-whatsapp"/></svg>
+            Chat on WhatsApp
+          </a>
+          <a href="tel:<%= site.phone.replace(/\s/g, '') %>" class="btn btn-outline">
+            <svg><use href="#i-phone"/></svg>
+            Call now
+          </a>
+        </div>
+      </div>
+
+      <div data-reveal>
+        <div class="card card-flat">
+          <div class="card-body-lg">
+            <h3 class="mb-3">Send us a message</h3>
+            <p style="font-size:.9063rem;color:var(--text-soft);margin-bottom:26px">
+              Fields marked with <span style="color:var(--danger)">*</span> are required.
+            </p>
+
+            <%- include('../partials/flash') %>
+
+            <form action="<%= helpers.url('/contact') %>" method="POST" data-validate>
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="source" value="contact_page">
+              <div class="hp-field"><input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true"></div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="c-name">Full name <span class="req">*</span></label>
+                  <input type="text" id="c-name" name="name" class="form-control" required maxlength="120"
+                         value="<%= form && form.name ? form.name : '' %>" placeholder="Your name">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="c-email">Email <span class="req">*</span></label>
+                  <input type="email" id="c-email" name="email" class="form-control" required maxlength="191"
+                         value="<%= form && form.email ? form.email : '' %>" placeholder="you@business.com">
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="c-phone">Phone / WhatsApp</label>
+                  <input type="tel" id="c-phone" name="phone" class="form-control" maxlength="30"
+                         value="<%= form && form.phone ? form.phone : '' %>" placeholder="01789668276">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="c-subject">Subject</label>
+                  <input type="text" id="c-subject" name="subject" class="form-control" maxlength="250"
+                         value="<%= form && form.subject ? form.subject : '' %>"
+                         placeholder="<%= prefillSubject || 'New website enquiry' %>">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="c-message">Your message <span class="req">*</span></label>
+                <textarea id="c-message" name="message" class="form-control" required maxlength="4000" style="min-height:150px"
+                          placeholder="Tell us about your products, what you sell, and what you need the website to do."><%= form && form.message ? form.message : '' %></textarea>
+              </div>
+
+              <% if (captcha.enabled && settings.captcha_on_contact === '1') { %>
+                <div class="form-group">
+                  <div class="g-recaptcha" data-sitekey="<%= captcha.siteKey %>"></div>
+                </div>
+                <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+              <% } %>
+
+              <button type="submit" class="btn btn-primary btn-block btn-lg">
+                Send message
+                <svg><use href="#i-send"/></svg>
+              </button>
+
+              <p style="font-size:.7813rem;color:var(--text-soft);text-align:center;margin-top:13px">
+                By sending this you agree to our <a href="<%= helpers.url('/privacy-policy') %>">privacy policy</a>.
+              </p>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<%# Map is embedded from Google Maps' no-API-key embed endpoint, which is why
+    it needs no script and stays inside the CSP frame-src allowance. %>
+<section class="section-sm section-alt">
+  <div class="container">
+    <div style="border-radius:var(--radius-lg);overflow:hidden;border:1px solid var(--border)">
+      <iframe
+        src="https://www.google.com/maps?q=<%= encodeURIComponent(site.address) %>&output=embed"
+        width="100%" height="400" style="border:0;display:block"
+        loading="lazy" referrerpolicy="no-referrer-when-downgrade"
+        title="<%= site.name %> location"></iframe>
+    </div>
+  </div>
+</section>
+
+<%# LocalBusiness structured data - helps the office appear in local search.
+    helpers.jsonLd escapes < > & so an admin-editable field cannot break out of
+    the script block. %>
+<script type="application/ld+json">
+<%- helpers.jsonLd({
+  '@context': 'https://schema.org',
+  '@type': 'LocalBusiness',
+  name: site.name,
+  description: site.description,
+  url: helpers.absoluteUrl('/'),
+  telephone: site.phone,
+  email: site.email,
+  address: {
+    '@type': 'PostalAddress',
+    streetAddress: 'House 72, RK Road',
+    addressLocality: 'Rangpur',
+    addressCountry: 'BD'
+  },
+  openingHours: site.hours,
+  sameAs: socials.map(function (s) { return s.href; })
+}) %>
+</script>

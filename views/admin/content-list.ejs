@@ -1,0 +1,185 @@
+<%#
+  Generic CMS list, driven by a resource from config/admin-resources.js.
+  Expects: resource, resourceKey, rows, pager, search, activeFilters, sort,
+           basePath, adminPath, csrfToken, helpers, site.
+
+  Column rendering switches on the column's declared `type`, so a new resource
+  needs no template change - only a registry entry.
+%>
+<%
+  var url = function (path) { return helpers.url('/' + adminPath + '/' + resourceKey + path); };
+  var hasFilters = (resource.filters || []).length > 0 || (resource.sortOptions || []).length > 0;
+  var imageField = null;
+  (resource.fields || []).forEach(function (f) { if (f.type === 'image') imageField = f.key; });
+%>
+
+<div class="panel">
+  <% if (hasFilters) { %>
+    <div class="panel-head">
+      <form class="toolbar" method="get" action="<%= url('') %>"
+            style="margin:0;padding:0;border:0;box-shadow:none;background:transparent;flex-wrap:wrap">
+        <div class="search-box">
+          <svg><use href="#i-search"/></svg>
+          <input type="search" name="q" class="form-control" value="<%= search %>"
+                 placeholder="Search <%= resource.label.toLowerCase() %>…" aria-label="Search">
+        </div>
+
+        <% (resource.filters || []).forEach(function (filter) { %>
+          <% var param = filter.param || filter.key; %>
+          <select name="<%= param %>" class="form-control" style="max-width:190px" aria-label="<%= filter.label %>">
+            <option value="">All <%= filter.label.toLowerCase() %></option>
+            <% filter.options.forEach(function (opt) { %>
+              <option value="<%= opt.value %>" <%= String(activeFilters[param] || '') === String(opt.value) ? 'selected' : '' %>><%= opt.label %></option>
+            <% }); %>
+          </select>
+        <% }); %>
+
+        <% if ((resource.sortOptions || []).length) { %>
+          <select name="sort" class="form-control" style="max-width:190px" aria-label="Sort">
+            <% resource.sortOptions.forEach(function (opt) { %>
+              <option value="<%= opt.value %>" <%= sort === opt.value ? 'selected' : '' %>><%= opt.label %></option>
+            <% }); %>
+          </select>
+        <% } %>
+
+        <button type="submit" class="btn btn-outline btn-sm">Apply</button>
+        <% if (search || Object.keys(activeFilters).length) { %>
+          <a href="<%= url('') %>" class="btn btn-ghost btn-sm">Clear</a>
+        <% } %>
+      </form>
+    </div>
+  <% } %>
+
+  <% if (rows && rows.length) { %>
+    <div class="table-wrap">
+      <table class="dash-table">
+        <thead>
+          <tr>
+            <% resource.columns.forEach(function (col) { %>
+              <th class="<%= col.align === 'num' ? 'num' : '' %>"><%= col.label %></th>
+            <% }); %>
+            <th class="num">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% rows.forEach(function (row) { %>
+            <tr>
+              <% resource.columns.forEach(function (col) { %>
+                <%
+                  var value = row[col.key];
+                %>
+                <td class="<%= col.align === 'num' ? 'num' : '' %>">
+                  <% if (col.type === 'product') { %>
+                    <div class="table-product">
+                      <img src="<%= helpers.url(row[col.image] || (imageField && row[imageField]) || '/assets/img/service-default.svg') %>"
+                           alt="" loading="lazy">
+                      <div>
+                        <div class="strong"><%= row[col.key] %></div>
+                        <% if (resource.columns.indexOf(col) === 0 && row.short_description) { %>
+                          <div style="font-size:.75rem;color:var(--text-soft);margin-top:2px">
+                            <%= helpers.excerpt(row.short_description, 60) %>
+                          </div>
+                        <% } %>
+                      </div>
+                    </div>
+
+                  <% } else if (col.type === 'money') { %>
+                    <span class="strong"><%= helpers.money(value, site.currency) %></span>
+
+                  <% } else if (col.type === 'date') { %>
+                    <span style="font-size:.8125rem"><%= value ? helpers.formatDate(value) : '—' %></span>
+
+                  <% } else if (col.type === 'bool') { %>
+                    <% if (value) { %>
+                      <span class="pill pill-success">Yes</span>
+                    <% } else { %>
+                      <span class="pill pill-muted">No</span>
+                    <% } %>
+
+                  <% } else if (col.type === 'status') { %>
+                    <span class="pill pill-<%= helpers.statusTone(value) %>"><%= helpers.humanise(value) %></span>
+
+                  <% } else if (col.type === 'rating') { %>
+                    <span class="rating" aria-label="<%= value %> out of 5">
+                      <% for (var i = 1; i <= 5; i++) { %>
+                        <svg style="width:13px;height:13px;color:<%= i <= Number(value) ? 'var(--warning)' : 'var(--border-strong)' %>"><use href="#i-star"/></svg>
+                      <% } %>
+                    </span>
+
+                  <% } else if (col.type === 'code') { %>
+                    <code style="font-size:.78rem;background:var(--bg-alt);padding:2px 6px;border-radius:5px"><%= value || '—' %></code>
+
+                  <% } else if (col.type === 'link') { %>
+                    <% if (value) { %>
+                      <a href="<%= value %>" target="_blank" rel="noopener" style="font-size:.8125rem">Visit site</a>
+                    <% } else { %>
+                      <span style="color:var(--text-soft)">—</span>
+                    <% } %>
+
+                  <% } else if (col.type === 'humanise') { %>
+                    <span style="font-size:.8125rem"><%= helpers.humanise(value) %></span>
+
+                  <% } else { %>
+                    <span style="font-size:.8438rem"><%= value || '—' %></span>
+                  <% } %>
+                </td>
+              <% }); %>
+
+              <td>
+                <div class="actions">
+                  <a href="<%= url('/' + row.id + '/edit') %>" class="btn btn-outline btn-sm">Edit</a>
+
+                  <%# Quick status flip, straight from the list. %>
+                  <% if (resource.fields.some(function (f) { return f.key === 'status'; })) { %>
+                    <form method="post" action="<%= url('/' + row.id + '/toggle/status') %>" style="display:inline">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <button type="submit" class="btn btn-ghost btn-sm"
+                              title="<%= row.status === 'active' ? 'Set inactive' : 'Set active' %>">
+                        <%= row.status === 'active' ? 'Disable' : 'Enable' %>
+                      </button>
+                    </form>
+                  <% } %>
+
+                  <form method="post" action="<%= url('/' + row.id + '/delete') %>" style="display:inline">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button type="submit" class="btn btn-ghost btn-sm"
+                            style="color:var(--danger)"
+                            data-confirm="Delete &quot;<%= String(row[resource.titleField] || '').replace(/"/g, '') %>&quot;? This cannot be undone.">Delete</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if (pager.totalPages > 1) { %>
+      <div class="panel-foot">
+        <span style="font-size:.8125rem;color:var(--text-soft)">
+          Showing <%= pager.from %>–<%= pager.to %> of <%= pager.total %>
+        </span>
+        <%- include('../partials/pagination', { baseUrl: '/' + adminPath + '/' + resourceKey }) %>
+      </div>
+    <% } %>
+  <% } else { %>
+    <div class="empty-state">
+      <div class="ico"><svg><use href="#<%= resource.icon %>"/></svg></div>
+      <h3>No <%= resource.label.toLowerCase() %><%= (search || Object.keys(activeFilters).length) ? ' match those filters' : ' yet' %></h3>
+      <p>
+        <% if (search || Object.keys(activeFilters).length) { %>
+          Try a different filter, or clear the search.
+        <% } else { %>
+          <%= resource.description %>
+        <% } %>
+      </p>
+      <% if (search || Object.keys(activeFilters).length) { %>
+        <a href="<%= url('') %>" class="btn btn-outline">Clear filters</a>
+      <% } %>
+      <a href="<%= url('/new') %>" class="btn btn-primary">
+        <svg><use href="#i-plus"/></svg>
+        New <%= resource.singular.toLowerCase() %>
+      </a>
+    </div>
+  <% } %>
+</div>
