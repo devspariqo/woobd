@@ -62,6 +62,14 @@
 
   --gradient: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
   --gradient-soft: linear-gradient(135deg, rgba(91, 33, 240, .08) 0%, rgba(255, 92, 43, .06) 100%);
+
+  /* The footer is dark in BOTH themes.
+     It used to be `background: var(--text)`, which flips to near-white in dark
+     mode - leaving white text on a white background. These are deliberately
+     fixed values that no theme overrides. */
+  --footer-bg: #0a0c1b;
+  --footer-bg-2: #151a35;
+  --footer-glow: rgba(91, 33, 240, .28);
 }
 
 /* Dark theme. Applied via [data-theme="dark"] on <html>, set by an inline
@@ -1726,9 +1734,28 @@ body.no-scroll { overflow: hidden; }
    -------------------------------------------------------------------------- */
 .cta-section {
   position: relative;
-  background: var(--gradient);
+  /* Layered rather than a flat two-stop gradient: a warm brand glow top-right,
+     a cool one bottom-left, over a deeper diagonal base. Reads as lit rather
+     than printed, and gives the white text more to sit against. */
+  background:
+    radial-gradient(circle at 84% 12%, rgba(255, 102, 0, .30) 0%, transparent 52%),
+    radial-gradient(circle at 8% 96%, rgba(120, 80, 255, .34) 0%, transparent 55%),
+    linear-gradient(135deg, #5b21f0 0%, #3f14b8 48%, #22076e 100%);
   color: #fff;
   overflow: hidden;
+}
+
+/* A fine hairline along the top edge, so the section reads as a distinct
+   surface rather than the previous section's background continuing. */
+.cta-section::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .35), transparent);
+  pointer-events: none;
 }
 
 .cta-section::before {
@@ -1739,17 +1766,6 @@ body.no-scroll { overflow: hidden; }
   width: 520px;
   height: 520px;
   background: radial-gradient(circle, rgba(255, 255, 255, .14) 0%, transparent 68%);
-  pointer-events: none;
-}
-
-.cta-section::after {
-  content: '';
-  position: absolute;
-  bottom: -240px;
-  left: -140px;
-  width: 480px;
-  height: 480px;
-  background: radial-gradient(circle, rgba(255, 255, 255, .09) 0%, transparent 70%);
   pointer-events: none;
 }
 
@@ -1880,7 +1896,29 @@ body.no-scroll { overflow: hidden; }
 /* --------------------------------------------------------------------------
    17. Footer
    -------------------------------------------------------------------------- */
-.site-footer { background: var(--text); color: rgba(255, 255, 255, .68); }
+.site-footer {
+  position: relative;
+  overflow: hidden;
+  /* A gradient rather than a flat fill, so it reads as a considered surface
+     instead of a black slab butted against the page. */
+  background: linear-gradient(180deg, var(--footer-bg) 0%, var(--footer-bg-2) 100%);
+  color: rgba(255, 255, 255, .68);
+}
+
+/* A soft brand glow, tying the footer to the purple used above it. */
+.site-footer::before {
+  content: '';
+  position: absolute;
+  top: -220px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 900px;
+  height: 420px;
+  background: radial-gradient(ellipse, var(--footer-glow) 0%, transparent 68%);
+  pointer-events: none;
+}
+
+.site-footer .container { position: relative; z-index: 1; }
 
 [data-theme='dark'] .site-footer { background: #05060d; }
 
@@ -2432,7 +2470,12 @@ body.no-scroll { overflow: hidden; }
 
   .hero-grid, .split, .cta-grid { grid-template-columns: 1fr; gap: 46px; }
   .hero { padding: 58px 0 72px; }
-  .hero-visual { order: -1; }
+
+  /* Content first, image after.
+     This used to be `order: -1`, which put the visual on top - so a phone
+     visitor got a picture before being told what the business does. The
+     headline and the call to action are the things that have to land first. */
+  .hero-visual { order: 0; }
   .hero-text { max-width: 100%; }
 
   .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
