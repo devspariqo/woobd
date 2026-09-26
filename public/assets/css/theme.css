@@ -940,28 +940,51 @@ select.form-control {
 
 .hamburger {
   display: none;
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   border-radius: var(--radius-sm);
   border: 1.5px solid var(--border);
+  background: var(--surface);
   color: var(--text);
+  transition: border-color var(--t-fast), background var(--t-fast), color var(--t-fast);
 }
 
-.hamburger span {
-  display: block;
-  width: 19px;
-  height: 2px;
-  background: currentColor;
-  border-radius: 2px;
+.hamburger:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--bg-alt);
+}
+
+.hamburger:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.hamburger-icon {
+  width: 23px;
+  height: 23px;
+  overflow: visible;
+}
+
+/* transform-box is required: without it the SVG origin is the element's own
+   bounding box and the bars rotate around the wrong point. */
+.hamburger-icon .bar {
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  transform-box: view-box;
+  transform-origin: 12px 12px;
   transition: transform var(--t), opacity var(--t-fast);
 }
 
-.hamburger span + span { margin-top: 4.5px; }
+.hamburger.is-open .bar-top { transform: translateY(5px) rotate(45deg); }
+.hamburger.is-open .bar-mid { opacity: 0; transform: scaleX(.4); }
+.hamburger.is-open .bar-bot { transform: translateY(-5px) rotate(-45deg); }
 
-.hamburger.is-open span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
-.hamburger.is-open span:nth-child(2) { opacity: 0; }
-.hamburger.is-open span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
+@media (prefers-reduced-motion: reduce) {
+  .hamburger-icon .bar { transition: none; }
+}
 
 /* --------------------------------------------------------------------------
    8. Mobile slide menu
@@ -999,7 +1022,10 @@ select.form-control {
   flex-direction: column;
   transform: translateX(100%);
   transition: transform .42s var(--ease-out);
-  box-shadow: -12px 0 44px rgba(0, 0, 0, .16);
+  /* Deeper and tighter than a generic drop shadow, so the panel reads as a
+     layer above the page rather than a floating box. */
+  box-shadow: -18px 0 60px rgba(0, 0, 0, .28);
+  border-left: 1px solid var(--border);
 }
 
 .mobile-menu.is-open .mobile-menu-panel { transform: translateX(0); }
@@ -1011,6 +1037,9 @@ select.form-control {
   gap: 16px;
   padding: 18px 22px;
   border-bottom: 1px solid var(--border);
+  /* A tint rather than a flat fill, so the header separates from the scrolling
+     list without needing a heavy rule. */
+  background: var(--bg-alt);
   flex-shrink: 0;
 }
 
@@ -1021,29 +1050,48 @@ select.form-control {
   height: 40px;
   display: grid;
   place-items: center;
-  border-radius: var(--radius-sm);
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
   color: var(--text-muted);
-  transition: background var(--t-fast), color var(--t-fast);
+  flex-shrink: 0;
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast), transform var(--t-fast);
 }
 
-.mobile-menu-close:hover { background: var(--bg-alt); color: var(--danger); }
-.mobile-menu-close svg { width: 20px; height: 20px; }
+.mobile-menu-close:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+  transform: rotate(90deg);
+}
+
+.mobile-menu-close:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.mobile-menu-close svg { width: 18px; height: 18px; }
 
 .mobile-menu-body {
   flex: 1;
   overflow-y: auto;
-  padding: 20px 22px;
+  padding: 16px 16px 22px;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
-.mobile-nav { display: flex; flex-direction: column; gap: 3px; }
+.mobile-nav { display: flex; flex-direction: column; gap: 2px; }
 
 .mobile-nav-link {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px 15px;
+  /* 48px minimum: comfortable for a thumb, and the target size both Apple and
+     Google recommend. */
+  min-height: 48px;
+  padding: 12px 15px;
   font-size: 1rem;
   font-weight: 500;
   color: var(--text);
@@ -1052,6 +1100,20 @@ select.form-control {
 }
 
 .mobile-nav-link:hover, .mobile-nav-link.active { background: var(--bg-alt); color: var(--primary); }
+
+/* An accent bar marks the current page, so the menu says where you are rather
+   than only where you can go. */
+.mobile-nav-link.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 20px;
+  border-radius: 0 3px 3px 0;
+  background: var(--primary);
+}
 
 .mobile-nav-link .caret { width: 15px; height: 15px; opacity: .5; transition: transform var(--t); }
 .mobile-nav-link.is-expanded .caret { transform: rotate(180deg); }
@@ -1067,23 +1129,29 @@ select.form-control {
 .mobile-subnav > div { overflow: hidden; }
 
 .mobile-subnav ul {
-  padding: 5px 0 9px 15px;
-  margin-left: 15px;
+  padding: 4px 0 10px 0;
+  margin: 2px 0 6px 15px;
   border-left: 2px solid var(--border);
 }
 
 .mobile-subnav a {
   display: block;
-  padding: 10px 13px;
+  min-height: 42px;
+  padding: 11px 14px;
   font-size: .9063rem;
   color: var(--text-muted);
-  border-radius: var(--radius-sm);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  transition: color var(--t-fast), background var(--t-fast), padding-left var(--t-fast);
 }
 
-.mobile-subnav a:hover { color: var(--primary); background: var(--bg-alt); }
+.mobile-subnav a:hover {
+  color: var(--primary);
+  background: var(--bg-alt);
+  padding-left: 19px;
+}
 
 .mobile-menu-foot {
-  padding: 22px;
+  padding: 20px 22px calc(20px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--border);
   background: var(--bg-alt);
   flex-shrink: 0;

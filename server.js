@@ -134,11 +134,21 @@ app.use(
   express.static(path.join(__dirname, 'public'), {
     maxAge: config.isProd ? '7d' : 0,
     etag: true,
-    // Fonts and images are content-addressed by name, so a long cache is safe;
-    // HTML is never served from here.
     setHeaders(res, filePath) {
+      // Fonts and images are content-addressed by name, so a long cache is safe;
+      // HTML is never served from here.
       if (/\.(woff2?|ttf|otf|svg|png|jpe?g|webp|ico|avif)$/i.test(filePath)) {
         res.setHeader('Cache-Control', `public, max-age=${config.isProd ? 2592000 : 0}`);
+        return;
+      }
+
+      // CSS and JS are NOT content-addressed, so the blanket 7-day max-age
+      // above meant a stylesheet change did not reach returning visitors for a
+      // week - the site kept rendering the previous design and looked like the
+      // deploy had not worked. Revalidate instead: the ETag makes it a cheap
+      // 304 when nothing changed, and an immediate update when it did.
+      if (/\.(css|js)$/i.test(filePath)) {
+        res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
       }
     },
   })

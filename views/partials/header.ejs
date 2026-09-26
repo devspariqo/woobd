@@ -57,7 +57,16 @@
       <% } %>
 
       <button type="button" class="hamburger" data-menu-open aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
-        <span></span><span></span><span></span>
+        <%#
+          Drawn as an SVG rather than three CSS bars: the strokes stay crisp at
+          any zoom, the rounded caps and spacing are exact, and the open state
+          animates cleanly into an X.
+        %>
+        <svg class="hamburger-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <line class="bar bar-top" x1="4" y1="7" x2="20" y2="7" />
+          <line class="bar bar-mid" x1="4" y1="12" x2="20" y2="12" />
+          <line class="bar bar-bot" x1="4" y1="17" x2="20" y2="17" />
+        </svg>
       </button>
     </div>
   </div>
