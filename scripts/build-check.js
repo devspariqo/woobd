@@ -221,6 +221,109 @@ console.log('\nChecking for escaped attributes…');
 }
 
 // ---------------------------------------------------------------------------
+// Deploy readiness
+//
+// Everything Hostinger's Web App host needs from the project, checked here so a
+// broken deploy contract fails the build rather than the deployment. Each of
+// these has a specific failure mode in production:
+//
+//   no start script      -> the host has nothing to run, the app never starts
+//   no engines           -> an unsupported Node is picked, native deps break
+//   fixed host/port      -> binds where the proxy cannot reach it, 502
+//   no UPLOAD_DIR hook   -> uploads are wiped by the next build rotation
+//   .env not ignored     -> credentials get committed
+// ---------------------------------------------------------------------------
+console.log('\nChecking deploy readiness…');
+
+{
+  const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+
+  if (pkg.scripts && pkg.scripts.start) {
+    pass(`start script present ("${pkg.scripts.start}")`);
+  } else {
+    fail('package.json has no start script - the host would not know how to run the app');
+  }
+
+  if (pkg.engines && pkg.engines.node) {
+    pass(`Node range declared (${pkg.engines.node})`);
+  } else {
+    fail('package.json declares no engines.node - the host may pick an unsupported Node');
+  }
+
+  // The app must not hardcode where it listens: the host injects PORT and the
+  // proxy has to be able to reach it.
+  const configSrc = fs.readFileSync(path.join(ROOT, 'src', 'config', 'index.js'), 'utf8');
+
+  if (/process\.env\.PORT/.test(configSrc)) {
+    pass('PORT is read from the environment');
+  } else {
+    fail('PORT is not read from process.env - the host-injected port would be ignored');
+  }
+
+  // A host defaulting to 127.0.0.1 is unreachable from the proxy.
+  if (/host:.*process\.env\.HOST\s*\|\|\s*['"]0\.0\.0\.0['"]/.test(configSrc)) {
+    pass('HOST defaults to 0.0.0.0');
+  } else if (/process\.env\.HOST/.test(configSrc)) {
+    warn('HOST is configurable - confirm it defaults to 0.0.0.0, not 127.0.0.1');
+  } else {
+    fail('HOST is not configurable - binding to 127.0.0.1 is unreachable behind the proxy');
+  }
+
+  if (/process\.env\.UPLOAD_DIR/.test(configSrc)) {
+    pass('UPLOAD_DIR lets uploads survive a redeploy');
+  } else {
+    fail('uploads path is fixed - Hostinger build rotation would delete user uploads');
+  }
+
+  if (/process\.env\.TRUST_PROXY/.test(configSrc)) {
+    pass('TRUST_PROXY is configurable (needed for secure cookies behind the proxy)');
+  } else {
+    fail('TRUST_PROXY is not configurable - sessions will not stick behind the proxy');
+  }
+
+  // A committed .env would publish every credential.
+  const ignore = fs.existsSync(path.join(ROOT, '.gitignore'))
+    ? fs.readFileSync(path.join(ROOT, '.gitignore'), 'utf8')
+    : '';
+
+  const requiredIgnores = ['.env', 'node_modules'];
+  const missing = requiredIgnores.filter((entry) => !new RegExp(`^${entry.replace('.', '\\.')}\\b`, 'm').test(ignore));
+
+  if (!missing.length) {
+    pass('.gitignore covers .env and node_modules');
+  } else {
+    fail(`.gitignore is missing: ${missing.join(', ')}`);
+  }
+
+  // .env.example must not carry real values.
+  const examplePath = path.join(ROOT, '.env.example');
+  if (fs.existsSync(examplePath)) {
+    const example = fs.readFileSync(examplePath, 'utf8');
+    // A populated secret-looking value that is not an obvious placeholder.
+    const suspicious = [...example.matchAll(/^([A-Z_]*(?:SECRET|PASSWORD|KEY|TOKEN)[A-Z_]*)=(.+)$/gmi)]
+      .filter(([, , value]) => {
+        const v = value.replace(/^["']|["']$/g, '').trim();
+        return v.length >= 8 && !/^(CHANGE_ME|your-|xxx|<|placeholder)/i.test(v);
+      })
+      .map(([, key]) => key);
+
+    if (!suspicious.length) {
+      pass('.env.example carries no real credentials');
+    } else {
+      fail(`.env.example looks like it has real values for: ${suspicious.join(', ')}`);
+    }
+  }
+
+  // The health endpoint is what the host probes.
+  const serverSrc = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
+  if (/healthz/.test(serverSrc)) {
+    pass('a /healthz endpoint exists for the host to probe');
+  } else {
+    warn('no /healthz endpoint - the host has no way to tell a live app from a hung one');
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Result
 // ---------------------------------------------------------------------------
 if (failures > 0) {

@@ -81,6 +81,31 @@ app.set('layout', 'layouts/public');
 // returns the actual (req, res, next) handler. Mounting one bare hands Express
 // the factory itself, which just returns a new function and never calls next():
 // the request then hangs until the client times out. Note the () on each.
+// Health probe.
+//
+// Registered FIRST, ahead of every other middleware. A probe that can be
+// redirected is a probe that lies: behind a proxy that omits or misconfigures
+// X-Forwarded-Proto, `req.secure` reads false and the host's health check gets
+// a 301 instead of a 200 - so the platform reports the app as unhealthy while
+// it is serving perfectly well, and you go chasing a fault that is not there.
+//
+// It also touches nothing but the database, so it stays truthful even when
+// sessions, CSRF or the canonical-host rules are misconfigured.
+app.get('/healthz', async (req, res) => {
+  let database = 'down';
+  try {
+    await db.healthCheck();
+    database = 'up';
+  } catch {
+    database = 'down';
+  }
+  res.status(database === 'up' ? 200 : 503).json({
+    status: database === 'up' ? 'ok' : 'degraded',
+    database,
+    uptime: Math.round(process.uptime()),
+  });
+});
+
 app.use(security.securityHeaders());
 app.use(security.canonicalHost());
 
@@ -185,22 +210,6 @@ app.use((req, res, next) => {
   adminRoutes(req, res, (err) => {
     req.url = originalUrl;
     next(err);
-  });
-});
-
-// Health probe - useful for Hostinger and for the smoke test.
-app.get('/healthz', async (req, res) => {
-  let database = 'down';
-  try {
-    await db.healthCheck();
-    database = 'up';
-  } catch {
-    database = 'down';
-  }
-  res.status(database === 'up' ? 200 : 503).json({
-    status: database === 'up' ? 'ok' : 'degraded',
-    database,
-    uptime: Math.round(process.uptime()),
   });
 });
 

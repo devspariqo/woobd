@@ -9,6 +9,47 @@ hypothetical one.
 
 ---
 
+## At a glance
+
+The whole deployment, in order. Each step is expanded below.
+
+```bash
+# 1. In hPanel: create a MySQL database, and note the name, user and password.
+
+# 2. In hPanel: create a Node.js Web App from this repository.
+#    Build command : npm install
+#    Start command : npm start
+#    Node version  : 20.x or 22.x
+
+# 3. Add the environment variables (section 4). At minimum:
+#      NODE_ENV=production
+#      APP_URL=https://your-domain.com
+#      SESSION_SECRET=<48 random bytes, see below>
+#      DB_HOST=127.0.0.1  DB_NAME=…  DB_USER=…  DB_PASSWORD="…"
+#      TRUST_PROXY=1
+#      UPLOAD_DIR=/home/<user>/woobd-uploads
+
+# 4. Open the app's terminal in hPanel and install the database:
+SEED_PASSWORD='a-strong-password' npm run setup
+
+# 5. Verify:
+curl -s https://your-domain.com/healthz
+
+# 6. Sign in at https://your-domain.com/<ADMIN_PATH>  (default: /dev-cp)
+```
+
+**The three that break most first deployments**, all covered below: `DB_HOST` must be
+`127.0.0.1` and not `localhost`; a password containing `#` must be quoted in `.env`; and
+`UPLOAD_DIR` must point outside the build directory or every redeploy deletes the
+uploads.
+
+`npm run build` runs a deploy-readiness check before you deploy — it verifies the start
+script, the Node range, that `PORT` and `HOST` come from the environment, that
+`UPLOAD_DIR` and `TRUST_PROXY` are wired up, and that no real credentials are sitting in
+`.env.example`. Run it locally first.
+
+---
+
 ## Contents
 
 1. [Before you start](#1-before-you-start)
@@ -572,5 +613,5 @@ not for a stream of customer payment screenshots.
 | `XKIRO_API_KEY` | — | — | Live chat assistant |
 | `XKIRO_BASE_URL` | — | xkiro endpoint | |
 | `XKIRO_MODEL` | — | `qwen/qwen3.8-omni-flash:free` | |
-| `SEED_PASSWORD` | — | `CHANGE_ME` | Used by `npm run setup` only |
+| `SEED_PASSWORD` | — | *generated* | `npm run setup` only. If unset, a random one is generated and printed once |
 | `ADMIN_PATH` | — | `dev-cp` | Used by the smoke test only |
