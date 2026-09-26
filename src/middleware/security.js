@@ -177,7 +177,28 @@ function errorHandler() {
     const status = err.status || err.statusCode || 500;
 
     if (status >= 500) {
-      logger.error(`${req.method} ${req.originalUrl} -> ${status}`, err);
+      // The raw SQL error for a missing table says nothing about the fix. Name
+      // it, because "every page 500s" with no other symptom is almost always a
+      // database that was never installed.
+      const missingTable = /Table '[\w.]+' doesn't exist|ER_NO_SUCH_TABLE/i.test(err.message || '');
+      const noConnection = /ECONNREFUSED|ETIMEDOUT|PROTOCOL_CONNECTION_LOST|Access denied/i.test(
+        err.code || err.message || ''
+      );
+
+      if (missingTable) {
+        logger.error(
+          `${req.method} ${req.originalUrl} -> 500: the database schema is missing. Run "npm run setup" against this database.`,
+          err
+        );
+      } else if (noConnection) {
+        logger.error(
+          `${req.method} ${req.originalUrl} -> 500: the database is unreachable. ` +
+            'Check DB_HOST (must be 127.0.0.1 on Hostinger, not localhost), DB_NAME, DB_USER and DB_PASSWORD.',
+          err
+        );
+      } else {
+        logger.error(`${req.method} ${req.originalUrl} -> ${status}`, err);
+      }
     } else {
       logger.warn(`${req.method} ${req.originalUrl} -> ${status}: ${err.message}`);
     }
@@ -192,15 +213,42 @@ function errorHandler() {
     }
 
     const template = status === 403 ? 'errors/403' : status === 404 ? 'errors/404' : 'errors/500';
-    return res.status(status).render(template, {
+
+    // Pass every local the templates read. `currentUrl` comes from the context
+    // middleware, which does not run when the database is unreachable - so
+    // without this the 500 page throws and the visitor sees a bare
+    // "Internal Server Error" instead of the styled page.
+    const locals = {
       title: status === 403 ? 'Access denied' : status === 404 ? 'Page not found' : 'Something went wrong',
       layout: req.path.startsWith(`/${settings.get('admin_path_slug', 'dev-cp')}`)
         ? 'layouts/admin'
         : 'layouts/public',
       message: err.message,
+      requestedPath: req.originalUrl,
+      currentUrl: req.originalUrl,
       // Only leak a stack trace when it can help the developer.
       stack: config.isDev ? err.stack : null,
-    });
+    };
+
+    // An error page that throws loses the original error as well. If the render
+    // fails for any reason, fall back to a minimal response rather than letting
+    // Express's built-in handler emit a bare, uninformative 500.
+    try {
+      return res.status(status).render(template, locals);
+    } catch (renderErr) {
+      logger.error('The error page itself failed to render', renderErr);
+
+      if (res.headersSent) return undefined;
+
+      return res
+        .status(status)
+        .type('text/plain')
+        .send(
+          status >= 500
+            ? 'Internal Server Error\n\nThe error page could not be rendered. Check the application log.'
+            : `${status}`
+        );
+    }
   };
 }
 

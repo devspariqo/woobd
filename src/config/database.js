@@ -126,6 +126,42 @@ async function healthCheck() {
     }
 }
 
+/**
+ * Tables the application cannot serve a single page without.
+ *
+ * Kept short and deliberately not exhaustive: the point is to distinguish
+ * "connected but never installed" from "installed and working".
+ */
+const CORE_TABLES = ['settings', 'users', 'services', 'customers', 'orders', 'menus', 'pages'];
+
+/**
+ * Verify the schema has actually been installed.
+ *
+ * `healthCheck` only proves the connection works. A database that exists but
+ * has never had `npm run setup` run against it connects perfectly and then
+ * fails every single query - so the app boots, listens, reports itself healthy,
+ * and returns 500 on every page. That combination is the single most confusing
+ * state to debug, because the health check says the problem is not the database
+ * and the 500 says nothing at all.
+ */
+async function schemaCheck() {
+    const conn = await getPool().getConnection();
+    try {
+        const [rows] = await conn.query(
+            `SELECT TABLE_NAME AS name FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (?)`,
+            [CORE_TABLES]
+        );
+
+        const found = new Set(rows.map((row) => row.name));
+        const missing = CORE_TABLES.filter((table) => !found.has(table));
+
+        return { ok: missing.length === 0, missing, total: CORE_TABLES.length };
+    } finally {
+        conn.release();
+    }
+}
+
 async function close() {
     if (pool) {
         await pool.end();
@@ -143,6 +179,8 @@ module.exports = {
     insert,
     update,
     healthCheck,
+    schemaCheck,
+    CORE_TABLES,
     close,
     /** Column list helper used by the admin CRUD tables. */
     escapeId: mysql.escapeId,

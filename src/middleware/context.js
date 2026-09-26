@@ -101,6 +101,84 @@ function isAdminRequest(req) {
 
 function viewContext() {
   return async (req, res, next) => {
+    // ---------------------------------------------------------------------
+    // Safe defaults, set BEFORE anything that can fail.
+    //
+    // Everything below this reads the database. When that fails the error
+    // handler runs - and it renders a template through a LAYOUT, which reads
+    // these same locals. With res.locals empty the layout throws too, so the
+    // render fails, Express falls through to its built-in handler, and the
+    // visitor gets a bare "Internal Server Error" with the real cause buried
+    // in the log. That is the worst possible failure: the one moment you need
+    // a readable error page is the moment you cannot render one.
+    //
+    // Setting them first means the layout always has something to work with,
+    // and the code below overwrites every one of them on the happy path.
+    // ---------------------------------------------------------------------
+    const fallbackName = settings.get('site_name', 'WooBD.Com') || 'WooBD.Com';
+
+    res.locals.site = {
+      name: fallbackName,
+      tagline: '',
+      description: '',
+      email: '',
+      phone: '',
+      whatsapp: '',
+      whatsappLink: '',
+      address: '',
+      hours: '',
+      currency: '৳',
+      currencyCode: 'BDT',
+      logoLight: helpers.url('/assets/img/logo-light.svg'),
+      logoDark: helpers.url('/assets/img/logo-dark.svg'),
+      favicon: helpers.url('/assets/img/favicon.svg'),
+      social: {},
+    };
+    res.locals.seo = {
+      title: fallbackName,
+      description: '',
+      keywords: '',
+      robots: 'index,follow',
+      canonical: '',
+      ogImage: '',
+    };
+    res.locals.defaultColorMode = 'light';
+    res.locals.helpers = helpers;
+    res.locals.settings = {};
+    res.locals.uploadLimits = storage.FOLDER_RULES;
+    res.locals.navActive = '';
+    res.locals.currentPath = req.path;
+    res.locals.currentUrl = req.originalUrl;
+    res.locals.adminPath = settings.get('admin_path_slug', 'dev-cp');
+    res.locals.flash = { success: null, error: null, info: null };
+    res.locals.menus = {
+      header: [],
+      headerTree: [],
+      mobile: [],
+      footerQuick: [],
+      footerServices: [],
+      footerInfo: [],
+    };
+    res.locals.staff = null;
+    res.locals.customer = null;
+    res.locals.isStaff = false;
+    res.locals.isCustomer = false;
+    res.locals.badges = {};
+    res.locals.layout = isAdminRequest(req) ? 'layouts/admin' : 'layouts/public';
+    res.locals.payments = { bkash: {}, nagad: {}, rocket: {}, card: {}, instructions: '' };
+    res.locals.socials = [];
+    res.locals.chat = { enabled: false, greeting: '' };
+    res.locals.googleAuth = { enabled: false };
+    res.locals.captcha = { enabled: false, siteKey: '' };
+    res.locals.query = {};
+    res.locals.showThemeToggle = false;
+
+    // Theme and fonts are read straight from the settings cache, which falls
+    // back to each setting's declared default when the database is unreachable
+    // - so these are safe to call even in the failure path.
+    res.locals.theme = themeTokens();
+    res.locals.fonts = { heading: 'Inter', body: 'Inter' };
+
     try {
       // loadAll() MUST run before publicValues().
       //

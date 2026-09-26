@@ -324,6 +324,78 @@ console.log('\nChecking deploy readiness…');
 }
 
 // ---------------------------------------------------------------------------
+// Error-path renderability
+//
+// Every local the context middleware sets inside its try block must ALSO be
+// defaulted before it. The try block reads the database; when that fails the
+// error handler renders a template through a LAYOUT, which reads those same
+// locals. If any is only set on the success path, the layout throws, the render
+// fails, and Express falls through to its built-in handler - so the visitor
+// sees a bare "Internal Server Error" and the real cause is buried.
+//
+// This is the worst failure mode there is: the one moment you need a readable
+// error page is the moment you cannot render one.
+// ---------------------------------------------------------------------------
+console.log('\nChecking error-path renderability…');
+
+{
+  const ctxPath = path.join(ROOT, 'src', 'middleware', 'context.js');
+  const src = fs.readFileSync(ctxPath, 'utf8');
+
+  const handlerStart = src.indexOf('function viewContext');
+  const tryAt = src.indexOf('try {', handlerStart);
+  const catchAt = src.indexOf('} catch (err) {', tryAt);
+
+  if (handlerStart < 0 || tryAt < 0 || catchAt < 0) {
+    fail('could not locate the viewContext try/catch - the check needs updating');
+  } else {
+    const before = src.slice(handlerStart, tryAt);
+    const inside = src.slice(tryAt, catchAt);
+
+    const names = (text) =>
+      new Set([...text.matchAll(/res\.locals\.([A-Za-z_][A-Za-z0-9_]*)\s*=/g)].map((m) => m[1]));
+
+    const defaulted = names(before);
+    const setInTry = names(inside);
+
+    const unguarded = [...setInTry].filter((name) => !defaulted.has(name)).sort();
+
+    if (!unguarded.length) {
+      pass(`all ${setInTry.size} context locals are defaulted before the database is touched`);
+    } else {
+      fail(
+        `these locals are set only inside viewContext's try block, so a failed database ` +
+          `would leave them undefined and break the error page: ${unguarded.join(', ')}`
+      );
+    }
+  }
+
+  // The error templates must not read an unguarded local either.
+  for (const name of ['403', '404', '500']) {
+    const file = path.join(ROOT, 'views', 'errors', `${name}.ejs`);
+    if (!fs.existsSync(file)) continue;
+
+    const body = fs.readFileSync(file, 'utf8');
+    const guards = new Set([
+      ...[...body.matchAll(/typeof\s+([A-Za-z_][A-Za-z0-9_]*)/g)].map((m) => m[1]),
+    ]);
+
+    const reads = [...body.matchAll(/<%[=-]([\s\S]*?)%>/g)]
+      .map((m) => m[1].replace(/'[^']*'/g, "''").replace(/"[^"]*"/g, '""'))
+      .join(' ')
+      .match(/(?:^|[^.\w$])(currentUrl|requestedPath|message|stack|title)\b/g) || [];
+
+    const bare = [...new Set(reads.map((r) => r.trim()))].filter((n) => !guards.has(n));
+
+    if (!bare.length) {
+      pass(`errors/${name}.ejs guards every local it reads`);
+    } else {
+      fail(`errors/${name}.ejs reads ${bare.join(', ')} without a typeof guard - the error page can throw`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Result
 // ---------------------------------------------------------------------------
 if (failures > 0) {

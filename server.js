@@ -89,19 +89,40 @@ app.set('layout', 'layouts/public');
 // a 301 instead of a 200 - so the platform reports the app as unhealthy while
 // it is serving perfectly well, and you go chasing a fault that is not there.
 //
-// It also touches nothing but the database, so it stays truthful even when
-// sessions, CSRF or the canonical-host rules are misconfigured.
+// It checks the SCHEMA, not just the connection. A database that exists but has
+// never had `npm run setup` run against it connects fine and then fails every
+// query - the app boots, listens, and returns 500 on every page. Reporting that
+// as "ok" is worse than reporting nothing, so the probe distinguishes the two
+// and states the fix.
 app.get('/healthz', async (req, res) => {
   let database = 'down';
+  let schema = 'unknown';
+  let hint = '';
+
   try {
     await db.healthCheck();
     database = 'up';
-  } catch {
+
+    const check = await db.schemaCheck();
+    schema = check.ok ? 'ready' : 'missing';
+
+    if (!check.ok) {
+      hint = `Database connected but not installed: ${check.missing.join(', ')} missing. Run "npm run setup" against this database.`;
+    }
+  } catch (err) {
     database = 'down';
+    schema = 'unknown';
+    hint = `Cannot reach the database (${err.code || err.message}). Check DB_HOST, DB_PORT, DB_NAME, DB_USER and DB_PASSWORD. On Hostinger DB_HOST must be 127.0.0.1, not localhost.`;
   }
-  res.status(database === 'up' ? 200 : 503).json({
-    status: database === 'up' ? 'ok' : 'degraded',
+
+  const healthy = database === 'up' && schema === 'ready';
+
+  // The hint names configuration, never data, so it is safe on a public probe.
+  res.status(healthy ? 200 : 503).json({
+    status: healthy ? 'ok' : 'degraded',
     database,
+    schema,
+    ...(hint ? { hint } : {}),
     uptime: Math.round(process.uptime()),
   });
 });
@@ -231,6 +252,23 @@ async function start() {
     // produces a clear log line instead of a 500 on every page.
     await db.healthCheck();
     logger.info('Database connection established.');
+
+    // Prove the schema is installed too. Connecting to an empty database
+    // succeeds, so without this the app boots, listens, reports healthy and
+    // then 500s on every page - the most confusing state to debug, because
+    // nothing says "you forgot to run setup".
+    //
+    // Deliberately a warning, not a fatal: the operator can run `npm run setup`
+    // from the host's terminal while the app is up, and it recovers on the next
+    // request without a restart. /healthz reports the same condition.
+    const schema = await db.schemaCheck();
+    if (!schema.ok) {
+      logger.error(
+        `Database is connected but NOT INSTALLED - ${schema.missing.length} of ${schema.total} core tables are missing ` +
+          `(${schema.missing.join(', ')}). Every page will return 500 until this is fixed. ` +
+          'Run: npm run setup'
+      );
+    }
 
     // Warm the settings cache so the first request is not the one that pays for it.
     await settings.loadAll();

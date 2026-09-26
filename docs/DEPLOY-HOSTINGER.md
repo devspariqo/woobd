@@ -483,6 +483,49 @@ The password is being truncated or mis-parsed. An unquoted `#` in `.env` starts
 a comment, and `@`, `/`, `:` are also unsafe unencoded. Percent-encode the
 password (`#` → `%23`, `@` → `%40`) or wrap it in quotes.
 
+### Every page returns 500 Internal Server Error
+
+**This is almost always a database that was never installed.** Start here:
+
+```bash
+curl -s https://your-domain.com/healthz
+```
+
+The probe tells you which of the two it is:
+
+```json
+{"status":"degraded","database":"up","schema":"missing",
+ "hint":"Database connected but not installed: settings, users, services, ... missing. Run \"npm run setup\" against this database."}
+```
+
+`database: "up"` with `schema: "missing"` means the credentials are correct and the
+tables are absent. Fix it from the app's terminal in hPanel:
+
+```bash
+SEED_PASSWORD='a-strong-password' npm run setup
+```
+
+Then reload. No restart needed.
+
+If instead you get `database: "down"`, the connection itself is failing - check
+`DB_HOST` (must be `127.0.0.1`, not `localhost`), `DB_NAME`, `DB_USER` and
+`DB_PASSWORD`. Quote the password if it contains `#`.
+
+**Why this used to be so hard to diagnose.** The app boots and listens even when
+the schema is missing, so the platform reports it as running. Every request then
+fails on the first query. The boot log, the request log and `/healthz` now all
+name the cause directly:
+
+```
+ERROR Database is connected but NOT INSTALLED - 7 of 7 core tables are missing
+      (settings, users, services, customers, orders, menus, pages).
+      Every page will return 500 until this is fixed. Run: npm run setup
+```
+
+If you are on an older revision and see a bare "Internal Server Error" with no
+detail, that build also had a bug where the error page itself could not render.
+Update to the current revision.
+
 ### 502 Bad Gateway, nothing useful in the logs
 
 Either `PORT` is set in your environment variables (remove it), or the startup

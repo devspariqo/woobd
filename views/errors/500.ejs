@@ -13,7 +13,17 @@
     </p>
 
     <div style="display:flex;gap:13px;justify-content:center;flex-wrap:wrap">
-      <a href="<%= helpers.url(currentUrl || '/') %>" class="btn btn-primary btn-lg">
+      <%#
+        Guarded like 404.ejs guards requestedPath. An error page that can itself
+        throw is the worst failure mode there is: the handler catches the
+        original fault, then the render fails too, Express falls through to its
+        built-in handler, and the visitor gets a bare "Internal Server Error"
+        with the real cause buried in the log.
+
+        `currentUrl` comes from the context middleware, which never runs when
+        the database is unreachable - exactly when a 500 is most likely.
+      %>
+      <a href="<%= helpers.url(typeof currentUrl !== 'undefined' && currentUrl ? currentUrl : '/') %>" class="btn btn-primary btn-lg">
         <svg><use href="#i-refresh"/></svg>
         Try again
       </a>

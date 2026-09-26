@@ -1,3 +1,30 @@
+<%#
+  Safe defaults for every local this layout reads.
+
+  These normally come from the context middleware - which queries the database,
+  so it never runs when the database is unreachable. That is precisely when an
+  error page has to render, and without these defaults the LAYOUT throws: the
+  handler catches the original fault, then the render fails too, Express falls
+  through to its built-in handler, and the visitor sees a bare
+  "Internal Server Error" with the real cause buried in the log.
+
+  A layout must never depend on middleware having succeeded.
+%>
+<%
+  var site = typeof site !== 'undefined' && site ? site : { name: 'WooBD.Com', tagline: '', description: '', email: '', phone: '', whatsapp: '', whatsappLink: '', address: '' };
+  var seo = Object.assign(
+    { title: site.name, description: site.description || '', keywords: '', robots: 'index,follow', canonical: '', ogImage: '' },
+    typeof seo !== 'undefined' && seo ? seo : {}
+  );
+  var defaultColorMode = typeof defaultColorMode !== 'undefined' && defaultColorMode ? defaultColorMode : 'light';
+  var pageTitle = typeof pageTitle !== 'undefined' ? pageTitle : '';
+  var pageDescription = typeof pageDescription !== 'undefined' ? pageDescription : '';
+  var pageRobots = typeof pageRobots !== 'undefined' ? pageRobots : '';
+  var pageCanonical = typeof pageCanonical !== 'undefined' ? pageCanonical : '';
+  var adminPath = typeof adminPath !== 'undefined' && adminPath ? adminPath : 'dev-cp';
+  var staff = typeof staff !== 'undefined' ? staff : null;
+  var pageSubtitle = typeof pageSubtitle !== 'undefined' ? pageSubtitle : '';
+%>
 <!DOCTYPE html>
 <html lang="en" data-theme="<%= defaultColorMode %>">
 <head>
