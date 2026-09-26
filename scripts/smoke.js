@@ -1061,6 +1061,9 @@ async function checkAdminSettings() {
     captcha_on_contact: after === '1' ? '1' : '',
     captcha_site_key: '',
     captcha_secret_key: '',
+    // Select fields must be posted too: the save validates them against their
+    // options, so an omitted one is rejected rather than left unchanged.
+    captcha_mode: 'invisible',
     admin_path_slug: ADMIN_SLUG,
     max_login_attempts: '5',
     lockout_minutes: '15',
@@ -1113,6 +1116,9 @@ async function checkAdminSettings() {
     captcha_on_contact: before === '1' ? '1' : '',
     captcha_site_key: '',
     captcha_secret_key: '',
+    // Also required, or the restore POST is rejected and the flipped value
+    // stays flipped - which makes the next run start from a different state.
+    captcha_mode: 'invisible',
     admin_path_slug: ADMIN_SLUG,
     max_login_attempts: '5',
     lockout_minutes: '15',

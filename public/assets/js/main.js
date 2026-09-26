@@ -885,6 +885,62 @@
     });
   }
 
+  /**
+   * Invisible reCAPTCHA.
+   *
+   * The widget renders no box, so it cannot submit the form itself - it has to
+   * be told when to run. This intercepts the submit, asks Google for a token,
+   * and re-submits once the token arrives.
+   *
+   * `onRecaptchaSolved` is a global because the reCAPTCHA script calls it by
+   * name from the widget's data-callback attribute.
+   */
+  var pendingCaptchaForm = null;
+
+  window.onRecaptchaSolved = function () {
+    if (!pendingCaptchaForm) return;
+    var form = pendingCaptchaForm;
+    pendingCaptchaForm = null;
+    // Set a flag rather than calling submit() directly, so the form's own
+    // submit handlers run and validation still applies.
+    form.dataset.recaptchaPassed = '1';
+    form.requestSubmit ? form.requestSubmit() : form.submit();
+  };
+
+  function initInvisibleCaptcha() {
+    var widgets = $$('.g-recaptcha[data-size="invisible"]');
+    if (!widgets.length) return;
+
+    widgets.forEach(function (widget) {
+      var form = widget.closest('form');
+      if (!form) return;
+
+      form.addEventListener('submit', function (event) {
+        // Already verified - let it through.
+        if (form.dataset.recaptchaPassed === '1') return;
+
+        if (typeof window.grecaptcha === 'undefined' || !window.grecaptcha.execute) {
+          // The script did not load - a blocker, or offline. Let the submit
+          // through rather than trapping the visitor on a form they cannot
+          // send; the server still verifies the token it never received.
+          return;
+        }
+
+        event.preventDefault();
+        pendingCaptchaForm = form;
+
+        try {
+          window.grecaptcha.execute();
+        } catch (err) {
+          // If execution fails, do not leave them stuck.
+          pendingCaptchaForm = null;
+          form.dataset.recaptchaPassed = '1';
+          form.requestSubmit ? form.requestSubmit() : form.submit();
+        }
+      });
+    });
+  }
+
   function boot() {
     initTheme();
     initHeader();
@@ -900,6 +956,7 @@
     initAlerts();
     initChat();
     initCarousel();
+    initInvisibleCaptcha();
   }
 
   if (document.readyState === 'loading') {

@@ -87,7 +87,14 @@
 
   <main class="admin-auth-card">
     <div class="admin-auth-brand">
-      <img src="<%= site.logoDark %>" alt="<%= site.name %>">
+      <%#
+        Both variants, swapped by CSS on the theme - same mechanism as the site
+        header. This used to hardcode site.logoDark, which is the artwork drawn
+        for a dark background: on the default light theme it put light-coloured
+        artwork on a light card and the logo all but vanished.
+      %>
+      <img src="<%= site.logoLight %>" alt="<%= site.name %>" class="logo-for-light">
+      <img src="<%= site.logoDark %>" alt="<%= site.name %>" class="logo-for-dark">
       <h1>Staff sign in</h1>
       <p>Restricted area — authorised personnel only.</p>
     </div>

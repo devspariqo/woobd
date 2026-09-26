@@ -113,10 +113,8 @@
   </div>
 
   <% if (captcha.enabled && settings.captcha_on_signup === '1') { %>
-    <div class="form-group">
-      <div class="g-recaptcha" data-sitekey="<%= captcha.siteKey %>"></div>
-    </div>
-    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <%- include('../partials/recaptcha', { captcha: { siteKey: captcha.siteKey, mode: captcha.mode } }) %>
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
   <% } %>
 
   <button type="submit" class="btn btn-primary btn-block btn-lg">

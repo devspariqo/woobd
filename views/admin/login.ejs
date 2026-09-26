@@ -40,10 +40,7 @@
   </div>
 
   <% if (showCaptcha) { %>
-    <div class="recaptcha-wrap">
-      <div class="g-recaptcha" data-sitekey="<%= c.siteKey %>"></div>
-    </div>
-  <% } %>
+    <%- include('../partials/recaptcha', { captcha: { siteKey: c.siteKey, mode: captcha.mode } }) %><% } %>
 
   <button type="submit" class="btn btn-primary btn-block btn-lg">
     Sign in

@@ -275,6 +275,10 @@ function viewContext() {
             // showed no challenge on it at all.
             settings.getBool('captcha_on_contact')),
         siteKey: captchaSiteKey,
+        // 'invisible' renders no box; 'checkbox' is the classic tick box. Any
+        // value other than the two known modes falls back to invisible, so a
+        // typo cannot leave a form unprotected by rendering nothing.
+        mode: settings.get('captcha_mode') === 'checkbox' ? 'checkbox' : 'invisible',
       };
 
       res.locals.googleAuth = {

@@ -819,9 +819,13 @@ select.form-control {
 .brand img { height: auto; max-height: 46px; width: auto; }
 
 /* Swap the logo asset with the theme, so one <img> serves both modes. */
-.brand .logo-for-dark { display: none; }
-[data-theme='dark'] .brand .logo-for-light { display: none; }
-[data-theme='dark'] .brand .logo-for-dark { display: block; }
+/* Theme-aware logo swap.
+   Both variants sit in the DOM and CSS picks one, so the right artwork shows
+   immediately without waiting for JavaScript to run. Scoped globally rather
+   than to `.brand`, so the admin sign-in card can use the same mechanism. */
+.logo-for-dark { display: none; }
+[data-theme='dark'] .logo-for-light { display: none; }
+[data-theme='dark'] .logo-for-dark { display: block; }
 
 .nav { display: flex; align-items: center; gap: 3px; }
 

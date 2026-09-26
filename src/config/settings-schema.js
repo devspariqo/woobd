@@ -129,7 +129,17 @@ const SETTINGS = [
   { key: 'captcha_on_signup', type: 'boolean', group: 'security', default: '1', public: true, label: 'CAPTCHA on customer sign up', help: 'Show the reCAPTCHA checkbox on the customer sign-up form.' },
   { key: 'captcha_on_admin', type: 'boolean', group: 'security', default: '1', public: true, label: 'CAPTCHA on admin login', help: 'Show the reCAPTCHA checkbox on this admin panel login page.' },
   { key: 'captcha_on_contact', type: 'boolean', group: 'security', default: '1', public: true, label: 'CAPTCHA on contact form', help: 'Show the reCAPTCHA checkbox on the public contact form.' },
-  { key: 'captcha_site_key', type: 'text', group: 'security', default: '', public: true, label: 'reCAPTCHA site key', help: 'Public key from your Google reCAPTCHA v2 (checkbox) registration. Safe to expose to browsers.' },
+  { key: 'captcha_site_key', type: 'text', group: 'security', default: '', public: true, label: 'reCAPTCHA site key', help: 'Public key from your Google reCAPTCHA v2 registration. Safe to expose to browsers.' },
+  {
+    key: 'captcha_mode',
+    type: 'select',
+    group: 'security',
+    default: 'invisible',
+    public: true,
+    label: 'reCAPTCHA style',
+    options: ['invisible', 'checkbox'],
+    help: 'Invisible shows no box — the challenge only appears if Google is unsure. It needs a key registered as "reCAPTCHA v2 - Invisible". Choose "checkbox" if your key is the standard tick-box type.',
+  },
   { key: 'captcha_secret_key', type: 'text', group: 'security', default: '', public: false, label: 'reCAPTCHA secret key', help: 'Private key from the same registration. Never sent to the browser. Leave blank to keep the saved value.' },
   { key: 'force_https', type: 'boolean', group: 'security', default: '1', public: false, label: 'Force HTTPS redirect', help: 'Redirect plain-HTTP visitors to HTTPS. Leave on in production; it has no effect on localhost.' },
 

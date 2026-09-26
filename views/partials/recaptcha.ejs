@@ -1,0 +1,35 @@
+<%#
+  reCAPTCHA widget.
+
+  Expects `captcha` = { siteKey, mode }. Renders nothing when no site key is
+  configured, so a form never shows a broken widget.
+
+  Two modes, both reCAPTCHA v2:
+
+    checkbox  - the familiar "I'm not a robot" box. Works with a standard v2 key.
+    invisible - no box at all. The challenge appears only when Google is unsure,
+                so a normal visitor sees nothing. Needs a key registered as
+                "reCAPTCHA v2 - Invisible" in the Google admin console; a
+                checkbox key will not render in this mode.
+
+  Invisible mode cannot submit on its own, so it calls a global callback which
+  main.js wires up to the form it sits in.
+%>
+<% if (captcha && captcha.siteKey) { %>
+  <% if (captcha.mode === 'invisible') { %>
+    <div class="recaptcha-wrap">
+      <div class="g-recaptcha"
+           data-sitekey="<%= captcha.siteKey %>"
+           data-size="invisible"
+           data-badge="bottomright"
+           data-callback="onRecaptchaSolved"></div>
+      <p class="form-hint" style="text-align:center">
+        Protected by reCAPTCHA. No action needed — verification is automatic.
+      </p>
+    </div>
+  <% } else { %>
+    <div class="recaptcha-wrap">
+      <div class="g-recaptcha" data-sitekey="<%= captcha.siteKey %>"></div>
+    </div>
+  <% } %>
+<% } %>
