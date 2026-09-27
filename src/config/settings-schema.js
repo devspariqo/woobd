@@ -137,6 +137,31 @@ const SETTINGS = [
   { key: 'hero_video_loop', type: 'boolean', group: 'homepage', default: '1', public: true, label: 'Loop the hero video' },
   { key: 'hero_video_controls', type: 'boolean', group: 'homepage', default: '1', public: true, label: 'Show video controls' },
   { key: 'trustbar_title', type: 'text', group: 'homepage', default: 'Trusted by growing brands across Bangladesh', public: true, label: 'Trust bar title' },
+
+  // --- Pricing section -----------------------------------------------------
+  // The term toggle above the package cards. Two discounts, applied to the
+  // monthly price over the term, so each card can show a monthly equivalent
+  // rather than a lump sum - which is what the visitor is actually comparing.
+  {
+    key: 'pricing_show_terms',
+    type: 'boolean',
+    group: 'homepage',
+    default: '1',
+    public: true,
+    label: 'Show the term toggle on packages',
+    help: 'The Monthly / 6 Months / Yearly switch above the package cards.',
+  },
+  { key: 'pricing_6mo_discount', type: 'number', group: 'homepage', default: '10', public: true, label: '6-month discount (%)', help: 'Shown as the saving on the 6 Months option.' },
+  { key: 'pricing_12mo_discount', type: 'number', group: 'homepage', default: '25', public: true, label: 'Yearly discount (%)', help: 'A package with its own yearly discount uses that instead.' },
+  {
+    key: 'pricing_popular_index',
+    type: 'number',
+    group: 'homepage',
+    default: '3',
+    public: true,
+    label: 'Highlight which package card',
+    help: 'Card number to highlight, counting from 1. Set 0 for none. Four cards with the third highlighted is the usual arrangement.',
+  },
   { key: 'about_title', type: 'text', group: 'homepage', default: 'A design studio that understands Bangladeshi e-commerce', public: true, label: 'About title' },
   { key: 'about_text', type: 'textarea', group: 'homepage', default: 'Since day one we have focused on one thing: online stores that convert. We handle design, development, payment integration and post-launch support so you can focus on sourcing and selling.', public: true, label: 'About text' },
   { key: 'about_image', type: 'file', group: 'homepage', default: '', public: true, label: 'About image' },

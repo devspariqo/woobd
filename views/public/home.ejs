@@ -99,7 +99,20 @@
 <% } %>
 
 <%# ---------------------------------------------------- SERVICES %>
-<section class="section section-alt">
+<%
+  // Term toggle figures, resolved once for the whole section.
+  var sixDiscount = Math.max(0, Math.min(90, Number(settings.pricing_6mo_discount) || 0));
+  var twelveDiscount = Math.max(0, Math.min(90, Number(settings.pricing_12mo_discount) || 0));
+  var popularIndex = Number(settings.pricing_popular_index) || 0;
+  var showTerms = settings.pricing_show_terms === '1';
+
+  // Four cards, the number the layout is designed around. Showing every active
+  // package turns a pricing section into a catalogue and pushes the call to
+  // action below the fold; the rest are one click away.
+  var shown = services.slice(0, 4);
+  var hasRecurring = shown.some(function (s) { return s.billing_cycle !== 'one_time'; });
+%>
+<section class="section section-alt" id="packages">
   <div class="container">
     <div class="section-head" data-reveal>
       <span class="eyebrow">Our Packages</span>
@@ -108,9 +121,37 @@
     </div>
 
     <% if (services.length) { %>
-      <div class="grid grid-3">
-        <% services.forEach(function (service) { %>
-          <%- include('../partials/service-card', { service: service }) %>
+      <% if (showTerms && hasRecurring) { %>
+        <%
+          // Only offer a term that actually saves the visitor something, so the
+          // control never advertises a discount that does not exist.
+          var terms = [{ key: 'monthly', label: 'Monthly', save: 0 }];
+          if (sixDiscount > 0) terms.push({ key: 'term6', label: '6 Months', save: sixDiscount });
+          if (twelveDiscount > 0) terms.push({ key: 'term12', label: 'Yearly', save: twelveDiscount });
+        %>
+        <% if (terms.length > 1) { %>
+          <div class="term-toggle" data-term-toggle role="group" aria-label="Billing period">
+            <% terms.forEach(function (term, i) { %>
+              <button type="button"
+                      class="term-option<%= i === 0 ? ' is-active' : '' %>"
+                      data-term="<%= term.key %>"
+                      aria-pressed="<%= i === 0 ? 'true' : 'false' %>">
+                <%= term.label %>
+                <% if (term.save > 0) { %><span class="term-save">Save <%= term.save %>%</span><% } %>
+              </button>
+            <% }); %>
+          </div>
+        <% } %>
+      <% } %>
+
+      <div class="price-grid<%= shown.length === 4 ? ' price-grid-4' : '' %>">
+        <% shown.forEach(function (service, i) { %>
+          <%- include('../partials/pricing-card', {
+            service: service,
+            index: i + 1,
+            popular: popularIndex === i + 1,
+            discounts: { six: sixDiscount, twelve: twelveDiscount }
+          }) %>
         <% }); %>
       </div>
 

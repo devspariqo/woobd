@@ -1,0 +1,108 @@
+<%#
+  A package card for the homepage pricing section.
+
+  Follows the reference design: name, one-line summary, a large monthly figure,
+  a full-width call to action, then the feature list. No image - the packages
+  are compared on what they include, and a photo per card only pushes the price
+  further down the page.
+
+  Expects:
+    service     the row
+    index       1-based position, used to pick the highlighted card
+    popular     true when this card is the highlighted one
+    discounts   { six, twelve } percentages for the term toggle
+
+  Prices are emitted three times as data attributes and the visible figure is
+  swapped by JS, so switching term does not need a round trip.
+%>
+<%
+  var price = Number(service.price) || 0;
+  var hasSale = service.sale_price && Number(service.sale_price) > 0 && Number(service.sale_price) < price;
+  if (hasSale) price = Number(service.sale_price);
+
+  var features = helpers.parseJson(service.features, []);
+
+  // The global term discounts, not the package's own yearly figure.
+  //
+  // The toggle above the cards advertises one saving for the whole section, and
+  // a package carrying its own percentage would quietly show a different number
+  // - the switch would say "Save 25%" over a card computing 10%. A section-level
+  // offer has to be uniform to be honest. A package's own yearly discount still
+  // applies on its detail page, where it is shown explicitly.
+  var yearlyDiscount = discounts.twelve;
+  var sixDiscount = discounts.six;
+
+  // Rounded to whole currency units. A discount produces figures like 899.10
+  // and 749.25, and no one quotes a price to two decimal places on a pricing
+  // card - it reads as a calculation rather than an offer.
+  var monthly = Math.round(price);
+  var sixMonthly = Math.round(price * (1 - sixDiscount / 100));
+  var yearlyMonthly = Math.round(price * (1 - yearlyDiscount / 100));
+
+  var isRecurring = service.billing_cycle !== 'one_time';
+  var minMonths = Number(service.min_months) || 1;
+%>
+<article class="price-card<%= popular ? ' is-popular' : '' %>" data-reveal>
+  <% if (popular) { %><span class="price-flag">Most popular</span><% } %>
+
+  <header class="price-head">
+    <h3><%= service.title %></h3>
+    <p><%= helpers.excerpt(service.short_description || service.description, 64) %></p>
+  </header>
+
+  <div class="price-amount">
+    <% if (isRecurring) { %>
+      <%
+        // The full formatted string for each term, not a number: the toggle
+        // swaps them verbatim, so the currency symbol and separators stay
+        // identical to what the server would have rendered.
+      %>
+      <span class="price-value"
+            data-monthly="<%= helpers.money(monthly, site.currency) %>"
+            data-term6="<%= helpers.money(sixMonthly, site.currency) %>"
+            data-term12="<%= helpers.money(yearlyMonthly, site.currency) %>"><%= helpers.money(monthly, site.currency) %></span>
+      <span class="price-cycle">/ month</span>
+    <% } else { %>
+      <span class="price-value"><%= helpers.money(monthly, site.currency) %></span>
+      <span class="price-cycle">one-off</span>
+    <% } %>
+  </div>
+
+  <% if (hasSale) { %>
+    <p class="price-was">Was <s><%= helpers.money(service.price, site.currency) %></s></p>
+  <% } %>
+
+  <a href="<%= helpers.url('/services/' + service.slug) %>" class="price-cta">
+    Get started
+    <svg><use href="#i-arrow-right"/></svg>
+  </a>
+
+  <ul class="price-features">
+    <% features.forEach(function (feature) { %>
+      <li>
+        <span class="price-tick"><svg><use href="#i-check"/></svg></span>
+        <%= feature %>
+      </li>
+    <% }); %>
+  </ul>
+
+  <%#
+    The inset box along the bottom. The reference uses it for per-order fees;
+    these packages do not have any, so it carries the term information instead -
+    the same visual weight, and it answers the question the toggle above raises.
+  %>
+  <% if (isRecurring && (minMonths > 1 || sixDiscount > 0 || yearlyDiscount > 0)) { %>
+    <div class="price-terms">
+      <span class="price-terms-label">Term &amp; savings</span>
+      <% if (minMonths > 1) { %>
+        <div class="price-terms-row"><span>Minimum</span><strong><%= minMonths %> months</strong></div>
+      <% } %>
+      <% if (sixDiscount > 0) { %>
+        <div class="price-terms-row is-save"><span>6 months</span><strong>Save <%= sixDiscount %>%</strong></div>
+      <% } %>
+      <% if (yearlyDiscount > 0) { %>
+        <div class="price-terms-row is-save"><span>12 months</span><strong>Save <%= yearlyDiscount %>%</strong></div>
+      <% } %>
+    </div>
+  <% } %>
+</article>

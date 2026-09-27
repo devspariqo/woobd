@@ -1002,6 +1002,61 @@
 
 
   /**
+   * Term toggle on the packages section.
+   *
+   * Each price carries the formatted string for every term, so switching is a
+   * text swap - no round trip, and the currency symbol and separators stay
+   * exactly as the server rendered them.
+   *
+   * The choice is remembered for the session, so a visitor who picked Yearly on
+   * the homepage does not have to pick it again after following a link back.
+   */
+  function initTermToggle() {
+    var toggle = $('[data-term-toggle]');
+    if (!toggle) return;
+
+    var buttons = $$('.term-option', toggle);
+    var prices = $$('.price-value[data-monthly]');
+    if (!buttons.length || !prices.length) return;
+
+    function apply(term) {
+      buttons.forEach(function (button) {
+        var active = button.getAttribute('data-term') === term;
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+
+      prices.forEach(function (price) {
+        var value = price.getAttribute('data-' + term);
+        if (value) price.textContent = value;
+      });
+
+      try {
+        window.sessionStorage.setItem('woobd-term', term);
+      } catch (err) {
+        // Private mode, or storage disabled. Not worth reporting.
+      }
+    }
+
+    buttons.forEach(function (button) {
+      button.addEventListener('click', function () {
+        apply(button.getAttribute('data-term'));
+      });
+    });
+
+    // Restore a previous choice, but only if that term is on offer here.
+    var saved = null;
+    try {
+      saved = window.sessionStorage.getItem('woobd-term');
+    } catch (err) {
+      saved = null;
+    }
+
+    var available = buttons.map(function (b) { return b.getAttribute('data-term'); });
+    if (saved && available.indexOf(saved) !== -1 && saved !== 'monthly') apply(saved);
+  }
+
+  /**
    * Hero video.
    *
    * Autoplay is a request, not a guarantee: browsers block it for a video with
@@ -1041,6 +1096,7 @@
     initCarousel();
     initInvisibleCaptcha();
     initHeroVideo();
+    initTermToggle();
   }
 
   if (document.readyState === 'loading') {

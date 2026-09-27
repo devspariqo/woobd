@@ -951,7 +951,11 @@ INSERT INTO `settings` (`id`, `setting_key`, `setting_value`, `setting_group`, `
 (26061, 'hero_video_loop', '1', 'homepage', 'boolean', '2026-09-26 15:22:38'),
 (26062, 'hero_video_controls', '1', 'homepage', 'boolean', '2026-09-26 15:22:38'),
 (26064, 'cta_bg_overlay', 'dark-blur', 'homepage', 'select', '2026-09-27 06:37:35'),
-(26063, 'cta_bg_image', '', 'homepage', 'file', '2026-09-27 06:37:35');
+(26063, 'cta_bg_image', '', 'homepage', 'file', '2026-09-27 06:37:35'),
+(26068, 'pricing_popular_index', '3', 'homepage', 'number', '2026-09-27 08:37:25'),
+(26067, 'pricing_12mo_discount', '25', 'homepage', 'number', '2026-09-27 08:37:25'),
+(26066, 'pricing_6mo_discount', '10', 'homepage', 'number', '2026-09-27 08:37:25'),
+(26065, 'pricing_show_terms', '1', 'homepage', 'boolean', '2026-09-27 08:37:25');
 
 -- --------------------------------------------------------
 

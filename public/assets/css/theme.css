@@ -1969,6 +1969,286 @@ body.no-scroll { overflow: hidden; }
 .split-service { align-items: start; grid-template-columns: 1.6fr 1fr; }
 
 /* --------------------------------------------------------------------------
+   Pricing section (homepage packages)
+
+   A segmented term switch above a row of cards, with one card inverted to mark
+   it as the recommended one. Everything is driven by custom properties so the
+   highlighted card is a single class rather than a second set of rules.
+   -------------------------------------------------------------------------- */
+.term-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px;
+  margin: 0 auto 42px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  /* Centred without a wrapper: the section head above is centred too, so the
+     switch lines up with it. */
+  display: flex;
+  width: max-content;
+}
+
+.term-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 20px;
+  border-radius: var(--radius-pill);
+  font-size: .875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+
+.term-option:hover { color: var(--text); }
+
+.term-option.is-active {
+  background: var(--primary);
+  color: #fff;
+}
+
+.term-save {
+  font-size: .6875rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  color: var(--success);
+}
+
+.term-option.is-active .term-save { color: rgba(255, 255, 255, .92); }
+
+.price-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 22px;
+  align-items: stretch;
+}
+
+/* Four cards get an explicit four-column track so they sit on one row on a
+   desktop, rather than auto-fit leaving an orphan on a second row. */
+@media (min-width: 1100px) {
+  .price-grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+.price-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 30px 26px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition: transform var(--t), box-shadow var(--t), border-color var(--t);
+}
+
+.price-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--border-strong);
+}
+
+.price-head h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: var(--text);
+}
+
+.price-head p {
+  font-size: .875rem;
+  line-height: 1.5;
+  color: var(--text-soft);
+  margin: 0;
+  /* Two lines keeps every card's price on the same baseline down the row,
+     whatever length the summary happens to be. */
+  min-height: 2.6em;
+}
+
+.price-amount {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin: 20px 0 6px;
+}
+
+.price-value {
+  font-size: 2.125rem;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  color: var(--text);
+  /* Tabular figures stop the price jittering sideways when the term toggle
+     changes the number. */
+  font-variant-numeric: tabular-nums;
+}
+
+.price-cycle { font-size: .875rem; color: var(--text-soft); }
+.price-was { font-size: .8125rem; color: var(--text-soft); margin: 0 0 6px; }
+
+.price-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 46px;
+  margin: 20px 0 24px;
+  padding: 12px 20px;
+  border-radius: var(--radius-pill);
+  background: var(--primary);
+  color: #fff;
+  font-size: .9375rem;
+  font-weight: 600;
+  text-align: center;
+  transition: background var(--t-fast), transform var(--t-fast);
+}
+
+.price-cta:hover { background: var(--primary-dark); color: #fff; transform: translateY(-1px); }
+.price-cta svg { width: 17px; height: 17px; }
+
+.price-features {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  /* Pushes the term box to the bottom so every card's box lines up. */
+  flex: 1;
+}
+
+.price-features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: .875rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.price-tick {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+  background: var(--primary);
+  color: #fff;
+}
+
+.price-tick svg { width: 11px; height: 11px; }
+
+.price-terms {
+  margin-top: 24px;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: var(--bg-alt);
+}
+
+.price-terms-label {
+  display: block;
+  font-size: .6875rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  margin-bottom: 9px;
+}
+
+.price-terms-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: .8125rem;
+  color: var(--text-muted);
+  padding: 3px 0;
+}
+
+.price-terms-row strong { color: var(--text); font-weight: 700; }
+.price-terms-row.is-save strong { color: var(--success); }
+
+/* --- The highlighted card ------------------------------------------------
+   Inverted rather than outlined: at four cards across, a border alone does not
+   read as a recommendation from any distance. */
+.price-card.is-popular {
+  background: var(--primary);
+  border-color: var(--primary);
+  box-shadow: 0 18px 48px rgba(91, 33, 240, .28);
+  /* Slightly taller than its neighbours, so the row reads as a peak rather
+     than a flat line with one odd colour. */
+  margin-top: -14px;
+  margin-bottom: -14px;
+  padding-top: 44px;
+}
+
+.price-card.is-popular .price-head h3,
+.price-card.is-popular .price-value { color: #fff; }
+.price-card.is-popular .price-head p,
+.price-card.is-popular .price-cycle,
+.price-card.is-popular .price-was { color: rgba(255, 255, 255, .82); }
+.price-card.is-popular .price-features li { color: rgba(255, 255, 255, .94); }
+
+.price-card.is-popular .price-cta {
+  background: #fff;
+  color: var(--primary);
+}
+.price-card.is-popular .price-cta:hover { background: rgba(255, 255, 255, .9); color: var(--primary-dark); }
+
+.price-card.is-popular .price-tick {
+  background: rgba(255, 255, 255, .22);
+  color: #fff;
+}
+
+.price-card.is-popular .price-terms { background: rgba(0, 0, 0, .18); }
+.price-card.is-popular .price-terms-label,
+.price-card.is-popular .price-terms-row { color: rgba(255, 255, 255, .84); }
+.price-card.is-popular .price-terms-row strong { color: #fff; }
+.price-card.is-popular .price-terms-row.is-save strong { color: #b9f6ce; }
+
+.price-flag {
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 16px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--primary);
+  font-size: .6875rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: var(--shadow-sm);
+}
+
+@media (max-width: 1100px) {
+  /* Two columns rather than four: the cards stay readable and the highlighted
+     one keeps its offset. */
+  .price-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .price-grid { grid-template-columns: 1fr; gap: 18px; }
+  /* The negative margins would overlap the cards above and below on one
+     column, so the emphasis becomes the shadow alone. */
+  .price-card.is-popular { margin-top: 0; margin-bottom: 0; padding-top: 30px; }
+  .term-toggle { width: 100%; justify-content: center; flex-wrap: wrap; }
+  .term-option { padding: 8px 13px; font-size: .8125rem; }
+  .term-save { display: none; }
+}
+
+/* --------------------------------------------------------------------------
    CTA background image
 
    Optional. When set, the section keeps its gradient as the base and the photo
