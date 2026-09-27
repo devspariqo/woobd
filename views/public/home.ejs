@@ -109,7 +109,17 @@
   // Four cards, the number the layout is designed around. Showing every active
   // package turns a pricing section into a catalogue and pushes the call to
   // action below the fold; the rest are one click away.
-  var shown = services.slice(0, 4);
+  //
+  // Packages with no description and no features are skipped. A half-filled row
+  // renders as a card with a name and a price and nothing else, which reads as a
+  // broken page rather than a package - and there is always another package
+  // worth showing in its place.
+  var presentable = services.filter(function (s) {
+    var feats = helpers.parseJson(s.features, []);
+    return feats.length > 0 || (s.short_description || s.description || '').trim().length > 0;
+  });
+
+  var shown = presentable.slice(0, 4);
   var hasRecurring = shown.some(function (s) { return s.billing_cycle !== 'one_time'; });
 %>
 <section class="section section-alt" id="packages">

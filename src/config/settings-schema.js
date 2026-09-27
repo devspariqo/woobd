@@ -33,6 +33,25 @@ const SETTINGS = [
   { key: 'logo_footer', type: 'file', group: 'branding', default: '', public: true, label: 'Footer logo' },
   { key: 'favicon', type: 'file', group: 'branding', default: '', public: true, label: 'Favicon' },
   { key: 'logo_width', type: 'number', group: 'branding', default: '160', public: true, label: 'Logo width (px)' },
+  {
+    key: 'auth_bg_image',
+    type: 'file',
+    group: 'branding',
+    default: '',
+    public: true,
+    label: 'Sign-in page background image',
+    help: 'Behind the panel on the left of the sign-in and sign-up pages. A portrait or square image works best. It is darkened automatically so the white text on top stays readable — leave empty to keep the brand gradient.',
+  },
+  {
+    key: 'auth_bg_overlay',
+    type: 'select',
+    group: 'branding',
+    default: 'dark',
+    public: true,
+    label: 'Sign-in background treatment',
+    options: ['dark', 'heavy', 'light'],
+    help: 'How heavily to darken the image. Use a heavier option if your photo is light or busy.',
+  },
 
   // ---------------- Theme / colours ----------------
   { key: 'theme_primary', type: 'text', group: 'theme', default: '#5b21f0', public: true, label: 'Primary colour' },

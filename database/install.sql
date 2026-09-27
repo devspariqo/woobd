@@ -955,7 +955,9 @@ INSERT INTO `settings` (`id`, `setting_key`, `setting_value`, `setting_group`, `
 (26068, 'pricing_popular_index', '3', 'homepage', 'number', '2026-09-27 08:37:25'),
 (26067, 'pricing_12mo_discount', '25', 'homepage', 'number', '2026-09-27 08:37:25'),
 (26066, 'pricing_6mo_discount', '10', 'homepage', 'number', '2026-09-27 08:37:25'),
-(26065, 'pricing_show_terms', '1', 'homepage', 'boolean', '2026-09-27 08:37:25');
+(26065, 'pricing_show_terms', '1', 'homepage', 'boolean', '2026-09-27 08:37:25'),
+(26070, 'auth_bg_overlay', 'dark', 'branding', 'select', '2026-09-27 09:04:36'),
+(26069, 'auth_bg_image', '', 'branding', 'file', '2026-09-27 09:04:36');
 
 -- --------------------------------------------------------
 
