@@ -272,6 +272,13 @@ exports.signinSubmit = async (req, res, next) => {
     req.session.regenerate((regenerateErr) => {
       if (regenerateErr) return next(regenerateErr);
 
+      // "Keep me signed in" decides how long the session survives. Checked:
+      // the configured lifetime, a week by default. Unchecked: twelve hours.
+      // Set after regenerate(), because regenerating resets the cookie.
+      req.session.cookie.maxAge = req.body.remember === '1'
+        ? config.session.maxAge
+        : 1000 * 60 * 60 * 12;
+
       req.session.customer = {
         id: customer.id,
         name: customer.name,

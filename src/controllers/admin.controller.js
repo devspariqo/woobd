@@ -87,6 +87,10 @@ exports.loginSubmit = async (req, res, next) => {
     const username = clean.str(req.body.username, 60);
     const password = String(req.body.password || '');
     const next = clean.path(req.body.next, 300);
+    // An unchecked checkbox submits nothing at all, so this is presence, not
+    // value. Carried through the error re-render so a failed attempt does not
+    // silently reset the operator's choice.
+    const remember = req.body.remember === '1';
 
     const render = (errors, status = 400) =>
       res.status(status).render('admin/login', {
@@ -94,7 +98,7 @@ exports.loginSubmit = async (req, res, next) => {
         pageTitle: 'Staff sign in',
         adminPath,
         errors,
-        form: { username },
+        form: { username, remember },
         showCaptcha: settings.getBool('captcha_on_admin') && Boolean(res.locals.captcha.siteKey),
         seo: { ...res.locals.seo, title: 'Staff sign in', robots: 'noindex,nofollow' },
       });
@@ -153,6 +157,18 @@ exports.loginSubmit = async (req, res, next) => {
 
     req.session.regenerate((err) => {
       if (err) return next(err);
+
+      // "Keep me signed in" decides how long the session survives.
+      //
+      // Checked: the configured session lifetime, which is a week by default.
+      // Unchecked: twelve hours - long enough not to interrupt a working day,
+      // short enough that a shared machine does not stay signed in overnight.
+      //
+      // Set after regenerate(), because regenerating resets the cookie.
+      req.session.cookie.maxAge = remember
+        ? config.session.maxAge
+        : 1000 * 60 * 60 * 12;
+
       req.session.staff = {
         id: staff.id,
         name: staff.name,

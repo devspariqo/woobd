@@ -39,6 +39,14 @@
     </div>
   </div>
 
+  <%# Matches the customer sign-in. Without it an operator on a shared machine
+      has no way to choose a short session, and one on their own has to sign in
+      again every day. %>
+  <label class="checkbox" style="margin-bottom:22px">
+    <input type="checkbox" name="remember" value="1" <%= form && form.remember ? 'checked' : '' %>>
+    <span>Keep me signed in on this device</span>
+  </label>
+
   <% if (showCaptcha) { %>
     <%- include('../partials/recaptcha', { captcha: { siteKey: c.siteKey, mode: captcha.mode } }) %><% } %>
 

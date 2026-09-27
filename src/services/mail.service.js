@@ -56,60 +56,148 @@ function resetTransport() {
   transporterKey = '';
 }
 
-/** The branded shell every message is wrapped in. Table-based for Outlook. */
-function wrapLayout({ title, body, ctaText, ctaUrl, footerNote }) {
+/**
+ * The branded shell every message is wrapped in.
+ *
+ * Table-based with inline styles, because that is the only thing Outlook,
+ * Gmail and Apple Mail all agree on. No external CSS, no flexbox, no grid.
+ *
+ * Design notes worth keeping:
+ *   - The header carries the LIGHT logo on white. `logo_light` is the artwork
+ *     drawn for a light background; the dark variant would disappear here. The
+ *     site's own name is the fallback when no logo is uploaded.
+ *   - A colour strip under the header ties the message to the brand without
+ *     putting the logo on a saturated field, where a light-background logo
+ *     would be invisible.
+ *   - The footer is the part people actually scroll to when they want to reply
+ *     or call, so it carries the full set rather than just an address.
+ */
+function wrapLayout({ title, body, ctaText, ctaUrl, footerNote, preheader }) {
   const primary = settings.get('theme_primary', '#5b21f0');
+  const primaryDark = settings.get('theme_primary_dark', '#4316c4');
   const siteName = settings.get('site_name', 'WooBD.Com');
   const siteUrl = config.app.url;
   const address = settings.get('office_address', '');
+  const email = settings.get('contact_email', '');
+  const phone = settings.get('contact_phone', '');
+  const whatsapp = settings.get('whatsapp_link', '');
+  const whatsappLabel = settings.get('whatsapp_number', '');
+  const facebook = settings.get('social_facebook', '');
+  const linkedin = settings.get('social_linkedin', '');
+  const instagram = settings.get('social_instagram', '');
+  const youtube = settings.get('social_youtube', '');
+
+  // Absolute, because a relative path is meaningless in an inbox.
+  const logoPath = settings.get('logo_light', '');
+  const logoUrl = logoPath
+    ? (/^https?:\/\//i.test(logoPath) ? logoPath : `${siteUrl}${helpers.url(logoPath)}`)
+    : '';
+
+  const socials = [
+    facebook && { label: 'Facebook', url: facebook },
+    linkedin && { label: 'LinkedIn', url: linkedin },
+    instagram && { label: 'Instagram', url: instagram },
+    youtube && { label: 'YouTube', url: youtube },
+  ].filter(Boolean);
+
+  // Shown in the inbox preview line next to the subject. Without it the client
+  // pulls whatever text it finds first, which is usually "View this in browser".
+  const preview = preheader || title;
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
 <title>${helpers.escapeHtml(title)}</title>
 </head>
-<body style="margin:0;padding:0;background:#f3f4f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f9;padding:28px 12px;">
+<body style="margin:0;padding:0;background:#eef0f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+
+  <div style="display:none;font-size:1px;color:#eef0f7;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${helpers.escapeHtml(preview)}</div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef0f7;padding:32px 12px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 4px 18px rgba(16,18,35,.06);">
+
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 6px 28px rgba(16,18,35,.09);">
+
+          <!-- Header: logo on white -->
           <tr>
-            <td style="background:${primary};padding:26px 32px;">
-              <a href="${siteUrl}" style="color:#ffffff;font-size:20px;font-weight:700;text-decoration:none;letter-spacing:-.2px;">${helpers.escapeHtml(siteName)}</a>
+            <td align="center" style="padding:30px 32px 22px;background:#ffffff;">
+              ${
+                logoUrl
+                  ? `<img src="${logoUrl}" alt="${helpers.escapeHtml(siteName)}" height="42" style="display:block;height:42px;width:auto;max-width:240px;border:0;outline:none;text-decoration:none;">`
+                  : `<span style="font-size:21px;font-weight:800;color:#101223;letter-spacing:-.3px;">${helpers.escapeHtml(siteName)}</span>`
+              }
             </td>
           </tr>
+
+          <!-- Brand strip -->
           <tr>
-            <td style="padding:32px;">
-              <h1 style="margin:0 0 16px;font-size:21px;line-height:1.35;color:#101223;font-weight:700;">${helpers.escapeHtml(title)}</h1>
-              <div style="font-size:15px;line-height:1.65;color:#3d4257;">${body}</div>
+            <td style="height:5px;line-height:5px;font-size:0;background:${primary};">&nbsp;</td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:34px 34px 8px;">
+              <h1 style="margin:0 0 18px;font-size:22px;line-height:1.35;color:#101223;font-weight:700;letter-spacing:-.2px;">${helpers.escapeHtml(title)}</h1>
+              <div style="font-size:15px;line-height:1.68;color:#3d4257;">${body}</div>
               ${
                 ctaText && ctaUrl
-                  ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px 0 6px;">
-                      <tr><td style="background:${primary};border-radius:9px;">
-                        <a href="${ctaUrl}" style="display:inline-block;padding:13px 26px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;">${helpers.escapeHtml(ctaText)}</a>
-                      </td></tr>
+                  ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0 4px;">
+                      <tr>
+                        <td style="background:${primary};border-radius:10px;box-shadow:0 4px 12px rgba(91,33,240,.24);">
+                          <a href="${ctaUrl}" style="display:inline-block;padding:14px 30px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;">${helpers.escapeHtml(ctaText)}</a>
+                        </td>
+                      </tr>
                      </table>`
                   : ''
               }
               ${
                 footerNote
-                  ? `<p style="margin:22px 0 0;font-size:13px;line-height:1.6;color:#767c94;">${footerNote}</p>`
+                  ? `<p style="margin:24px 0 0;padding-top:18px;border-top:1px solid #eceef6;font-size:13px;line-height:1.65;color:#767c94;">${footerNote}</p>`
                   : ''
               }
             </td>
           </tr>
+
+          <!-- Footer -->
           <tr>
-            <td style="padding:22px 32px;background:#f7f8fc;border-top:1px solid #e7e9f2;font-size:12.5px;line-height:1.6;color:#767c94;">
-              <strong style="color:#3d4257;">${helpers.escapeHtml(siteName)}</strong><br>
-              ${helpers.escapeHtml(address)}<br>
-              <a href="mailto:${helpers.escapeHtml(settings.get('contact_email'))}" style="color:${primary};text-decoration:none;">${helpers.escapeHtml(settings.get('contact_email'))}</a>
-              &nbsp;·&nbsp;
-              <a href="${settings.get('whatsapp_link')}" style="color:${primary};text-decoration:none;">${helpers.escapeHtml(settings.get('whatsapp_number'))}</a>
+            <td style="padding:26px 34px 30px;background:#f7f8fc;border-top:1px solid #e7e9f2;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="font-size:13px;line-height:1.7;color:#767c94;padding-bottom:14px;">
+                    <strong style="color:#101223;font-size:14px;">${helpers.escapeHtml(siteName)}</strong><br>
+                    ${address ? `${helpers.escapeHtml(address)}<br>` : ''}
+                    ${email ? `<a href="mailto:${helpers.escapeHtml(email)}" style="color:${primary};text-decoration:none;">${helpers.escapeHtml(email)}</a>` : ''}
+                    ${email && phone ? ' &nbsp;·&nbsp; ' : ''}
+                    ${phone ? `<a href="tel:${helpers.escapeHtml(String(phone).replace(/\s/g, ''))}" style="color:${primary};text-decoration:none;">${helpers.escapeHtml(phone)}</a>` : ''}
+                  </td>
+                </tr>
+                ${
+                  whatsapp || socials.length
+                    ? `<tr>
+                        <td style="padding-bottom:14px;font-size:13px;line-height:1.9;">
+                          ${whatsapp ? `<a href="${whatsapp}" style="color:${primary};text-decoration:none;font-weight:600;">WhatsApp${whatsappLabel ? ` ${helpers.escapeHtml(whatsappLabel)}` : ''}</a>` : ''}
+                          ${whatsapp && socials.length ? `<span style="color:#c3c7d6;"> &nbsp;·&nbsp; </span>` : ''}
+                          ${socials.map((s) => `<a href="${s.url}" style="color:${primary};text-decoration:none;font-weight:600;">${s.label}</a>`).join('<span style="color:#c3c7d6;"> &nbsp;·&nbsp; </span>')}
+                        </td>
+                      </tr>`
+                    : ''
+                }
+                <tr>
+                  <td style="padding-top:16px;border-top:1px solid #e7e9f2;font-size:12px;line-height:1.7;color:#9aa0b6;">
+                    <a href="${siteUrl}" style="color:${primaryDark};text-decoration:none;font-weight:600;">${helpers.escapeHtml(String(siteUrl).replace(/^https?:\/\//, '').replace(/\/$/, ''))}</a><br>
+                    You are receiving this because you have an account or placed an order with us.
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
+
         </table>
+
       </td>
     </tr>
   </table>
@@ -365,26 +453,79 @@ async function sendContactNotification(entry) {
   });
 }
 
+/**
+ * Tell the team a new order came in.
+ *
+ * Goes to the contact address plus every active staff account - admin, manager
+ * and editor. Relying on the contact address alone means an order sits unseen
+ * whenever that mailbox is not the one somebody checks.
+ *
+ * Recipients are de-duplicated, because the contact address is often also a
+ * staff account and nobody wants two copies.
+ */
 async function sendAdminNewOrder(order, customer) {
   if (!settings.getBool('notify_admin_new_order', true)) return { ok: false, skipped: true };
-  const to = settings.get('contact_email');
-  if (!to) return { ok: false, skipped: true };
+
+  const recipients = new Set();
+
+  const contactEmail = String(settings.get('contact_email', '') || '').trim();
+  if (contactEmail) recipients.add(contactEmail);
+
+  try {
+    // Lazy require: the user model pulls in the database pool, and mail is
+    // imported by things that must still load when the database is down.
+    const userModel = require('../models/user.model');
+    const staff = await userModel.listStaff({ perPage: 100, status: 'active' });
+
+    for (const member of staff.rows || []) {
+      const email = String(member.email || '').trim();
+      if (email) recipients.add(email);
+    }
+  } catch (err) {
+    // A staff lookup failure must not cost us the notification entirely - the
+    // contact address is still a valid recipient.
+    logger.warn('Could not list staff for the new-order notification', err);
+  }
+
+  if (!recipients.size) return { ok: false, skipped: true };
+
+  const rows = [
+    ['Order', order.order_number, true],
+    ['Customer', `${customer.name} <${customer.email}>`],
+    ['Package', order.service_title],
+    order.billing_cycle && order.billing_cycle !== 'one_time'
+      ? ['Billing', `${order.term_months || 1} months, ${order.billing_cycle}`]
+      : null,
+    order.domain_name ? ['Domain', order.domain_name] : null,
+    ['Total', helpers.money(order.total, settings.get('currency_symbol')), true],
+    ['Payment', String(order.payment_status || 'unpaid').replace(/_/g, ' ')],
+  ].filter(Boolean);
+
+  const detailTable = `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:14px;">
+    ${rows
+      .map(
+        ([label, value, strong]) =>
+          `<tr>
+             <td style="padding:10px 0;border-bottom:1px solid #eceef6;color:#767c94;width:120px;vertical-align:top;">${helpers.escapeHtml(label)}</td>
+             <td style="padding:10px 0;border-bottom:1px solid #eceef6;${strong ? 'font-weight:700;' : ''}">${helpers.escapeHtml(String(value))}</td>
+           </tr>`
+      )
+      .join('')}
+  </table>`;
+
   return send({
-    to,
-    subject: `New order ${order.order_number} - ${order.service_title}`,
+    to: [...recipients].join(', '),
+    subject: `New order ${order.order_number} — ${order.service_title}`,
     replyTo: customer.email,
     html: wrapLayout({
       title: 'A new order just came in',
-      body: `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:14px;">
-               <tr><td style="padding:8px 0;border-bottom:1px solid #eceef6;color:#767c94;width:110px;">Order</td><td style="padding:8px 0;border-bottom:1px solid #eceef6;font-weight:600;">${helpers.escapeHtml(order.order_number)}</td></tr>
-               <tr><td style="padding:8px 0;border-bottom:1px solid #eceef6;color:#767c94;">Customer</td><td style="padding:8px 0;border-bottom:1px solid #eceef6;">${helpers.escapeHtml(customer.name)} &lt;${helpers.escapeHtml(customer.email)}&gt;</td></tr>
-               <tr><td style="padding:8px 0;border-bottom:1px solid #eceef6;color:#767c94;">Package</td><td style="padding:8px 0;border-bottom:1px solid #eceef6;">${helpers.escapeHtml(order.service_title)}</td></tr>
-               <tr><td style="padding:8px 0;color:#767c94;">Total</td><td style="padding:8px 0;font-weight:700;">${helpers.money(order.total, settings.get('currency_symbol'))}</td></tr>
-             </table>`,
+      preheader: `${order.order_number} from ${customer.name} — ${helpers.money(order.total, settings.get('currency_symbol'))}`,
+      body: `<p style="margin:0 0 18px;">A new order has been placed and is waiting for review.</p>${detailTable}`,
       ctaText: 'Open the order',
       ctaUrl: `${config.app.url}${helpers.url(`/admin/orders/${order.id}`)}`,
+      footerNote: 'Replying to this email goes straight to the customer.',
     }),
-    text: `New order ${order.order_number} from ${customer.name}.`,
+    text: `New order ${order.order_number} from ${customer.name} <${customer.email}>. Total ${order.total}.`,
   });
 }
 
