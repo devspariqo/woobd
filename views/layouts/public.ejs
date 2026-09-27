@@ -55,13 +55,51 @@
 
   <% if (seo.verification) { %><meta name="google-site-verification" content="<%= seo.verification %>"><% } %>
 
-  <%# Fonts are loaded from Google Fonts with a preconnect; the fallback stack in
-      the CSS keeps text readable if the request is slow. %>
+  <%#
+    Warm the reCAPTCHA origins before the widget is needed.
+
+    The script itself is loaded at the bottom of the form's page, but the
+    handshake to google.com and the iframe from gstatic.com are two more
+    origins the browser has to resolve and connect to. Doing that here costs
+    nothing on pages without a captcha and saves a round trip on the ones with.
+  %>
+  <% if (captcha.enabled) { %>
+    <link rel="preconnect" href="https://www.google.com">
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <% } %>
+
+  <%#
+    Fonts, loaded without blocking the first paint.
+
+    A plain stylesheet link to fonts.googleapis.com is render-blocking against
+    a third-party origin: the browser will not paint until the CSS arrives and
+    it has discovered the font files behind it. On a slow mobile connection
+    that is several hundred milliseconds of blank screen, and it delays the
+    largest element on the page.
+
+    `media="print"` makes the browser fetch the sheet without applying it, so
+    it downloads in parallel and nothing waits on it. The onload swaps the
+    media and it applies the moment it lands. The noscript copy covers
+    JavaScript being off, where onload would never fire and the custom font
+    would never be used.
+
+    The swap is safe because the CSS names system-ui immediately after the
+    custom family, so text is legible throughout - and both families are the
+    same width class, so it is a font change rather than a layout shift.
+  %>
+  <%
+    var fontHref = 'https://fonts.googleapis.com/css2?family='
+      + encodeURIComponent(fonts.heading).replace(/%20/g, '+') + ':wght@400;500;600;700;800'
+      + '&family=' + encodeURIComponent(fonts.body).replace(/%20/g, '+') + ':wght@400;500;600'
+      + '&display=swap';
+  %>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=<%= encodeURIComponent(fonts.heading).replace(/%20/g, '+') %>:wght@400;500;600;700;800&family=<%= encodeURIComponent(fonts.body).replace(/%20/g, '+') %>:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="preload" as="style" href="<%= fontHref %>">
+  <link rel="stylesheet" href="<%= fontHref %>" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="<%= fontHref %>"></noscript>
 
-  <link rel="stylesheet" href="<%= helpers.url('/assets/css/theme.css') %>">
+  <link rel="stylesheet" href="<%= helpers.versioned('/assets/css/theme.css') %>">
 
   <%# Site tokens come from the settings table, so the admin panel can restyle
       the whole public site without a deploy. %>

@@ -43,7 +43,14 @@
 </div>
 
 <%# ---- Action-required queue. This is the operator's to-do list. ---- %>
-<% if (pendingPaymentCount || num(orderStats && orderStats.pending)) { %>
+<%
+  // A CAPTCHA switch that is on with no keys behind it is the worst kind of
+  // broken: the settings screen says the site is protected, the login page
+  // shows no challenge, and nothing anywhere reports a problem. Surfacing it
+  // here is the difference between a silent gap and a fixable one.
+  var captchaMisconfigured = captcha && captcha.anyToggleOn && !captcha.configured;
+%>
+<% if (pendingPaymentCount || num(orderStats && orderStats.pending) || captchaMisconfigured) { %>
   <div class="panel" style="margin-bottom:22px;border-color:var(--warning)">
     <div class="panel-head" style="background:rgba(240,160,32,.06)">
       <div>
@@ -89,6 +96,22 @@
               <div style="font-weight:700;font-size:1.0625rem"><%= money(invoiceStats.outstanding, cur) %> outstanding</div>
               <div style="font-size:.8125rem;color:var(--text-soft);margin-top:2px"><%= num(invoiceStats.unpaid) %> unpaid invoice<%= num(invoiceStats.unpaid) > 1 ? 's' : '' %>.</div>
               <a href="<%= helpers.url('/' + adminPath + '/invoices?status=unpaid') %>" class="btn btn-outline btn-sm" style="margin-top:9px">View invoices</a>
+            </div>
+          </div>
+        <% } %>
+
+        <% if (captchaMisconfigured) { %>
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            <span style="flex-shrink:0;width:34px;height:34px;display:grid;place-items:center;border-radius:9px;background:rgba(224,43,43,.11);color:var(--danger)">
+              <svg style="width:17px;height:17px"><use href="#i-shield"/></svg>
+            </span>
+            <div>
+              <div style="font-weight:700;font-size:1.0625rem">CAPTCHA is on but not configured</div>
+              <div style="font-size:.8125rem;color:var(--text-soft);margin-top:2px">
+                A form is set to require verification, but no reCAPTCHA keys are saved — so no challenge is
+                shown and nothing is being checked. Add both keys, or switch the forms off.
+              </div>
+              <a href="<%= helpers.url('/' + adminPath + '/settings?group=security') %>" class="btn btn-outline btn-sm" style="margin-top:9px">Open security settings</a>
             </div>
           </div>
         <% } %>

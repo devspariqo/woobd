@@ -4,15 +4,16 @@
  * Middleware order matters and is deliberate:
  *   1. config + logger            - fail fast before binding a port
  *   2. security headers           - must wrap every response, including errors
- *   3. static assets              - served before sessions so images are cheap
- *   4. body parsers + cookies
- *   5. session (DB-backed)        - survives a Hostinger redeploy
- *   6. view context               - needs the session, feeds every template
- *   7. identity                   - re-validates the session against the DB
- *   8. CSRF                       - sits after identity so 419s can render
- *   9. maintenance gate           - staff bypass reads identity
- *  10. routes
- *  11. 404 + error handler
+ *   3. compression                - wraps the response before anything writes
+ *   4. static assets              - served before sessions so images are cheap
+ *   5. body parsers + cookies
+ *   6. session (DB-backed)        - survives a Hostinger redeploy
+ *   7. view context               - needs the session, feeds every template
+ *   8. identity                   - re-validates the session against the DB
+ *   9. CSRF                       - sits after identity so 419s can render
+ *  10. maintenance gate           - staff bypass reads identity
+ *  11. routes
+ *  12. 404 + error handler
  */
 'use strict';
 
@@ -35,6 +36,7 @@ const { viewContext, invalidateMenus } = require('./src/middleware/context');
 const auth = require('./src/middleware/auth');
 const csrf = require('./src/middleware/csrf');
 const security = require('./src/middleware/security');
+const compress = require('./src/middleware/compress');
 
 const publicRoutes = require('./src/routes/public.routes');
 const authRoutes = require('./src/routes/auth.routes');
@@ -130,11 +132,21 @@ app.get('/healthz', async (req, res) => {
 app.use(security.securityHeaders());
 app.use(security.canonicalHost());
 
+// Mounted before anything that can write a response, so every route - pages,
+// static assets, the sitemap and the JSON APIs - is wrapped. Placed after the
+// security headers so those are already on the response when the body is
+// finally flushed.
+app.use(compress({ threshold: 1024 }));
+
 app.use(
   express.static(path.join(__dirname, 'public'), {
     maxAge: config.isProd ? '7d' : 0,
     etag: true,
     setHeaders(res, filePath) {
+      // Whether this request carries a version stamp, which decides whether a
+      // long cache is safe - see the CSS/JS branch below.
+      const isVersioned = Boolean(res.req && res.req.query && res.req.query.v);
+
       // Fonts and images are content-addressed by name, so a long cache is safe;
       // HTML is never served from here.
       if (/\.(woff2?|ttf|otf|svg|png|jpe?g|webp|ico|avif)$/i.test(filePath)) {
@@ -142,13 +154,25 @@ app.use(
         return;
       }
 
-      // CSS and JS are NOT content-addressed, so the blanket 7-day max-age
-      // above meant a stylesheet change did not reach returning visitors for a
-      // week - the site kept rendering the previous design and looked like the
-      // deploy had not worked. Revalidate instead: the ETag makes it a cheap
-      // 304 when nothing changed, and an immediate update when it did.
+      // CSS and JS are NOT content-addressed by name, so the blanket 7-day
+      // max-age this used to set meant a stylesheet change did not reach
+      // returning visitors for a week - the site kept rendering the previous
+      // design and looked like the deploy had not worked. Revalidating was the
+      // correct answer to that, at the cost of a 304 round trip before the
+      // browser could use a file it already had.
+      //
+      // Templates now request these through helpers.versioned(), so the URL
+      // carries the file's modification time. A year-long immutable cache is
+      // safe under that: any edit changes the mtime, which changes the URL, and
+      // the previous URL is simply never requested again. An unstamped request
+      // - an old cached page, or a hand-typed path - still revalidates.
       if (/\.(css|js)$/i.test(filePath)) {
-        res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+        res.setHeader(
+          'Cache-Control',
+          config.isProd && isVersioned
+            ? 'public, max-age=31536000, immutable'
+            : 'public, max-age=0, must-revalidate'
+        );
       }
     },
   })

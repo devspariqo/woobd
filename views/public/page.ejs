@@ -10,7 +10,8 @@
       <img src="<%= helpers.url(page.featured_image) %>"
            alt="<%= page.title %>"
            class="page-featured"
-           width="1200" height="630">
+           width="1200" height="630"
+           fetchpriority="high" decoding="async">
     <% } %>
 
     <%# Legal pages are authored by staff in the admin panel, so the content is

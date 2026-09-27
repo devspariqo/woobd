@@ -6,7 +6,7 @@
   <title><%= pageTitle %> - <%= site.name %></title>
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" type="image/svg+xml" href="<%= site.favicon %>">
-  <link rel="stylesheet" href="<%= helpers.url('/assets/css/theme.css') %>">
+  <link rel="stylesheet" href="<%= helpers.versioned('/assets/css/theme.css') %>">
 
   <%# Self-contained document styling. The print layout deliberately does not
       pull in dashboard.css: this page is rendered as paper, and the screen

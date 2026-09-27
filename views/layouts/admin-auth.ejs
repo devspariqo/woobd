@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=<%= encodeURIComponent(fonts.heading).replace(/%20/g, '+') %>:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="<%= helpers.url('/assets/css/theme.css') %>">
+  <link rel="stylesheet" href="<%= helpers.versioned('/assets/css/theme.css') %>">
 
   <script>
     (function () {
@@ -111,8 +111,8 @@
 
   <%- include('../partials/icons') %>
   <% if (typeof showCaptcha !== 'undefined' && showCaptcha) { %>
-    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <script src="https://www.google.com/recaptcha/api.js?render=explicit" async defer></script>
   <% } %>
-  <script src="<%= helpers.url('/assets/js/main.js') %>" defer></script>
+  <script src="<%= helpers.versioned('/assets/js/main.js') %>" defer></script>
 </body>
 </html>

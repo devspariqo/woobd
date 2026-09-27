@@ -56,7 +56,7 @@
       <div class="post-hero-meta">
         <span class="post-author-inline">
           <% if (post.author_avatar) { %>
-            <img src="<%= helpers.url(post.author_avatar) %>" alt="" width="34" height="34">
+            <img src="<%= helpers.url(post.author_avatar) %>" alt="" width="34" height="34" decoding="async">
           <% } else { %>
             <span class="post-author-fallback"><%= authorInitials %></span>
           <% } %>
@@ -151,7 +151,7 @@
         <%# ------------------------------------------------ Author card %>
         <div class="post-author-card">
           <% if (post.author_avatar) { %>
-            <img src="<%= helpers.url(post.author_avatar) %>" alt="<%= post.author_name %>" width="72" height="72">
+            <img src="<%= helpers.url(post.author_avatar) %>" alt="<%= post.author_name %>" width="72" height="72" loading="lazy" decoding="async">
           <% } else { %>
             <span class="post-author-card-fallback"><%= authorInitials %></span>
           <% } %>

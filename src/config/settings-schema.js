@@ -86,6 +86,30 @@ const SETTINGS = [
   { key: 'google_site_verification', type: 'text', group: 'seo', default: '', public: true, label: 'Google site verification' },
   { key: 'facebook_pixel_id', type: 'text', group: 'seo', default: '', public: true, label: 'Facebook Pixel ID' },
 
+  // ---------------- Crawler files ----------------
+  //
+  // robots.txt and sitemap.xml are generated from the database on every
+  // request, so they are correct by construction - a new package or article
+  // appears without anyone maintaining a list. What an operator still needs is
+  // a say in what gets listed and what crawlers are told, which is what this
+  // group is.
+  //
+  // The staging switch matters more than it looks: a site that is publicly
+  // reachable before launch gets indexed, and the first impression Google forms
+  // of it is a half-finished page. `robots_block_all` is the one switch that
+  // prevents that without touching DNS or the webserver config.
+  { key: 'robots_enabled', type: 'boolean', group: 'seo_files', default: '1', public: false, label: 'Serve robots.txt', help: 'Turn off and /robots.txt returns 404, leaving crawlers to their default behaviour. Leave on unless another system serves this file.' },
+  { key: 'robots_block_all', type: 'boolean', group: 'seo_files', default: '0', public: false, label: 'Discourage all crawlers (staging)', help: 'Emits "Disallow: /" for every agent. Use on a staging or pre-launch copy; turn it off before the real site goes live or it will never be indexed.' },
+  { key: 'robots_crawl_delay', type: 'number', group: 'seo_files', default: '0', public: false, label: 'Crawl delay (seconds)', help: 'Seconds between requests for polite crawlers. 0 omits the directive, which is what Google recommends - it ignores Crawl-delay and honours the Search Console setting instead.' },
+  { key: 'robots_extra_disallow', type: 'textarea', group: 'seo_files', default: '', public: false, label: 'Extra Disallow paths', help: 'One path per line, each starting with a slash. Added to the built-in list that already covers the admin panel, the account area and filtered listings.' },
+  { key: 'robots_custom', type: 'textarea', group: 'seo_files', default: '', public: false, label: 'Extra robots.txt lines', help: 'Appended verbatim at the end. Use for Sitemap lines for other sections, or a Host directive. Anything typed here is not validated.' },
+  { key: 'sitemap_enabled', type: 'boolean', group: 'seo_files', default: '1', public: false, label: 'Serve sitemap.xml', help: 'Publishes an XML sitemap built from the live content. Turning this off also removes the Sitemap line from robots.txt.' },
+  { key: 'sitemap_include_services', type: 'boolean', group: 'seo_files', default: '1', public: false, label: 'Include packages and services' },
+  { key: 'sitemap_include_portfolio', type: 'boolean', group: 'seo_files', default: '1', public: false, label: 'Include portfolio projects' },
+  { key: 'sitemap_include_pages', type: 'boolean', group: 'seo_files', default: '1', public: false, label: 'Include CMS pages' },
+  { key: 'sitemap_include_posts', type: 'boolean', group: 'seo_files', default: '1', public: false, label: 'Include blog posts' },
+  { key: 'sitemap_cache_minutes', type: 'number', group: 'seo_files', default: '15', public: false, label: 'Sitemap cache (minutes)', help: 'The sitemap runs several queries. Caching it keeps a crawler walking every URL from turning into hundreds of database round trips. 0 rebuilds it on every request.' },
+
   // ---------------- Header / CTA ----------------
   { key: 'topbar_enabled', type: 'boolean', group: 'header', default: '1', public: true, label: 'Show topbar' },
   { key: 'topbar_text', type: 'text', group: 'header', default: 'Need an online store that actually sells? Free consultation available.', public: true, label: 'Topbar text' },
@@ -346,6 +370,7 @@ const GROUP_LABELS = {
   theme: 'Theme & Colours',
   typography: 'Typography',
   seo: 'SEO & Analytics',
+  seo_files: 'Robots & Sitemap',
   header: 'Header & CTA',
   footer: 'Footer',
   social: 'Social Links',

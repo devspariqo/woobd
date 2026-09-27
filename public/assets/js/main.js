@@ -886,95 +886,275 @@
   }
 
   /**
-   * Invisible reCAPTCHA.
+   * Package comparison.
    *
-   * The widget renders no box, so it cannot submit the form itself - it has to
-   * be told when to run. This intercepts the submit, asks Google for a token,
-   * and re-submits once the token arrives.
-   *
-   * `onRecaptchaSolved` is a global because the reCAPTCHA script calls it by
-   * name from the widget's data-callback attribute.
+   * The picker is a plain GET form, so the page works with this script absent -
+   * the visitor ticks boxes and presses the noscript submit button. All this
+   * adds is the reload on tick, and locking the boxes at the column cap so the
+   * limit is visible before a submission rather than after one.
    */
+  function initCompare() {
+    var form = $('[data-compare-form]');
+    if (!form) return;
+
+    var boxes = $$('input[name="p"]', form);
+    if (!boxes.length) return;
+
+    var max = Number(form.getAttribute('data-max')) || 4;
+
+    function sync() {
+      var checked = boxes.filter(function (box) { return box.checked; }).length;
+
+      boxes.forEach(function (box) {
+        var option = box.closest('.cmp-option');
+        box.disabled = !box.checked && checked >= max;
+        if (option) {
+          option.classList.toggle('is-disabled', box.disabled);
+          option.classList.toggle('is-on', box.checked);
+        }
+      });
+    }
+
+    boxes.forEach(function (box) {
+      box.addEventListener('change', function () {
+        sync();
+        // submit() rather than requestSubmit(): with scripting on there is no
+        // submit button to name, and this form runs no validation.
+        form.submit();
+      });
+    });
+
+    // The server already marks the cap, but re-running it here means the state
+    // is correct after a back-navigation restores ticked boxes from the cache.
+    sync();
+  }
+
+  /* ---------------------------------------------------------------------
+     reCAPTCHA
+     --------------------------------------------------------------------- */
+
+  /**
+   * Widgets waiting to be rendered, keyed by their container element.
+   *
+   * Rendering is explicit rather than automatic. The api.js auto-renderer
+   * picks up `.g-recaptcha` elements on its own schedule, which leaves two
+   * things unknowable from this side: whether a given element has been
+   * rendered yet, and what its widget id is. Without the id, `execute()` has
+   * to fall back to "the first widget on the page", and the callback has to be
+   * matched back to a form by guessing.
+   *
+   * Rendering here removes both guesses. `?render=explicit` tells Google not to
+   * touch the markup, and every widget id is ours.
+   */
+  var captchaWidgets = [];
+
+  /** The form waiting on a challenge, and the timer that stops it hanging. */
   var pendingCaptchaForm = null;
-  // Safety net so a form can never hang waiting for a callback that does not
-  // arrive - see initInvisibleCaptcha.
   var pendingCaptchaTimer = null;
 
-  window.onRecaptchaSolved = function () {
-    if (!pendingCaptchaForm) return;
-    var form = pendingCaptchaForm;
-    pendingCaptchaForm = null;
+  /**
+   * Run `callback` once the reCAPTCHA API can actually render.
+   *
+   * Not driven by an `onload=` parameter on the script tag, which is the usual
+   * approach and has a race: api.js is loaded with `async`, so it can finish
+   * and fire its onload before this file - loaded with `defer` - has defined
+   * the function it is meant to call. The result is a widget that never
+   * renders and a silent console error.
+   *
+   * `grecaptcha.ready()` is the supported way to wait, and it is what Google's
+   * own examples use. The poll underneath covers the case where api.js never
+   * arrived at all - a blocker, or offline - without leaving an interval
+   * running for the life of the page.
+   */
+  function whenRecaptchaReady(callback) {
+    var done = false;
+    var finish = function () {
+      if (done) return;
+      done = true;
+      callback();
+    };
 
-    // The safety timer has done its job.
+    if (window.grecaptcha && typeof window.grecaptcha.render === 'function') {
+      if (typeof window.grecaptcha.ready === 'function') window.grecaptcha.ready(finish);
+      else finish();
+      return;
+    }
+
+    var tries = 0;
+    var poll = window.setInterval(function () {
+      tries += 1;
+      if (window.grecaptcha && typeof window.grecaptcha.render === 'function') {
+        window.clearInterval(poll);
+        if (typeof window.grecaptcha.ready === 'function') window.grecaptcha.ready(finish);
+        else finish();
+      } else if (tries >= 100) {
+        // Roughly twenty seconds. Beyond that the script is not coming, and a
+        // request that never resolves is worse than one that fails.
+        window.clearInterval(poll);
+      }
+    }, 200);
+  }
+
+  /** Google's error codes worth naming, because each one has its own fix. */
+  function captchaMessage(code) {
+    if (code === 'missing-input-secret' || code === 'invalid-input-secret') {
+      return 'The reCAPTCHA secret key is not accepted. Check it in Settings, Security.';
+    }
+    if (code === 'invalid-keys') {
+      return 'Google does not recognise the reCAPTCHA keys. Check both in Settings, Security.';
+    }
+    if (code === 'timeout-or-duplicate') {
+      return 'The verification expired. Please try again.';
+    }
+    return 'The verification could not complete. Please try again.';
+  }
+
+  /** Show a message inside a form, creating the slot the first time. */
+  function captchaNotice(form, text) {
+    var slot = $('.recaptcha-notice', form);
+    if (!slot) {
+      slot = document.createElement('p');
+      slot.className = 'recaptcha-notice';
+      var wrap = $('.recaptcha-wrap', form);
+      if (wrap) wrap.parentNode.insertBefore(slot, wrap.nextSibling);
+      else form.insertBefore(slot, form.firstChild);
+    }
+    slot.textContent = text;
+  }
+
+  function clearCaptchaNotice(form) {
+    var slot = $('.recaptcha-notice', form);
+    if (slot) slot.remove();
+  }
+
+  /** Render every widget that has not been rendered yet. */
+  function renderCaptchaWidgets() {
+    captchaWidgets.forEach(function (entry) {
+      if (entry.rendered) return;
+
+      try {
+        entry.id = window.grecaptcha.render(entry.el, {
+          sitekey: entry.el.getAttribute('data-sitekey'),
+          // Asking for invisible costs nothing when the key is a checkbox key:
+          // Google ignores the request and draws the box anyway. The runtime
+          // check in the submit handler adapts instead of fighting it.
+          size: entry.wantsInvisible ? 'invisible' : 'checkbox',
+          badge: entry.el.getAttribute('data-badge') || 'bottomright',
+          callback: function () { onCaptchaSolved(entry.form); },
+          'expired-callback': function () {
+            // The token has a two-minute life. Without clearing the flag a form
+            // left open would submit a token that is already dead.
+            delete entry.form.dataset.recaptchaPassed;
+          },
+          'error-callback': function (code) {
+            // The widget itself failed - a blocked script, or a key that is not
+            // valid for this domain. Say so rather than leaving the button
+            // doing nothing at all.
+            captchaNotice(entry.form, captchaMessage(code));
+          },
+        });
+        entry.rendered = true;
+      } catch (err) {
+        // render() throws if this element already holds a widget, which can
+        // happen when api.js was cached and got there first. The widget works
+        // either way, so this is not worth surfacing to the visitor.
+        entry.rendered = true;
+      }
+    });
+  }
+
+  /**
+   * A challenge was solved. Submit the form it belongs to.
+   *
+   * The flag rather than a direct call to the server keeps the form's own
+   * handlers in play - the validation and double-click guard still run.
+   */
+  function onCaptchaSolved(form) {
+    if (!form) return;
+
     if (pendingCaptchaTimer) {
       window.clearTimeout(pendingCaptchaTimer);
       pendingCaptchaTimer = null;
     }
+    pendingCaptchaForm = null;
 
-    // Set a flag rather than calling submit() directly, so the form's own
-    // submit handlers run and validation still applies.
+    clearCaptchaNotice(form);
     form.dataset.recaptchaPassed = '1';
 
-    // The validation handler disables the submit button on the first submit as
-    // a double-click guard. requestSubmit() runs interactive validation, so put
-    // the button back before asking it to submit.
+    // The double-click guard disables the submit button on the first pass.
+    // requestSubmit() runs interactive validation, so put it back first.
     var button = form.querySelector('[type="submit"]');
     if (button && button.disabled) button.removeAttribute('disabled');
 
     if (form.requestSubmit) form.requestSubmit();
     else form.submit();
-  };
+  }
 
   /**
-   * Invisible reCAPTCHA.
+   * Wire up every reCAPTCHA widget on the page.
    *
-   * The widget renders no box, so it cannot submit the form itself - it has to
-   * be told when to run. This intercepts the submit, asks Google for a token,
-   * and re-submits once the token arrives.
+   * Three shapes have to work, and the old code only handled one of them:
    *
-   * Two failure modes shaped this code, both of which made the form do nothing
-   * at all, which is the worst outcome: the visitor sees no error and assumes
-   * the site is broken.
+   *   1. An invisible key in invisible mode. No box, no click - the submit is
+   *      intercepted, execute() runs, and the callback re-submits.
    *
-   *   1. A reCAPTCHA v2 CHECKBOX key ignores data-size="invisible" and renders
-   *      a visible box anyway. The visitor ticks it, a token appears - and the
-   *      old code intercepted the submit regardless, called execute(), and
-   *      waited for a callback that never came. The check below for an existing
-   *      token means a solved checkbox is left alone.
+   *   2. A checkbox key while the panel says "invisible". Google ignores
+   *      size:invisible for these and draws a visible box. The old code
+   *      intercepted the submit regardless and called execute(), which for a
+   *      checkbox widget resolves nothing - so the form hung until the safety
+   *      timer fired and submitted with no token, and the server rejected it.
+   *      The height check below detects the drawn box and asks the visitor to
+   *      tick it instead.
    *
-   *   2. If the reCAPTCHA script is blocked or slow, grecaptcha.execute() never
-   *      fires the callback. The safety timer submits anyway so the server can
-   *      answer with a real message rather than the page hanging.
+   *   3. A checkbox key in checkbox mode. Nothing to intercept; the tick
+   *      supplies the token.
    */
-  function initInvisibleCaptcha() {
-    var widgets = $$('.g-recaptcha[data-size="invisible"]');
+  function initRecaptcha() {
+    var widgets = $$('.g-recaptcha');
     if (!widgets.length) return;
 
-    widgets.forEach(function (widget) {
-      var form = widget.closest('form');
+    widgets.forEach(function (el) {
+      var form = el.closest('form');
       if (!form) return;
 
+      var wantsInvisible = el.getAttribute('data-size') === 'invisible';
+
+      captchaWidgets.push({ el: el, form: form, wantsInvisible: wantsInvisible, id: null, rendered: false });
+
+      if (!wantsInvisible) return;
+
       form.addEventListener('submit', function (event) {
-        // Already verified - let it through.
         if (form.dataset.recaptchaPassed === '1') return;
 
-        // A token is already present: the visitor solved a visible checkbox, or
-        // this is a re-submit. Either way there is nothing to do.
+        // A token is already present: the visitor solved a visible challenge,
+        // or this is the re-submit after a success.
         var token = form.querySelector('[name="g-recaptcha-response"]');
         if (token && token.value) return;
 
-        if (typeof window.grecaptcha === 'undefined' || !window.grecaptcha.execute) {
-          // The script did not load - a blocker, or offline. Let the submit
-          // through rather than trapping the visitor on a form they cannot
-          // send; the server still verifies the token it never received.
+        if (typeof window.grecaptcha === 'undefined' || typeof window.grecaptcha.execute !== 'function') {
+          // The script never loaded - blocked, offline, or still in flight. Let
+          // the submit through rather than trapping the visitor on a form that
+          // does nothing; the server decides what to do about the missing token.
+          return;
+        }
+
+        // A drawn checkbox means Google did not honour invisible mode, which
+        // happens when the key was registered as a checkbox. execute() cannot
+        // produce a token for it, so ask for the tick instead of hanging.
+        if (el.getBoundingClientRect().height > 10) {
+          event.preventDefault();
+          captchaNotice(form, 'Please tick the "I am not a robot" box above, then try again.');
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
           return;
         }
 
         event.preventDefault();
+        clearCaptchaNotice(form);
         pendingCaptchaForm = form;
 
-        // Never leave the form hanging: if the callback does not arrive within
-        // a few seconds, submit anyway and let the server explain.
+        // Never leave the form hanging. If the callback does not arrive, submit
+        // anyway and let the server answer - a real error message beats a
+        // button that appears to do nothing.
         if (pendingCaptchaTimer) window.clearTimeout(pendingCaptchaTimer);
         pendingCaptchaTimer = window.setTimeout(function () {
           var stuck = pendingCaptchaForm;
@@ -984,12 +1164,15 @@
           stuck.dataset.recaptchaPassed = '1';
           if (stuck.requestSubmit) stuck.requestSubmit();
           else stuck.submit();
-        }, 6000);
+        }, 8000);
 
         try {
-          window.grecaptcha.execute();
+          var entry = captchaWidgets.filter(function (item) { return item.form === form; })[0];
+          // Passing the id explicitly. Without it Google falls back to the
+          // first widget on the page, which is wrong the moment a page has two.
+          if (entry && entry.id !== null && entry.id !== undefined) window.grecaptcha.execute(entry.id);
+          else window.grecaptcha.execute();
         } catch (err) {
-          // If execution fails, do not leave them stuck.
           window.clearTimeout(pendingCaptchaTimer);
           pendingCaptchaTimer = null;
           pendingCaptchaForm = null;
@@ -998,6 +1181,8 @@
         }
       });
     });
+
+    whenRecaptchaReady(renderCaptchaWidgets);
   }
 
 
@@ -1094,7 +1279,8 @@
     initAlerts();
     initChat();
     initCarousel();
-    initInvisibleCaptcha();
+    initRecaptcha();
+    initCompare();
     initHeroVideo();
     initTermToggle();
   }

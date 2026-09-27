@@ -55,9 +55,15 @@
 <article class="price-card<%= popular ? ' is-popular' : '' %>" data-reveal>
   <% if (popular) { %><span class="price-flag">Most popular</span><% } %>
 
+  <%#
+    Name and price only. The short description used to sit here, and it was the
+    one line on the card that could not be compared: every package has a
+    different sentence at a different length, so it pushed the prices out of
+    alignment and the eye had nothing to scan down. The four cards are read
+    across, not one at a time.
+  %>
   <header class="price-head">
     <h3><%= service.title %></h3>
-    <p><%= helpers.excerpt(service.short_description || service.description, 64) %></p>
   </header>
 
   <div class="price-amount">

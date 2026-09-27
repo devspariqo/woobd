@@ -9,11 +9,12 @@
     checkbox  - the familiar "I'm not a robot" box. Works with a standard v2 key.
     invisible - no box at all. The challenge appears only when Google is unsure,
                 so a normal visitor sees nothing. Needs a key registered as
-                "reCAPTCHA v2 - Invisible" in the Google admin console; a
-                checkbox key will not render in this mode.
+                "reCAPTCHA v2 - Invisible" in the Google admin console.
 
-  Invisible mode cannot submit on its own, so it calls a global callback which
-  main.js wires up to the form it sits in.
+  No data-callback here. The widget is rendered explicitly by main.js, which
+  passes the callback in the render options - a callback named in the markup
+  would have to be a global, and it could not tell one form's widget from
+  another's on a page that carries two.
 %>
 <% if (captcha && captcha.siteKey) { %>
   <% if (captcha.mode === 'invisible') { %>
@@ -21,8 +22,7 @@
       <div class="g-recaptcha"
            data-sitekey="<%= captcha.siteKey %>"
            data-size="invisible"
-           data-badge="bottomright"
-           data-callback="onRecaptchaSolved"></div>
+           data-badge="bottomright"></div>
       <p class="form-hint" style="text-align:center">
         Protected by reCAPTCHA. No action needed — verification is automatic.
       </p>

@@ -4,6 +4,9 @@
  */
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
+
 const config = require('../config');
 
 /** Build an absolute URL that respects APP_BASE_PATH. Every link in every
@@ -215,6 +218,49 @@ function assetUrl(path, fallback) {
 }
 
 /**
+ * A static asset URL stamped with the file's modification time.
+ *
+ * CSS and JS are the render-blocking requests on every page, and they were
+ * being served with `max-age=0, must-revalidate` - a conditional request and a
+ * 304 round trip before the browser could use a stylesheet it already had.
+ * That is the correct conservative answer, because the file name never changes
+ * and a long cache would keep serving the old design after a deploy. It is also
+ * slow on every single page view.
+ *
+ * Stamping the URL removes the trade-off: `theme.css?v=1758...` is a different
+ * URL from `theme.css?v=1759...`, so the file can be cached forever and still
+ * update the instant it changes. The modification time is used rather than a
+ * hand-bumped number because it cannot be forgotten.
+ *
+ * `statSync` runs once per file per process - the result is memoised, so this
+ * is a Map lookup on every render after the first.
+ */
+const assetVersionCache = new Map();
+
+function versioned(assetPath) {
+  const requested = String(assetPath || '');
+  if (!requested) return url('/');
+
+  const relative = requested.replace(/^\/+/, '').split('?')[0];
+  let stamp = assetVersionCache.get(relative);
+
+  if (stamp === undefined) {
+    try {
+      stamp = String(Math.floor(fs.statSync(path.join(__dirname, '..', '..', 'public', relative)).mtimeMs));
+    } catch (err) {
+      // A missing file must not fail a render. The URL goes out unstamped and
+      // the static handler falls back to revalidation for it.
+      stamp = '';
+    }
+    assetVersionCache.set(relative, stamp);
+  }
+
+  const base = url(requested);
+  if (!stamp) return base;
+  return `${base}${base.includes('?') ? '&' : '?'}v=${stamp}`;
+}
+
+/**
  * Serialise a value for embedding inside
  * `<script type="application/ld+json">`.
  *
@@ -241,6 +287,7 @@ module.exports = {
   url,
   absoluteUrl,
   assetUrl,
+  versioned,
   escapeHtml,
   jsonLd,
   money,

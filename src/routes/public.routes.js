@@ -22,6 +22,11 @@ router.get('/', ctrl.home);
 router.get('/about', ctrl.about);
 router.get('/services', ctrl.services);
 router.get('/services/:slug', ctrl.serviceSingle);
+
+// Comparison sits on its own path rather than under /services, because it is
+// about the whole catalogue at once - and because /services/:slug would
+// otherwise swallow it as a package whose slug is "compare".
+router.get('/compare', ctrl.compare);
 router.get('/portfolio', ctrl.portfolio);
 router.get('/portfolio/:slug', ctrl.portfolioSingle);
 router.get('/contact', ctrl.contactForm);

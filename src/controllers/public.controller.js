@@ -318,6 +318,135 @@ function buildServiceSchema(service, locals) {
 }
 
 // ---------------------------------------------------------------------------
+// Package comparison
+// ---------------------------------------------------------------------------
+
+/** How many packages fit across the table before the columns stop being read. */
+const COMPARE_MAX = 4;
+
+/**
+ * Side-by-side package comparison.
+ *
+ * The selection lives in the query string rather than in the page state, so a
+ * comparison can be linked, bookmarked, and pasted into a message. That is the
+ * whole point of comparing: the person who needs the answer is usually not the
+ * one who did the clicking.
+ *
+ * Feature rows are the union of every selected package's features, in the order
+ * they first appear. Alphabetical would be tidier and wrong - the features are
+ * authored in a deliberate order, and re-sorting them scrambles the story the
+ * package is telling.
+ */
+exports.compare = async (req, res, next) => {
+  try {
+    // Two shapes arrive here and both are legitimate: ?p=a&p=b is what the
+    // checkboxes produce, ?p=a,b is what a hand-written link looks like.
+    const raw = req.query.p;
+    const requested = (Array.isArray(raw) ? raw : String(raw || '').split(','))
+      .map((value) => clean.slug(String(value).trim()))
+      .filter(Boolean);
+
+    const result = await content.listServices({ status: 'active', perPage: 300 });
+    const all = result.rows || [];
+
+    // The same filter the homepage uses: a package with no features and no
+    // description renders as a row of empty cells, which reads as a bug.
+    const comparable = all.filter(
+      (row) => helpersParse(row).length > 0 || String(row.short_description || '').trim().length > 0
+    );
+
+    // Order follows the catalogue rather than the order the boxes were ticked,
+    // so adding a fourth package does not reshuffle the first three columns.
+    const selected = comparable.filter((row) => requested.includes(row.slug)).slice(0, COMPARE_MAX);
+
+    // Every feature across the selection, de-duplicated case-insensitively -
+    // "SSL certificate" and "SSL Certificate" are one row, not two.
+    const rows = [];
+    const seen = new Set();
+    for (const pkg of selected) {
+      for (const feature of helpersParse(pkg)) {
+        const label = String(feature).trim();
+        const key = label.toLowerCase();
+        if (!label || seen.has(key)) continue;
+        seen.add(key);
+        rows.push({ label, key });
+      }
+    }
+
+    // Precomputed per package so the template stays a lookup rather than
+    // repeating the parse for every cell.
+    const columns = selected.map((pkg) => {
+      const own = new Set(helpersParse(pkg).map((f) => String(f).trim().toLowerCase()));
+      const base = Number(pkg.price) || 0;
+      const sale = Number(pkg.sale_price) || 0;
+      const hasSale = sale > 0 && sale < base;
+
+      return {
+        slug: pkg.slug,
+        title: pkg.title,
+        category: pkg.category_name || '',
+        billing: pkg.billing_cycle === 'one_time' ? 'One-off' : 'Per month',
+        minMonths: Number(pkg.min_months) || 1,
+        isRecurring: pkg.billing_cycle !== 'one_time',
+        price: hasSale ? sale : base,
+        wasPrice: hasSale ? base : null,
+        features: own,
+        summary: res.locals.helpers.excerpt(pkg.short_description || pkg.description, 150),
+      };
+    });
+
+    // The grid is the whole answer: a tick or a dash per package per feature.
+    //
+    // An earlier version also flagged the rows only one package carried. It
+    // turned out to be pure noise - the packages are written in tiers, so
+    // nearly every feature line differs between them ("up to 300 products"
+    // against "up to 1,000"), which meant a badge on almost every row. And it
+    // said nothing the tick marks did not already say.
+    const matrix = rows.map((row) => ({
+      label: row.label,
+      cells: columns.map((column) => column.features.has(row.key)),
+    }));
+
+    res.render('public/compare', {
+      layout: 'layouts/public',
+      pageTitle: 'Compare Packages',
+      lead: 'Put our packages side by side and see exactly what each one includes.',
+      crumbs: [{ label: 'Packages', url: '/services' }, { label: 'Compare' }],
+      columns,
+      matrix,
+      all: comparable.map((row) => ({ slug: row.slug, title: row.title })),
+      requested,
+      max: COMPARE_MAX,
+      seo: {
+        ...res.locals.seo,
+        title: `Compare Website Packages Side by Side - ${res.locals.site.name}`,
+        description:
+          'Compare every feature, price and billing term across our website design packages before you choose. No sales call required.',
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/** Features are stored as a JSON string in a text column; this normalises both. */
+function helpersParse(row) {
+  const parsed = safeParseFeatures(row && row.features);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+function safeParseFeatures(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (!raw) return [];
+  try {
+    const value = JSON.parse(raw);
+    return Array.isArray(value) ? value : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Portfolio
 // ---------------------------------------------------------------------------
 
@@ -515,50 +644,95 @@ exports.contactSubmit = async (req, res, next) => {
  * `lastmod` is emitted only where the row has a real updated timestamp - a
  * sitemap that claims everything changed today is ignored.
  */
+async function buildSitemap() {
+  const base = String(config.app.url || '').replace(/\/$/, '');
+  const urls = [];
+
+  const add = (path, lastmod, priority, changefreq) => {
+    urls.push({ loc: `${base}${path}`, lastmod, priority, changefreq });
+  };
+
+  // Fixed routes, in rough order of importance.
+  add('/', null, '1.0', 'weekly');
+  add('/services', null, '0.9', 'weekly');
+  add('/compare', null, '0.7', 'monthly');
+  add('/portfolio', null, '0.8', 'monthly');
+  add('/blog', null, '0.8', 'daily');
+  add('/contact', null, '0.6', 'yearly');
+  add('/live-chat', null, '0.4', 'yearly');
+
+  const iso = (value) => (value ? new Date(value).toISOString().slice(0, 10) : null);
+
+  // Each section is fetched only when it is being listed. Turning a section off
+  // has to save the query as well as the line, or a site that deliberately
+  // hides 400 portfolio pieces still pays to load them on every crawl.
+  const wantServices = settings.getBool('sitemap_include_services', true);
+  const wantPortfolio = settings.getBool('sitemap_include_portfolio', true);
+  const wantPages = settings.getBool('sitemap_include_pages', true);
+  const wantPosts = settings.getBool('sitemap_include_posts', true);
+
+  const [services, portfolio, pages, posts] = await Promise.all([
+    wantServices ? content.listServices({ status: 'active', perPage: 500 }) : null,
+    wantPortfolio ? content.listPortfolio({ status: 'active', perPage: 500 }) : null,
+    wantPages ? content.listPages({ status: 'published' }) : null,
+    wantPosts ? content.publishedPostIndex() : null,
+  ]);
+
+  for (const row of (services && services.rows) || []) add(`/services/${row.slug}`, iso(row.updated_at), '0.8', 'monthly');
+  for (const row of (portfolio && portfolio.rows) || []) add(`/portfolio/${row.slug}`, iso(row.updated_at), '0.7', 'monthly');
+  for (const row of pages || []) add(`/page/${row.slug}`, iso(row.updated_at), '0.4', 'yearly');
+  for (const row of posts || []) add(`/blog/${row.slug}`, iso(row.updated_at), '0.7', 'monthly');
+
+  const body = urls
+    .map((entry) => {
+      const parts = [`    <loc>${escapeXml(entry.loc)}</loc>`];
+      if (entry.lastmod) parts.push(`    <lastmod>${entry.lastmod}</lastmod>`);
+      parts.push(`    <changefreq>${entry.changefreq}</changefreq>`);
+      parts.push(`    <priority>${entry.priority}</priority>`);
+      return `  <url>\n${parts.join('\n')}\n  </url>`;
+    })
+    .join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`;
+}
+
+/** XML has five characters that cannot appear bare in text or an attribute. */
+function escapeXml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 exports.sitemap = async (req, res, next) => {
   try {
-    const base = String(config.app.url || '').replace(/\/$/, '');
-    const urls = [];
+    // Off means off. An empty <urlset> would be a valid-looking sitemap that
+    // claims the site has no pages, which is worse than saying it is not here.
+    if (!settings.getBool('sitemap_enabled', true)) {
+      return res.status(404).type('text/plain').send('Sitemap is disabled.');
+    }
 
-    const add = (path, lastmod, priority, changefreq) => {
-      urls.push({ loc: `${base}${path}`, lastmod, priority, changefreq });
-    };
+    const minutes = Math.max(0, settings.getInt('sitemap_cache_minutes', 15));
 
-    // Fixed routes, in rough order of importance.
-    add('/', null, '1.0', 'weekly');
-    add('/services', null, '0.9', 'weekly');
-    add('/portfolio', null, '0.8', 'monthly');
-    add('/blog', null, '0.8', 'daily');
-    add('/contact', null, '0.6', 'yearly');
-    add('/live-chat', null, '0.4', 'yearly');
+    // The cache key carries the include flags, so flipping one in the panel
+    // takes effect on the next request instead of waiting out the TTL.
+    const key = [
+      'sitemap',
+      settings.getBool('sitemap_include_services', true) ? 1 : 0,
+      settings.getBool('sitemap_include_portfolio', true) ? 1 : 0,
+      settings.getBool('sitemap_include_pages', true) ? 1 : 0,
+      settings.getBool('sitemap_include_posts', true) ? 1 : 0,
+    ].join(':');
 
-    const iso = (value) => (value ? new Date(value).toISOString().slice(0, 10) : null);
+    // A crawler walking every URL in the file is the one visitor guaranteed to
+    // hit it repeatedly, so this is the response most worth caching.
+    const xml = await cached(key, minutes * 60 * 1000, buildSitemap);
 
-    const [services, portfolio, pages, posts] = await Promise.all([
-      content.listServices({ status: 'active', perPage: 500 }),
-      content.listPortfolio({ status: 'active', perPage: 500 }),
-      content.listPages({ status: 'published' }),
-      content.publishedPostIndex(),
-    ]);
-
-    for (const row of services.rows || []) add(`/services/${row.slug}`, iso(row.updated_at), '0.8', 'monthly');
-    for (const row of portfolio.rows || []) add(`/portfolio/${row.slug}`, iso(row.updated_at), '0.7', 'monthly');
-    for (const row of pages || []) add(`/page/${row.slug}`, iso(row.updated_at), '0.4', 'yearly');
-    for (const row of posts || []) add(`/blog/${row.slug}`, iso(row.updated_at), '0.7', 'monthly');
-
-    const body = urls
-      .map((entry) => {
-        const parts = [`    <loc>${res.locals.helpers.escapeHtml(entry.loc)}</loc>`];
-        if (entry.lastmod) parts.push(`    <lastmod>${entry.lastmod}</lastmod>`);
-        parts.push(`    <changefreq>${entry.changefreq}</changefreq>`);
-        parts.push(`    <priority>${entry.priority}</priority>`);
-        return `  <url>\n${parts.join('\n')}\n  </url>`;
-      })
-      .join('\n');
-
-    res.type('application/xml').send(
-      `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`
-    );
+    res.type('application/xml');
+    res.setHeader('Cache-Control', `public, max-age=${Math.max(300, minutes * 60)}`);
+    res.send(xml);
   } catch (err) {
     next(err);
   }
@@ -572,23 +746,66 @@ exports.sitemap = async (req, res, next) => {
  * the listing itself.
  */
 exports.robots = (req, res) => {
+  if (!settings.getBool('robots_enabled', true)) {
+    return res.status(404).type('text/plain').send('robots.txt is disabled.');
+  }
+
   const base = String(config.app.url || '').replace(/\/$/, '');
   const adminPath = settings.get('admin_path_slug', 'dev-cp');
+  const sitemapOn = settings.getBool('sitemap_enabled', true);
+  const sitemapLine = sitemapOn ? `Sitemap: ${base}/sitemap.xml` : null;
 
-  const lines = [
-    'User-agent: *',
-    'Allow: /',
-    `Disallow: /${adminPath}/`,
-    'Disallow: /account/',
-    'Disallow: /api/',
-    'Disallow: /*?q=',
-    'Disallow: /*?page=',
-    '',
-    `Sitemap: ${base}/sitemap.xml`,
-    '',
-  ];
+  // Collected in a Set so an operator who also lists /account/ by hand does not
+  // end up with the line twice. Duplicates are legal but they make the file
+  // look unmaintained, and the next person to read it cannot tell which copy is
+  // authoritative.
+  const rules = new Set();
 
-  res.type('text/plain').send(lines.join('\n'));
+  if (settings.getBool('robots_block_all')) {
+    // The wildcard agent below already covers every crawler, so one Disallow is
+    // enough. Enumerating named agents is how this file normally drifts out of
+    // step with the site.
+    rules.add('Disallow: /');
+
+    const lines = ['User-agent: *', ...rules, ''];
+    // The sitemap is still advertised. A staging site that is opened up later
+    // should not make Google rediscover the file from scratch.
+    if (sitemapLine) lines.push(sitemapLine, '');
+
+    res.type('text/plain');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.send(lines.join('\n'));
+  }
+
+  rules.add('Allow: /');
+  rules.add(`Disallow: /${adminPath}/`);
+  rules.add('Disallow: /account/');
+  rules.add('Disallow: /api/');
+  rules.add('Disallow: /*?q=');
+  rules.add('Disallow: /*?page=');
+
+  // Operator additions, one path per line. Blanks and comment lines are
+  // dropped: a stray '#' left in would comment out every rule after it.
+  String(settings.get('robots_extra_disallow', '') || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+    .forEach((line) => rules.add(`Disallow: ${line.startsWith('/') ? line : '/' + line}`));
+
+  const delay = settings.getInt('robots_crawl_delay', 0);
+  if (delay > 0) rules.add(`Crawl-delay: ${delay}`);
+
+  const lines = ['User-agent: *', ...rules, ''];
+  if (sitemapLine) lines.push(sitemapLine, '');
+
+  // Appended verbatim. This is the escape hatch for directives this form does
+  // not model, so it is deliberately not parsed.
+  const custom = String(settings.get('robots_custom', '') || '').trim();
+  if (custom) lines.push(custom, '');
+
+  res.type('text/plain');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.send(lines.join('\n'));
 };
 
 /**

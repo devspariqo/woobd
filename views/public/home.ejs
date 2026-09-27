@@ -170,6 +170,18 @@
           View all packages
           <svg><use href="#i-arrow-right"/></svg>
         </a>
+        <%#
+          Offered next to "View all packages" rather than buried on the listing.
+          The question a visitor has at this point is which of the four they are
+          looking at is the right one, and that is exactly what the comparison
+          answers.
+        %>
+        <% if (shown.length > 1) { %>
+          <a href="<%= helpers.url('/compare') %>" class="btn btn-outline btn-lg" style="margin-left:10px">
+            Compare packages
+            <svg><use href="#i-repeat"/></svg>
+          </a>
+        <% } %>
       </div>
     <% } else { %>
       <p class="text-center">Our package list is being updated. <a href="<%= helpers.url('/contact') %>">Contact us</a> for a custom quote.</p>
@@ -540,7 +552,7 @@
 
           <% if (captcha.enabled && settings.captcha_on_contact === '1') { %>
             <%- include('../partials/recaptcha', { captcha: { siteKey: captcha.siteKey, mode: captcha.mode } }) %>
-<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+<script src="https://www.google.com/recaptcha/api.js?render=explicit" async defer></script>
           <% } %>
 
           <button type="submit" class="btn btn-primary btn-block btn-lg">

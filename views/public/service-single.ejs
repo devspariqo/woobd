@@ -31,7 +31,7 @@
         <%# Hero image %>
         <div style="border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow);margin-bottom:38px">
           <% if (service.image) { %>
-            <img src="<%= helpers.url(service.image) %>" alt="<%= service.title %>" width="900" height="506" style="width:100%">
+            <img src="<%= helpers.url(service.image) %>" alt="<%= service.title %>" width="900" height="506" style="width:100%" fetchpriority="high" decoding="async">
           <% } else { %>
             <img src="<%= helpers.url('/assets/img/service-default.svg') %>" alt="<%= service.title %>" width="900" height="506" style="width:100%">
           <% } %>

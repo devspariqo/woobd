@@ -1,0 +1,189 @@
+<%#
+  Package comparison.
+
+  Expects:
+    columns    selected packages, each with its parsed features and price
+    matrix     one row per feature, with a boolean per column
+    all        every comparable package, for the picker
+    requested  slugs the visitor asked for
+    max        how many columns the table will show
+
+  The selection is a GET form, so the page works with JavaScript off and every
+  comparison is a real URL. JavaScript only makes it update without a click.
+%>
+<%- include('../partials/page-hero', {
+  pageTitle: 'Compare Packages',
+  lead: 'Put our packages side by side and see exactly what each one includes — price, billing term and every feature, in one table.',
+  crumbs: [{ label: 'Packages', url: '/services' }, { label: 'Compare' }]
+}) %>
+
+<section class="section">
+  <div class="container">
+
+    <%#
+      The picker. Rendered even when nothing is selected, because choosing is
+      the first thing a visitor needs to do here.
+    %>
+    <div class="cmp-picker" data-compare-picker>
+      <div class="cmp-picker-head">
+        <div>
+          <h2>Pick packages to compare</h2>
+          <p>Choose up to <%= max %>. The table updates as you go.</p>
+        </div>
+        <% if (columns.length) { %>
+          <a href="<%= helpers.url('/compare') %>" class="btn btn-outline btn-sm">Clear all</a>
+        <% } %>
+      </div>
+
+      <form method="get" action="<%= helpers.url('/compare') %>" data-compare-form data-max="<%= max %>">
+        <div class="cmp-options">
+          <% all.forEach(function (item) { %>
+            <%
+              var isOn = requested.indexOf(item.slug) !== -1;
+              // Once the table is full, the remaining boxes are disabled rather
+              // than left clickable and silently ignored.
+              var isFull = !isOn && requested.length >= max;
+            %>
+            <label class="cmp-option<%= isOn ? ' is-on' : '' %><%= isFull ? ' is-disabled' : '' %>">
+              <input type="checkbox" name="p" value="<%= item.slug %>"
+                     <%= isOn ? 'checked' : '' %> <%= isFull ? 'disabled' : '' %>>
+              <span><%= item.title %></span>
+            </label>
+          <% }); %>
+        </div>
+
+        <%# The submit button is the no-JavaScript path. With JavaScript the form
+            submits itself on change, so this is a fallback rather than the
+            only way through. %>
+        <noscript>
+          <button type="submit" class="btn btn-primary" style="margin-top:18px">Compare selected</button>
+        </noscript>
+      </form>
+    </div>
+
+    <% if (columns.length >= 2) { %>
+      <%#
+        The table. A real <table> rather than a grid of divs: the content is
+        genuinely tabular, and screen readers announce the row and column
+        headers from the markup instead of needing them spelled out.
+      %>
+      <div class="cmp-scroll">
+        <table class="cmp-table">
+          <thead>
+            <tr>
+              <th scope="col" class="cmp-corner">
+                <span class="cmp-corner-label">Feature</span>
+              </th>
+              <% columns.forEach(function (column) { %>
+                <th scope="col" class="cmp-col-head">
+                  <div class="cmp-pkg">
+                    <% if (column.category) { %><span class="cmp-pkg-tag"><%= column.category %></span><% } %>
+                    <h3><%= column.title %></h3>
+                    <div class="cmp-pkg-price">
+                      <strong><%= helpers.money(column.price, site.currency) %></strong>
+                      <span><%= column.billing %></span>
+                    </div>
+                    <% if (column.wasPrice) { %>
+                      <div class="cmp-pkg-was">Was <s><%= helpers.money(column.wasPrice, site.currency) %></s></div>
+                    <% } %>
+                    <a href="<%= helpers.url('/services/' + column.slug) %>" class="btn btn-primary btn-sm btn-block">
+                      Choose this
+                    </a>
+                    <a href="<%= helpers.url('/services/' + column.slug) %>" class="cmp-pkg-more">See full details</a>
+                  </div>
+                </th>
+              <% }); %>
+            </tr>
+          </thead>
+
+          <tbody>
+            <%# The facts that decide a purchase, above the feature list. %>
+            <tr class="cmp-row-group">
+              <th scope="row" colspan="<%= columns.length + 1 %>">Package</th>
+            </tr>
+            <tr>
+              <th scope="row">Price</th>
+              <% columns.forEach(function (column) { %>
+                <td>
+                  <strong><%= helpers.money(column.price, site.currency) %></strong>
+                  <span class="cmp-unit"><%= column.isRecurring ? 'per month' : 'one-off' %></span>
+                </td>
+              <% }); %>
+            </tr>
+            <tr>
+              <th scope="row">Billing</th>
+              <% columns.forEach(function (column) { %>
+                <td><%= column.billing %></td>
+              <% }); %>
+            </tr>
+            <tr>
+              <th scope="row">Minimum term</th>
+              <% columns.forEach(function (column) { %>
+                <td><%= column.isRecurring ? (column.minMonths > 1 ? column.minMonths + ' months' : 'None') : '—' %></td>
+              <% }); %>
+            </tr>
+
+            <% if (matrix.length) { %>
+              <tr class="cmp-row-group">
+                <th scope="row" colspan="<%= columns.length + 1 %>">What's included</th>
+              </tr>
+              <% matrix.forEach(function (row) { %>
+                <tr>
+                  <th scope="row"><%= row.label %></th>
+                  <% columns.forEach(function (column, i) { %>
+                    <td class="cmp-cell">
+                      <% if (row.cells[i]) { %>
+                        <span class="cmp-yes" aria-label="Included">
+                          <svg><use href="#i-check"/></svg>
+                        </span>
+                      <% } else { %>
+                        <span class="cmp-no" aria-label="Not included">—</span>
+                      <% } %>
+                    </td>
+                  <% }); %>
+                </tr>
+              <% }); %>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="cmp-note">
+        Prices are in <%= site.currency %>. Long-term billing discounts are shown on each package page.
+        Need something between two packages? <a href="<%= helpers.url('/contact') %>">Ask us for a custom quote</a>.
+      </p>
+    <% } else if (columns.length === 1) { %>
+      <div class="cmp-empty">
+        <div class="feature-icon"><svg><use href="#i-package"/></svg></div>
+        <h3>Pick one more package</h3>
+        <p>A comparison needs at least two. Add another above and the table appears.</p>
+        <a href="<%= helpers.url('/services') %>" class="btn btn-outline">Browse all packages</a>
+      </div>
+    <% } else { %>
+      <div class="cmp-empty">
+        <div class="feature-icon"><svg><use href="#i-package"/></svg></div>
+        <h3>Nothing selected yet</h3>
+        <p>Choose two or more packages above to see them side by side.</p>
+        <a href="<%= helpers.url('/services') %>" class="btn btn-outline">Browse all packages</a>
+      </div>
+    <% } %>
+  </div>
+</section>
+
+<% if (columns.length >= 2) { %>
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-head" data-reveal>
+      <span class="eyebrow">Still deciding?</span>
+      <h2>We will tell you which one fits</h2>
+      <p>Send us your requirements and we will recommend the smallest package that does the job — not the largest one you will pay for.</p>
+    </div>
+    <div class="text-center" data-reveal>
+      <a href="<%= helpers.url('/contact') %>" class="btn btn-primary btn-lg">
+        Get a recommendation
+        <svg><use href="#i-arrow-right"/></svg>
+      </a>
+    </div>
+  </div>
+</section>
+<% } %>

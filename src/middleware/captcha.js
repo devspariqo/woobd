@@ -13,10 +13,25 @@ const logger = require('../utils/logger');
 const VERIFY_URL = 'https://www.google.com/recaptcha/api/siteverify';
 
 /**
+ * Where the keys came from, for the log.
+ *
+ * "captcha is not working" has three unrelated causes - a switch that is off,
+ * keys that are missing, keys that are wrong - and they are indistinguishable
+ * from the browser. Naming the source turns the log line into a diagnosis
+ * without ever printing the credential itself.
+ */
+function keySource() {
+  const stored = settings.get('captcha_site_key');
+  if (stored && stored.trim() && !/^CHANGE_ME/i.test(stored.trim())) return 'database';
+  if (process.env.RECAPTCHA_SITE_KEY) return 'environment';
+  return 'none';
+}
+
+/**
  * Verify a submitted captcha token.
  *
  * @param {string} token   from `g-recaptcha-response`
- * @param {string} ip      remote address, passed to Google for risk scoring
+ * @param {string} ip      remote address, kept for signature compatibility
  * @param {string} action  'login' | 'signup' | 'admin' | 'contact' - picks the
  *                         on/off setting for this specific form
  */
@@ -35,13 +50,26 @@ async function verify(token, ip, action) {
   const siteKey = settings.secret('captcha_site_key', process.env.RECAPTCHA_SITE_KEY);
 
   // Not configured at all - do not block the user.
-  if (!secret || !siteKey) return { ok: true, skipped: true };
+  //
+  // The switch is on and this is the state that looks identical to a working
+  // site from the outside, so it is logged at warn rather than passing in
+  // silence. An operator who has turned CAPTCHA on and sees nothing on the form
+  // has no other way to learn that the keys are what is missing.
+  if (!secret || !siteKey) {
+    logger.warn('CAPTCHA is enabled for this form but no reCAPTCHA keys are configured - skipping verification', {
+      action,
+      keySource: keySource(),
+      hasSecret: Boolean(secret),
+      hasSiteKey: Boolean(siteKey),
+    });
+    return { ok: true, skipped: true, unconfigured: true };
+  }
 
   if (!token) {
     // Logged, because a missing token and a rejected token look identical on
     // screen and have completely different causes: one is a front-end problem,
     // the other a key problem.
-    logger.warn('reCAPTCHA token missing from the submission', { action });
+    logger.warn('reCAPTCHA token missing from the submission', { action, keySource: keySource() });
     return { ok: false, message: 'The verification did not complete. Please try again.' };
   }
 
@@ -72,7 +100,7 @@ async function verify(token, ip, action) {
     if (result.success) return { ok: true };
 
     const codes = (result['error-codes'] || []).join(', ');
-    logger.warn('reCAPTCHA rejected a submission', { action, codes });
+    logger.warn('reCAPTCHA rejected a submission', { action, codes, keySource: keySource() });
 
     // Each Google code means something different, and they are not
     // interchangeable. Saying which one it is turns "captcha is broken" into a

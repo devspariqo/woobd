@@ -1940,6 +1940,20 @@ body.no-scroll { overflow: hidden; }
 
 .recaptcha-wrap .form-hint { margin: 0; }
 
+/* An inline message from the widget - a failed load, or a checkbox key that
+   ignored invisible mode. Styled as a form error so it reads as something the
+   visitor has to act on, not as a hint. */
+.recaptcha-notice {
+  margin: 0 0 14px;
+  padding: 10px 13px;
+  border-radius: var(--radius-sm);
+  background: rgba(224, 43, 43, .08);
+  border: 1px solid rgba(224, 43, 43, .25);
+  color: var(--danger);
+  font-size: .8125rem;
+  line-height: 1.5;
+}
+
 /* Invisible mode renders no box, only the badge - so the reserved space would
    be a gap with nothing in it. */
 .recaptcha-wrap:has(.g-recaptcha[data-size="invisible"]) { min-height: 0; }
@@ -2100,18 +2114,12 @@ body.no-scroll { overflow: hidden; }
 .price-head h3 {
   font-size: 1.125rem;
   font-weight: 700;
-  margin-bottom: 6px;
+  /* The summary paragraph that used to sit under the name is gone, so the
+     heading carries the whole gap down to the price. The 2.6em min-height that
+     used to reserve two lines for that paragraph is gone with it - keeping it
+     would leave a band of empty space under every package name. */
+  margin: 0 0 14px;
   color: var(--text);
-}
-
-.price-head p {
-  font-size: .875rem;
-  line-height: 1.5;
-  color: var(--text-soft);
-  margin: 0;
-  /* Two lines keeps every card's price on the same baseline down the row,
-     whatever length the summary happens to be. */
-  min-height: 2.6em;
 }
 
 .price-amount {
@@ -2275,7 +2283,6 @@ body.no-scroll { overflow: hidden; }
 
 .price-card.is-popular .price-head h3,
 .price-card.is-popular .price-value { color: #fff; }
-.price-card.is-popular .price-head p,
 .price-card.is-popular .price-cycle,
 .price-card.is-popular .price-was { color: rgba(255, 255, 255, .82); }
 .price-card.is-popular .price-features li { color: rgba(255, 255, 255, .94); }
@@ -2328,6 +2335,221 @@ body.no-scroll { overflow: hidden; }
   .term-toggle { width: 100%; justify-content: center; flex-wrap: wrap; }
   .term-option { padding: 8px 13px; font-size: .8125rem; }
   .term-save { display: none; }
+}
+
+/* --------------------------------------------------------------------------
+   Package comparison
+
+   The table is wider than a phone on purpose - that is what a comparison is.
+   Rather than crushing four packages into 360px, the whole table scrolls
+   sideways and the feature column is pinned to the left edge, so a row label
+   never leaves the screen while the packages move under it.
+
+   Every surface uses the theme variables, so the pinned column stays opaque
+   and correctly coloured in both light and dark mode. A hardcoded white here
+   would leave a bright stripe down a dark page.
+   -------------------------------------------------------------------------- */
+
+.cmp-picker {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 30px;
+}
+
+.cmp-picker-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.cmp-picker-head h2 { font-size: 1.125rem; margin: 0 0 4px; }
+.cmp-picker-head p { font-size: .875rem; color: var(--text-soft); margin: 0; }
+
+.cmp-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.cmp-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 15px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: .875rem;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--surface-2);
+  cursor: pointer;
+  transition: border-color var(--t-fast), background var(--t-fast), color var(--t-fast);
+}
+
+.cmp-option:hover { border-color: var(--primary); }
+
+.cmp-option input { accent-color: var(--primary); margin: 0; cursor: pointer; }
+
+/* The chosen chip. The border and tint together read as "selected" even for
+   someone who cannot distinguish the two colours. */
+.cmp-option.is-on {
+  border-color: var(--primary);
+  background: rgba(91, 33, 240, .08);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* At the four-package cap the rest are disabled rather than hidden, so the
+   catalogue still reads as complete and the limit is obvious. */
+.cmp-option.is-disabled { opacity: .45; cursor: not-allowed; }
+.cmp-option.is-disabled input { cursor: not-allowed; }
+
+.cmp-scroll {
+  overflow-x: auto;
+  /* Momentum scrolling on iOS, and a contained overscroll so the page behind
+     does not bounce when the table hits its end. */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.cmp-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  /* Four columns plus the label column is roughly this wide before it starts
+     to feel cramped. Below it, the container scrolls instead. */
+  min-width: 720px;
+}
+
+.cmp-table th,
+.cmp-table td {
+  text-align: left;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+/* The pinned label column. `position: sticky` inside a scrolling container is
+   what keeps it in view; the opaque background is what stops the columns
+   sliding underneath it. */
+.cmp-table tbody th,
+.cmp-corner {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--surface);
+  min-width: 190px;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-size: .9375rem;
+}
+
+.cmp-corner { z-index: 3; }
+.cmp-corner-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-soft); }
+
+.cmp-col-head {
+  min-width: 210px;
+  border-left: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.cmp-pkg { display: flex; flex-direction: column; gap: 10px; }
+
+.cmp-pkg-tag {
+  align-self: flex-start;
+  font-size: .6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-soft);
+}
+
+.cmp-pkg h3 { font-size: 1.0625rem; margin: 0; color: var(--text); }
+
+.cmp-pkg-price { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.cmp-pkg-price strong { font-size: 1.5rem; color: var(--text); line-height: 1.1; }
+.cmp-pkg-price span { font-size: .8125rem; color: var(--text-soft); }
+
+.cmp-pkg-was { font-size: .8125rem; color: var(--text-soft); }
+
+.cmp-pkg-more {
+  font-size: .8125rem;
+  color: var(--text-soft);
+  text-align: center;
+  text-decoration: underline;
+}
+
+.cmp-pkg-more:hover { color: var(--primary); }
+
+/* A band that separates the sections of the table - the hard numbers above,
+   the feature list below. */
+.cmp-row-group th {
+  background: var(--surface-2);
+  font-size: .75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--text-soft);
+  padding: 10px 18px;
+  position: static;
+}
+
+.cmp-table tbody tr:last-child th,
+.cmp-table tbody tr:last-child td { border-bottom: 0; }
+
+.cmp-cell { text-align: center; border-left: 1px solid var(--border); }
+
+.cmp-yes {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(15, 157, 88, .12);
+  color: var(--success);
+}
+
+.cmp-yes svg { width: 13px; height: 13px; }
+
+.cmp-no { color: var(--text-soft); font-size: 1.0625rem; }
+
+.cmp-unit { display: block; font-size: .75rem; color: var(--text-soft); margin-top: 2px; }
+
+.cmp-note {
+  margin-top: 16px;
+  font-size: .875rem;
+  color: var(--text-soft);
+}
+
+.cmp-empty {
+  text-align: center;
+  padding: 56px 20px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.cmp-empty h3 { margin: 18px 0 8px; }
+.cmp-empty p { color: var(--text-soft); margin: 0 0 22px; }
+.cmp-empty .feature-icon { margin: 0 auto; }
+
+/* On a phone the picker becomes a single column of full-width chips, which is
+   far easier to hit than a wrapped row of pills. */
+@media (max-width: 640px) {
+  .cmp-picker { padding: 18px; }
+  .cmp-options { flex-direction: column; }
+  .cmp-option { width: 100%; justify-content: flex-start; }
+  .cmp-table th, .cmp-table td { padding: 12px 14px; }
+  .cmp-table tbody th, .cmp-corner { min-width: 150px; }
+  .cmp-col-head { min-width: 180px; }
 }
 
 /* --------------------------------------------------------------------------

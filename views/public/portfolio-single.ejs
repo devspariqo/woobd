@@ -15,7 +15,7 @@
       <div>
         <div style="border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow);margin-bottom:38px">
           <% if (project.thumbnail) { %>
-            <img src="<%= helpers.url(project.thumbnail) %>" alt="<%= project.title %>" width="900" height="600" style="width:100%">
+            <img src="<%= helpers.url(project.thumbnail) %>" alt="<%= project.title %>" width="900" height="600" style="width:100%" fetchpriority="high" decoding="async">
           <% } else { %>
             <img src="<%= helpers.url('/assets/img/portfolio-default.svg') %>" alt="<%= project.title %>" width="900" height="600" style="width:100%">
           <% } %>

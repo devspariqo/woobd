@@ -12,6 +12,12 @@
       <div>
         <h2 style="margin-bottom:6px">Choose your package</h2>
         <p>Every package includes design, development, mobile optimisation and a handover walkthrough.</p>
+        <% if (services.length > 1) { %>
+          <a href="<%= helpers.url('/compare') %>" class="btn btn-outline btn-sm" style="margin-top:12px">
+            Compare packages side by side
+            <svg><use href="#i-repeat"/></svg>
+          </a>
+        <% } %>
       </div>
 
       <%# Category filter. Plain links, so it works without JavaScript and each

@@ -265,15 +265,24 @@ function viewContext() {
       const captchaSiteKey = settings.secret('captcha_site_key', config.recaptcha.siteKey);
       const captchaSecretKey = settings.secret('captcha_secret_key', config.recaptcha.secretKey);
 
+      // Which forms are switched on. Read once here rather than four times in
+      // the object below, and reused for the dashboard's configuration warning.
+      const captchaAnyToggleOn =
+        settings.getBool('captcha_on_login') ||
+        settings.getBool('captcha_on_signup') ||
+        settings.getBool('captcha_on_admin') ||
+        // Previously omitted, so a site protecting only the contact form
+        // showed no challenge on it at all.
+        settings.getBool('captcha_on_contact');
+
       res.locals.captcha = {
-        enabled:
-          Boolean(captchaSiteKey && captchaSecretKey) &&
-          (settings.getBool('captcha_on_login') ||
-            settings.getBool('captcha_on_signup') ||
-            settings.getBool('captcha_on_admin') ||
-            // Previously omitted, so a site protecting only the contact form
-            // showed no challenge on it at all.
-            settings.getBool('captcha_on_contact')),
+        enabled: Boolean(captchaSiteKey && captchaSecretKey) && captchaAnyToggleOn,
+        // The two facts the warning needs, kept apart on purpose. `configured`
+        // is about the keys, `anyToggleOn` is about the switches, and the state
+        // worth shouting about is "switch on, keys missing" - where the toggle
+        // says the site is protected and nothing is.
+        configured: Boolean(captchaSiteKey && captchaSecretKey),
+        anyToggleOn: captchaAnyToggleOn,
         siteKey: captchaSiteKey,
         // 'invisible' renders no box; 'checkbox' is the classic tick box. Any
         // value other than the two known modes falls back to invisible, so a

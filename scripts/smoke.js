@@ -227,6 +227,14 @@ async function req(pathname, options = {}) {
     },
     send(value) {
       if (value && typeof value === 'object' && !Buffer.isBuffer(value)) return this.json(value);
+
+      // Express sets the type for a string body before ending the response.
+      // The shim has to do the same, or every HTML response looks untyped here
+      // and anything that reads Content-Type - response compression, in
+      // particular - sees nothing to act on, so the harness silently stops
+      // covering it.
+      if (!this.getHeader('content-type')) this.setHeader('content-type', 'text/html; charset=utf-8');
+
       this.end(value === undefined ? '' : String(value));
       return this;
     },
@@ -248,6 +256,7 @@ async function req(pathname, options = {}) {
       settled = true;
       // Keep the session alive across requests.
       if (withCookies) absorbCookies(headerBag['set-cookie']);
+      const raw = Buffer.concat(chunks);
       resolve({
         status: resObj.statusCode,
         headers: {
@@ -256,7 +265,12 @@ async function req(pathname, options = {}) {
           raw: headerBag,
         },
         location: headerBag.location ?? null,
-        body: Buffer.concat(chunks).toString('utf8'),
+        // The decoded string is what almost every check wants. `buffer` is the
+        // untouched bytes, for the rare response that is not text - a
+        // compressed body decoded as UTF-8 is destroyed by the replacement
+        // characters, so anything inspecting it has to start from the bytes.
+        body: raw.toString('utf8'),
+        buffer: raw,
       });
     };
     // A handler that never responds must fail loudly rather than hang the run.
@@ -3478,6 +3492,245 @@ async function checkBlog() {
   await db.close().catch(() => {});
 }
 
+/**
+ * Crawler files, response compression and the package comparison.
+ *
+ * Compression is checked by sending an explicit Accept-Encoding, because the
+ * request shim above does not set one - which is why every other section in
+ * this file passes through the compression middleware untouched. The body is
+ * gunzipped rather than pattern-matched, so the check proves the payload is
+ * intact and not merely that a header was set.
+ */
+async function checkCrawlerFilesAndCompare() {
+  section('22. Crawler files, compression and the package comparison');
+
+  const zlib = require('zlib');
+  const { promisify } = require('util');
+  const gunzip = promisify(zlib.gunzip);
+  const db = require('../src/config/database');
+
+  try {
+    // --- robots.txt -------------------------------------------------------
+    const robots = await req('/robots.txt');
+    if (robots.status === 200) ok('robots.txt renders', '200');
+    else bad('robots.txt renders', `got ${robots.status}`);
+
+    for (const [needle, label] of [
+      ['User-agent: *', 'a wildcard agent'],
+      ['Allow: /', 'an allow rule'],
+      [`Disallow: /${ADMIN_SLUG}/`, 'the admin path blocked'],
+      ['Sitemap:', 'a sitemap reference'],
+    ]) {
+      if (robots.body.includes(needle)) ok(`robots.txt carries ${label}`);
+      else bad(`robots.txt carries ${label}`, `missing: ${needle}`);
+    }
+
+    // --- sitemap.xml ------------------------------------------------------
+    const sitemap = await req('/sitemap.xml');
+    if (sitemap.status === 200) ok('the sitemap renders', '200');
+    else bad('the sitemap renders', `got ${sitemap.status}`);
+
+    if (sitemap.body.startsWith('<?xml') && sitemap.body.includes('<urlset')) {
+      ok('the sitemap is a valid urlset document');
+    } else {
+      bad('the sitemap is a valid urlset document', 'no XML prologue or urlset');
+    }
+
+    const urlCount = (sitemap.body.match(/<loc>/g) || []).length;
+    if (urlCount > 0) ok('the sitemap lists URLs', `${urlCount} URL(s)`);
+    else bad('the sitemap lists URLs', 'empty');
+
+    for (const [path, label] of [
+      ['/compare', 'the comparison page'],
+      ['/services/', 'package pages'],
+      ['/blog/', 'blog posts'],
+    ]) {
+      if (sitemap.body.includes(path)) ok(`the sitemap includes ${label}`);
+      else warn(`the sitemap includes ${label}`, `no ${path} entries - section may be empty or switched off`);
+    }
+
+    // The XML must not carry a raw ampersand, which would make it unparseable.
+    const bareAmp = /&(?!amp;|lt;|gt;|quot;|apos;|#)/.test(sitemap.body);
+    if (!bareAmp) ok('the sitemap escapes its entities');
+    else bad('the sitemap escapes its entities', 'a bare & would break the XML');
+
+    // --- Compression ------------------------------------------------------
+    const gz = await req('/', { headers: { 'accept-encoding': 'gzip' } });
+    if (gz.headers.get('content-encoding') === 'gzip') ok('HTML is served gzipped');
+    else bad('HTML is served gzipped', `content-encoding: ${gz.headers.get('content-encoding')}`);
+
+    if (String(gz.headers.get('vary') || '').toLowerCase().includes('accept-encoding')) {
+      ok('the compressed response varies on Accept-Encoding');
+    } else {
+      bad('the compressed response varies on Accept-Encoding', 'a cache could serve gzip to a client that cannot read it');
+    }
+
+    const gzBody = gz.buffer;
+    if (gzBody[0] === 0x1f && gzBody[1] === 0x8b) {
+      ok('the gzipped body carries the gzip magic bytes');
+    } else {
+      bad('the gzipped body carries the gzip magic bytes', 'the body is not gzip data');
+    }
+
+    try {
+      const restored = (await gunzip(gzBody)).toString('utf8');
+      if (restored.includes('<!DOCTYPE html') || restored.includes('<html')) {
+        ok('the gzipped body decompresses back to the page');
+      } else {
+        bad('the gzipped body decompresses back to the page', 'the decompressed body is not HTML');
+      }
+    } catch (err) {
+      bad('the gzipped body decompresses back to the page', err.message);
+    }
+
+    const br = await req('/assets/css/theme.css', { headers: { 'accept-encoding': 'br' } });
+    if (br.headers.get('content-encoding') === 'br') ok('CSS is served as Brotli when offered');
+    else warn('CSS is served as Brotli when offered', `content-encoding: ${br.headers.get('content-encoding')}`);
+
+    // A small response should skip compression entirely - the compressed form
+    // would be larger than the original.
+    const tiny = await req('/robots.txt', { headers: { 'accept-encoding': 'gzip' } });
+    if (!tiny.headers.get('content-encoding')) {
+      ok('a small response is not compressed', 'below the 1KB threshold');
+    } else {
+      warn('a small response is not compressed', `compressed anyway: ${tiny.headers.get('content-encoding')}`);
+    }
+
+    // --- Asset versioning -------------------------------------------------
+    const home = await req('/');
+    const cssUrl = (home.body.match(/assets\/css\/theme\.css\?v=\d+/) || [])[0];
+    if (cssUrl) ok('the stylesheet URL is version-stamped', cssUrl);
+    else bad('the stylesheet URL is version-stamped', 'no ?v= on the stylesheet - it cannot be cached long');
+
+    const jsUrl = (home.body.match(/assets\/js\/main\.js\?v=\d+/) || [])[0];
+    if (jsUrl) ok('the script URL is version-stamped', jsUrl);
+    else bad('the script URL is version-stamped', 'no ?v= on the script');
+
+    if (home.body.includes('media="print"') && home.body.includes("onload=\"this.media='all'\"")) {
+      ok('fonts load without blocking the first paint');
+    } else {
+      warn('fonts load without blocking the first paint', 'the font stylesheet still blocks rendering');
+    }
+
+    // --- Package card -----------------------------------------------------
+    // The short summary was removed from the homepage pricing card, leaving the
+    // name directly above the price.
+    if (/class="price-head">\s*<h3>[^<]*<\/h3>\s*<\/header>/.test(home.body)) {
+      ok('the package card no longer shows a short summary');
+    } else {
+      bad('the package card no longer shows a short summary', 'the price-head still contains more than the name');
+    }
+
+    // --- Comparison page --------------------------------------------------
+    const empty = await req('/compare');
+    if (empty.status === 200) ok('the comparison page renders', '/compare → 200');
+    else bad('the comparison page renders', `got ${empty.status}`);
+
+    if (empty.body.includes('Nothing selected yet')) ok('the comparison page has an empty state');
+    else bad('the comparison page has an empty state', 'nothing tells the visitor to pick a package');
+
+    const single = await req('/compare?p=woocommerce-web-design-business');
+    if (single.body.includes('Pick one more package')) ok('one selection asks for a second');
+    else bad('one selection asks for a second', 'a one-column table was rendered');
+
+    // Real slugs, read from the database so the test does not depend on demo
+    // content that may have been renamed or removed.
+    const slugs = (
+      await db.query("SELECT slug FROM services WHERE status = 'active' ORDER BY sort_order ASC, id ASC LIMIT 6")
+    ).map((row) => row.slug);
+
+    if (slugs.length < 3) {
+      warn('the comparison table renders', 'fewer than three active packages to compare');
+    } else {
+      const two = await req(`/compare?p=${slugs[0]}&p=${slugs[1]}`);
+      const twoCols = (two.body.match(/class="cmp-col-head"/g) || []).length;
+      if (twoCols === 2) ok('a two-package comparison renders two columns');
+      else bad('a two-package comparison renders two columns', `got ${twoCols}`);
+
+      if ((two.body.match(/cmp-yes/g) || []).length > 0) ok('the comparison marks included features');
+      else bad('the comparison marks included features', 'no tick cells');
+
+      if ((two.body.match(/cmp-no/g) || []).length > 0) ok('the comparison marks absent features');
+      else bad('the comparison marks absent features', 'no dash cells');
+
+      const three = await req(`/compare?p=${slugs[0]}&p=${slugs[1]}&p=${slugs[2]}`);
+      const threeCols = (three.body.match(/class="cmp-col-head"/g) || []).length;
+      if (threeCols === 3) ok('a three-package comparison renders three columns');
+      else bad('a three-package comparison renders three columns', `got ${threeCols}`);
+
+      // The cap. Five slugs are requested; only four columns may come back.
+      const many = slugs.slice(0, 5).map((slug) => `p=${slug}`).join('&');
+      const capped = await req(`/compare?${many}`);
+      const cappedCols = (capped.body.match(/class="cmp-col-head"/g) || []).length;
+      if (cappedCols <= 4) ok('the comparison caps the columns at four', `${cappedCols} column(s) from 5 requested`);
+      else bad('the comparison caps the columns at four', `got ${cappedCols}`);
+
+      const disabled = (capped.body.match(/is-disabled/g) || []).length;
+      if (disabled > 0) ok('the picker disables the remaining boxes at the cap');
+      else warn('the picker disables the remaining boxes at the cap', 'nothing stops a fifth selection');
+    }
+
+    // --- Settings surface -------------------------------------------------
+    const login = await adminLogin();
+    if (!login.ok) {
+      warn('the crawler settings tab renders', `${login.reason} - skipping`);
+    } else {
+      const tab = await req(`/${ADMIN_SLUG}/settings?group=seo_files`);
+      if (tab.status === 200 && tab.body.includes('robots_enabled')) {
+        ok('the crawler settings tab renders', 'Robots & Sitemap');
+      } else {
+        bad('the crawler settings tab renders', `status ${tab.status}`);
+      }
+
+      const security = await req(`/${ADMIN_SLUG}/settings?group=security`);
+      if (security.body.includes('CAPTCHA is switched on but not configured')) {
+        ok('the security tab warns when CAPTCHA has no keys');
+      } else {
+        warn('the security tab warns when CAPTCHA has no keys', 'keys may be configured - nothing to warn about');
+      }
+
+      // The dashboard is where an operator lands after signing in, so the same
+      // warning has to be visible there - a warning only on the tab that
+      // happens to hold the setting is a warning nobody reads.
+      const dashboard = await req(`/${ADMIN_SLUG}/dashboard`);
+      if (dashboard.status !== 200) {
+        bad('the dashboard renders for the CAPTCHA check', `got ${dashboard.status}`);
+      } else if (security.body.includes('CAPTCHA is switched on but not configured')) {
+        if (dashboard.body.includes('CAPTCHA is on but not configured')) {
+          ok('the dashboard flags the CAPTCHA misconfiguration');
+        } else {
+          bad('the dashboard flags the CAPTCHA misconfiguration', 'the card is missing');
+        }
+      } else {
+        warn('the dashboard flags the CAPTCHA misconfiguration', 'keys are configured - nothing to flag');
+      }
+
+      // The SQL backup streams the dump with res.write as it walks the tables.
+      // The compression middleware buffers responses to decide whether to
+      // compress them, which would hold the whole dump in memory and deliver
+      // nothing until it finished - so a type it can never compress has to be
+      // released straight back to Node.
+      const backup = await req(`/${ADMIN_SLUG}/backup/download`, {
+        headers: { 'accept-encoding': 'gzip' },
+      });
+
+      if (backup.status !== 200) {
+        bad('the backup downloads', `got ${backup.status}`);
+      } else if (backup.headers.get('content-encoding')) {
+        bad('the backup is not compressed', `content-encoding: ${backup.headers.get('content-encoding')}`);
+      } else if (!backup.body.includes('SET FOREIGN_KEY_CHECKS')) {
+        bad('the backup downloads', 'the body is not a SQL dump');
+      } else {
+        ok('the backup streams uncompressed', 'application/sql is released, not buffered');
+      }
+    }
+  } catch (err) {
+    bad('crawler files and comparison', err.message);
+  }
+
+  await db.close().catch(() => {});
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -3530,6 +3783,9 @@ async function main() {
     await checkEditorAndFooter();
     await checkTermPricing();
     await checkMaintenanceAndChat();
+    // Sends its own Accept-Encoding, so it must not run before the sections
+    // that assume an uncompressed body.
+    await checkCrawlerFilesAndCompare();
   } catch (err) {
     console.error('\n  ✗ Smoke test aborted by an unexpected error');
     console.error(`    ${err.stack || err.message}\n`);
