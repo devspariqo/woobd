@@ -201,19 +201,31 @@ CREATE TABLE IF NOT EXISTS `posts` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `title` VARCHAR(200) NOT NULL,
   `slug` VARCHAR(200) NOT NULL,
+  `category` VARCHAR(80) DEFAULT NULL,
   `excerpt` VARCHAR(500) DEFAULT NULL,
   `content` LONGTEXT DEFAULT NULL,
+  `reading_minutes` INT UNSIGNED NOT NULL DEFAULT 0,
+  `view_count` INT UNSIGNED NOT NULL DEFAULT 0,
+  `is_featured` TINYINT(1) NOT NULL DEFAULT 0,
   `featured_image` VARCHAR(255) DEFAULT NULL,
   `author_id` INT UNSIGNED DEFAULT NULL,
   `status` ENUM('published','draft') NOT NULL DEFAULT 'draft',
   `published_at` DATETIME DEFAULT NULL,
   `seo_title` VARCHAR(200) DEFAULT NULL,
   `seo_description` VARCHAR(320) DEFAULT NULL,
+  `meta_keywords` VARCHAR(320) DEFAULT NULL,
+  `canonical_url` VARCHAR(500) DEFAULT NULL,
+  `robots` VARCHAR(50) NOT NULL DEFAULT 'index,follow',
+  `og_title` VARCHAR(200) DEFAULT NULL,
+  `og_description` VARCHAR(320) DEFAULT NULL,
+  `og_image` VARCHAR(255) DEFAULT NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_posts_slug` (`slug`),
-  KEY `idx_posts_status` (`status`)
+  KEY `idx_posts_status` (`status`),
+  KEY `idx_posts_category` (`category`),
+  KEY `idx_posts_published` (`published_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------------------------

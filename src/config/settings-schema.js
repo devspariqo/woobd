@@ -181,6 +181,20 @@ const SETTINGS = [
     label: 'Highlight which package card',
     help: 'Card number to highlight, counting from 1. Set 0 for none. Four cards with the third highlighted is the usual arrangement.',
   },
+
+  // --- Blog section on the homepage ----------------------------------------
+  {
+    key: 'blog_show_on_home',
+    type: 'boolean',
+    group: 'homepage',
+    default: '1',
+    public: true,
+    label: 'Show the blog section on the homepage',
+    help: 'Lists the most recent articles. Nothing appears if there are no published posts, whatever this is set to.',
+  },
+  { key: 'blog_section_title', type: 'text', group: 'homepage', default: 'Ideas, guides and what we are learning', public: true, label: 'Blog section title' },
+  { key: 'blog_section_text', type: 'textarea', group: 'homepage', default: 'Practical writing on selling online in Bangladesh — no filler, no listicles.', public: true, label: 'Blog section text' },
+  { key: 'blog_home_count', type: 'number', group: 'homepage', default: '3', public: true, label: 'Articles on the homepage', help: 'Three fits the row.' },
   { key: 'about_title', type: 'text', group: 'homepage', default: 'A design studio that understands Bangladeshi e-commerce', public: true, label: 'About title' },
   { key: 'about_text', type: 'textarea', group: 'homepage', default: 'Since day one we have focused on one thing: online stores that convert. We handle design, development, payment integration and post-launch support so you can focus on sourcing and selling.', public: true, label: 'About text' },
   { key: 'about_image', type: 'file', group: 'homepage', default: '', public: true, label: 'About image' },

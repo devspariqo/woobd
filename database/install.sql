@@ -671,14 +671,24 @@ CREATE TABLE `posts` (
   `id` int(10) UNSIGNED NOT NULL,
   `title` varchar(200) NOT NULL,
   `slug` varchar(200) NOT NULL,
+  `category` varchar(80) DEFAULT NULL,
   `excerpt` varchar(500) DEFAULT NULL,
   `content` longtext DEFAULT NULL,
+  `reading_minutes` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `view_count` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `is_featured` tinyint(1) NOT NULL DEFAULT 0,
   `featured_image` varchar(255) DEFAULT NULL,
   `author_id` int(10) UNSIGNED DEFAULT NULL,
   `status` enum('published','draft') NOT NULL DEFAULT 'draft',
   `published_at` datetime DEFAULT NULL,
   `seo_title` varchar(200) DEFAULT NULL,
   `seo_description` varchar(320) DEFAULT NULL,
+  `meta_keywords` varchar(320) DEFAULT NULL,
+  `canonical_url` varchar(500) DEFAULT NULL,
+  `robots` varchar(50) NOT NULL DEFAULT 'index,follow',
+  `og_title` varchar(200) DEFAULT NULL,
+  `og_description` varchar(320) DEFAULT NULL,
+  `og_image` varchar(255) DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -957,7 +967,11 @@ INSERT INTO `settings` (`id`, `setting_key`, `setting_value`, `setting_group`, `
 (26066, 'pricing_6mo_discount', '10', 'homepage', 'number', '2026-09-27 08:37:25'),
 (26065, 'pricing_show_terms', '1', 'homepage', 'boolean', '2026-09-27 08:37:25'),
 (26070, 'auth_bg_overlay', 'dark', 'branding', 'select', '2026-09-27 09:04:36'),
-(26069, 'auth_bg_image', '', 'branding', 'file', '2026-09-27 09:04:36');
+(26069, 'auth_bg_image', '', 'branding', 'file', '2026-09-27 09:04:36'),
+(26074, 'blog_home_count', '3', 'homepage', 'number', '2026-09-27 10:06:41'),
+(26073, 'blog_section_text', 'Practical writing on selling online in Bangladesh — no filler, no listicles.', 'homepage', 'textarea', '2026-09-27 10:06:41'),
+(26072, 'blog_section_title', 'Ideas, guides and what we are learning', 'homepage', 'text', '2026-09-27 10:06:41'),
+(26071, 'blog_show_on_home', '1', 'homepage', 'boolean', '2026-09-27 10:06:41');
 
 -- --------------------------------------------------------
 
@@ -1257,7 +1271,9 @@ ALTER TABLE `portfolio`
 ALTER TABLE `posts`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `uq_posts_slug` (`slug`),
-  ADD KEY `idx_posts_status` (`status`);
+  ADD KEY `idx_posts_status` (`status`),
+  ADD KEY `idx_posts_category` (`category`),
+  ADD KEY `idx_posts_published` (`published_at`);
 
 --
 -- Indexes for table `services`

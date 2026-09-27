@@ -27,6 +27,25 @@ router.get('/portfolio/:slug', ctrl.portfolioSingle);
 router.get('/contact', ctrl.contactForm);
 router.get('/live-chat', ctrl.staticPage('live-chat'));
 
+// ---------------------------------------------------------------------------
+// Blog
+//
+// The category filter is a query string rather than a path segment, so
+// /blog/category/guides cannot be mistaken for a post whose slug is
+// "category". One less thing to get wrong in the router.
+// ---------------------------------------------------------------------------
+router.get('/blog', ctrl.blogIndex);
+router.get('/blog/:slug', ctrl.blogPost);
+
+// ---------------------------------------------------------------------------
+// SEO plumbing
+//
+// Both were missing entirely. A blog nobody can find in a sitemap is a blog
+// nobody reads, and without robots.txt the panel URL is crawlable.
+// ---------------------------------------------------------------------------
+router.get('/sitemap.xml', ctrl.sitemap);
+router.get('/robots.txt', ctrl.robots);
+
 // What visitors see while maintenance mode is on.
 //
 // Staff are let through maintenance by design, so without this the only way to

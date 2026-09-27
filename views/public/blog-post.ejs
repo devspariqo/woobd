@@ -1,0 +1,277 @@
+<%#
+  Single blog post.
+
+  Layout, in the order the brief asked for it:
+
+    hero        title, meta and author on the left; the featured image at 16:9
+                on the right, over a blurred copy of that same image
+    body        65% article / 35% sticky sidebar
+    article     table of contents (collapses itself when short), content,
+                share row, author card
+    sidebar     top 5, categories, recent 7, CTA
+    related     six more posts, three across
+%>
+<%
+  var featured = post.featured_image ? helpers.url(post.featured_image) : '';
+  var authorInitials = helpers.initials(post.author_name || site.name);
+  var shareUrl = helpers.absoluteUrl('/blog/' + post.slug);
+  var shareText = encodeURIComponent(post.title);
+%>
+
+<%# ---------------------------------------------------------------- HERO %>
+<section class="post-hero<%= featured ? ' has-image' : '' %>">
+  <% if (featured) { %>
+    <%#
+      The blurred backdrop is the same file as the featured image, scaled up and
+      blurred. Using the image itself rather than a colour means the header
+      always matches the article, whatever is uploaded - and the scrim over it
+      is what keeps the title readable.
+    %>
+    <div class="post-hero-bg" aria-hidden="true">
+      <div class="post-hero-bg-image" style="background-image: url('<%= featured %>')"></div>
+      <div class="post-hero-scrim"></div>
+    </div>
+  <% } %>
+
+  <div class="container post-hero-inner">
+    <div class="post-hero-text">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="<%= helpers.url('/') %>">Home</a>
+        <span class="sep">/</span>
+        <a href="<%= helpers.url('/blog') %>">Blog</a>
+        <% if (post.category) { %>
+          <span class="sep">/</span>
+          <a href="<%= helpers.url('/blog?category=' + encodeURIComponent(post.category)) %>"><%= post.category %></a>
+        <% } %>
+      </nav>
+
+      <% if (post.category) { %>
+        <a class="post-hero-cat" href="<%= helpers.url('/blog?category=' + encodeURIComponent(post.category)) %>"><%= post.category %></a>
+      <% } %>
+
+      <h1><%= post.title %></h1>
+
+      <% if (post.excerpt) { %><p class="post-hero-lead"><%= post.excerpt %></p><% } %>
+
+      <div class="post-hero-meta">
+        <span class="post-author-inline">
+          <% if (post.author_avatar) { %>
+            <img src="<%= helpers.url(post.author_avatar) %>" alt="" width="34" height="34">
+          <% } else { %>
+            <span class="post-author-fallback"><%= authorInitials %></span>
+          <% } %>
+          <span>
+            <strong><%= post.author_name || site.name %></strong>
+            <em><%= post.author_role ? helpers.humanise(post.author_role) : 'Author' %></em>
+          </span>
+        </span>
+
+        <span class="post-hero-dot"></span>
+        <span><svg><use href="#i-calendar"/></svg><%= helpers.formatDate(post.published_at || post.created_at) %></span>
+        <span class="post-hero-dot"></span>
+        <span><svg><use href="#i-clock"/></svg><%= readingMinutes %> min read</span>
+      </div>
+    </div>
+
+    <% if (featured) { %>
+      <figure class="post-hero-media">
+        <img src="<%= featured %>" alt="<%= post.title %>" width="1600" height="900" fetchpriority="high">
+      </figure>
+    <% } %>
+  </div>
+</section>
+
+<% if (isPreview) { %>
+  <div class="maintenance-banner" role="status">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    <span><strong>Preview.</strong> This post is not published. Only staff can see it.</span>
+  </div>
+<% } %>
+
+<%# ---------------------------------------------------------------- BODY %>
+<section class="section post-body-section">
+  <div class="container">
+    <div class="post-layout">
+
+      <%# ------------------------------------------------ Article, 65% %>
+      <div class="post-main">
+        <% if (toc.length) { %>
+          <%#
+            The contents box collapses itself. Rendered open for a reader who
+            wants it, with a toggle for one who does not - the button is real,
+            so it works before any script runs.
+          %>
+          <details class="post-toc" open>
+            <summary>
+              <span class="post-toc-label"><svg><use href="#i-list"/></svg> On this page</span>
+              <svg class="post-toc-caret"><use href="#i-chevron-down"/></svg>
+            </summary>
+            <ol>
+              <% toc.forEach(function (item) { %>
+                <li class="post-toc-l<%= item.level %>">
+                  <a href="#<%= item.id %>"><%= item.text %></a>
+                </li>
+              <% }); %>
+            </ol>
+          </details>
+        <% } %>
+
+        <div class="prose post-content">
+          <%- post.content %>
+        </div>
+
+        <%# ------------------------------------------------ Share %>
+        <div class="post-share">
+          <span class="post-share-label">Share this article</span>
+          <div class="post-share-row">
+            <a href="https://www.facebook.com/sharer/sharer.php?u=<%= encodeURIComponent(shareUrl) %>"
+               target="_blank" rel="noopener" aria-label="Share on Facebook">
+              <svg><use href="#i-facebook"/></svg>
+            </a>
+            <a href="https://www.linkedin.com/sharing/share-offsite/?url=<%= encodeURIComponent(shareUrl) %>"
+               target="_blank" rel="noopener" aria-label="Share on LinkedIn">
+              <svg><use href="#i-linkedin"/></svg>
+            </a>
+            <a href="https://wa.me/?text=<%= shareText %>%20<%= encodeURIComponent(shareUrl) %>"
+               target="_blank" rel="noopener" aria-label="Share on WhatsApp">
+              <svg><use href="#i-whatsapp"/></svg>
+            </a>
+            <a href="https://twitter.com/intent/tweet?text=<%= shareText %>&url=<%= encodeURIComponent(shareUrl) %>"
+               target="_blank" rel="noopener" aria-label="Share on X">
+              <svg><use href="#i-twitter"/></svg>
+            </a>
+            <button type="button" data-copy="<%= shareUrl %>" aria-label="Copy the link">
+              <svg><use href="#i-link"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <%# ------------------------------------------------ Author card %>
+        <div class="post-author-card">
+          <% if (post.author_avatar) { %>
+            <img src="<%= helpers.url(post.author_avatar) %>" alt="<%= post.author_name %>" width="72" height="72">
+          <% } else { %>
+            <span class="post-author-card-fallback"><%= authorInitials %></span>
+          <% } %>
+          <div>
+            <span class="post-author-card-label">Written by</span>
+            <h3><%= post.author_name || site.name %></h3>
+            <p>
+              <%= post.author_role ? helpers.humanise(post.author_role) + ' at ' : 'Writing for ' %><%= site.name %>.
+              Get in touch if you would like help with something in this article.
+            </p>
+            <a href="<%= helpers.url('/contact') %>" class="post-author-card-link">
+              Talk to us <svg><use href="#i-arrow-right"/></svg>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <%# ------------------------------------------------ Sidebar, 35% %>
+      <aside class="post-side" aria-label="Blog sidebar">
+        <div class="post-side-sticky">
+
+          <% if (popular.length) { %>
+            <div class="post-widget">
+              <h3 class="post-widget-title">Most read</h3>
+              <ol class="post-rank-list">
+                <% popular.forEach(function (item, i) { %>
+                  <li>
+                    <span class="post-rank"><%= i + 1 %></span>
+                    <a href="<%= helpers.url('/blog/' + item.slug) %>"><%= item.title %></a>
+                  </li>
+                <% }); %>
+              </ol>
+            </div>
+          <% } %>
+
+          <% if (categories.length) { %>
+            <div class="post-widget">
+              <h3 class="post-widget-title">Categories</h3>
+              <ul class="post-cat-list">
+                <% categories.forEach(function (cat) { %>
+                  <li>
+                    <a href="<%= helpers.url('/blog?category=' + encodeURIComponent(cat.category)) %>">
+                      <span><%= cat.category %></span>
+                      <span class="post-cat-count"><%= cat.total %></span>
+                    </a>
+                  </li>
+                <% }); %>
+              </ul>
+            </div>
+          <% } %>
+
+          <% if (recent.length) { %>
+            <div class="post-widget">
+              <h3 class="post-widget-title">Latest articles</h3>
+              <ul class="post-recent-list">
+                <% recent.forEach(function (item) { %>
+                  <li>
+                    <a href="<%= helpers.url('/blog/' + item.slug) %>">
+                      <% if (item.featured_image) { %>
+                        <img src="<%= helpers.url(item.featured_image) %>" alt="" loading="lazy" width="120" height="68">
+                      <% } else { %>
+                        <span class="post-recent-blank"><svg><use href="#i-edit"/></svg></span>
+                      <% } %>
+                      <span>
+                        <strong><%= helpers.excerpt(item.title, 58) %></strong>
+                        <em><%= helpers.formatDate(item.published_at || item.created_at) %></em>
+                      </span>
+                    </a>
+                  </li>
+                <% }); %>
+              </ul>
+            </div>
+          <% } %>
+
+          <div class="post-widget post-widget-cta">
+            <h3>Need a hand with yours?</h3>
+            <p>Tell us what you sell and we will send a plan and a fixed price.</p>
+            <a href="<%= helpers.url('/contact') %>" class="btn btn-primary btn-block">Get a free quote</a>
+          </div>
+
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<%# ------------------------------------------------------------- RELATED %>
+<% if (related.length) { %>
+  <section class="section section-alt">
+    <div class="container">
+      <div class="section-head" data-reveal>
+        <span class="eyebrow">Keep reading</span>
+        <h2>Related articles</h2>
+      </div>
+
+      <div class="blog-grid blog-grid-3">
+        <% related.forEach(function (item) { %>
+          <article class="blog-card" data-reveal>
+            <a class="blog-card-media" href="<%= helpers.url('/blog/' + item.slug) %>" tabindex="-1" aria-hidden="true">
+              <% if (item.featured_image) { %>
+                <img src="<%= helpers.url(item.featured_image) %>" alt="<%= item.title %>" loading="lazy" width="800" height="450">
+              <% } else { %>
+                <span class="blog-card-blank"><svg><use href="#i-edit"/></svg></span>
+              <% } %>
+            </a>
+            <div class="blog-card-body">
+              <% if (item.category) { %>
+                <a class="blog-card-cat" href="<%= helpers.url('/blog?category=' + encodeURIComponent(item.category)) %>"><%= item.category %></a>
+              <% } %>
+              <h3 class="blog-card-title">
+                <a href="<%= helpers.url('/blog/' + item.slug) %>"><%= item.title %></a>
+              </h3>
+              <p class="blog-card-text"><%= helpers.excerpt(item.excerpt || item.content, 104) %></p>
+              <div class="blog-card-meta">
+                <span><svg><use href="#i-calendar"/></svg><%= helpers.formatDate(item.published_at || item.created_at) %></span>
+              </div>
+            </div>
+          </article>
+        <% }); %>
+      </div>
+    </div>
+  </section>
+<% } %>

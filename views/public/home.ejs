@@ -409,6 +409,56 @@
 </script>
 <% } %>
 
+<%# ---------------------------------------------------- BLOG %>
+<%#
+  Hidden when switched off, and also when nothing is published - an empty
+  "Latest articles" heading is worse than no section at all.
+%>
+<% if (settings.blog_show_on_home === '1' && blogPosts && blogPosts.length) { %>
+<section class="section">
+  <div class="container">
+    <div class="section-head" data-reveal>
+      <span class="eyebrow">From the blog</span>
+      <h2><%= settings.blog_section_title %></h2>
+      <p><%= settings.blog_section_text %></p>
+    </div>
+
+    <div class="blog-grid blog-grid-3">
+      <% blogPosts.forEach(function (post) { %>
+        <article class="blog-card" data-reveal>
+          <a class="blog-card-media" href="<%= helpers.url('/blog/' + post.slug) %>" tabindex="-1" aria-hidden="true">
+            <% if (post.featured_image) { %>
+              <img src="<%= helpers.url(post.featured_image) %>" alt="<%= post.title %>" loading="lazy" width="800" height="450">
+            <% } else { %>
+              <span class="blog-card-blank"><svg><use href="#i-edit"/></svg></span>
+            <% } %>
+          </a>
+          <div class="blog-card-body">
+            <% if (post.category) { %>
+              <a class="blog-card-cat" href="<%= helpers.url('/blog?category=' + encodeURIComponent(post.category)) %>"><%= post.category %></a>
+            <% } %>
+            <h3 class="blog-card-title">
+              <a href="<%= helpers.url('/blog/' + post.slug) %>"><%= post.title %></a>
+            </h3>
+            <p class="blog-card-text"><%= helpers.excerpt(post.excerpt || post.content, 108) %></p>
+            <div class="blog-card-meta">
+              <span><svg><use href="#i-calendar"/></svg><%= helpers.formatDate(post.published_at || post.created_at) %></span>
+            </div>
+          </div>
+        </article>
+      <% }); %>
+    </div>
+
+    <div class="text-center mt-6" data-reveal>
+      <a href="<%= helpers.url('/blog') %>" class="btn btn-outline btn-lg">
+        Read the blog
+        <svg><use href="#i-arrow-right"/></svg>
+      </a>
+    </div>
+  </div>
+</section>
+<% } %>
+
 <%# ---------------------------------------------------- CTA + form %>
 <section class="section cta-section<%= settings.cta_bg_image ? ' has-bg-image' : '' %>"
          id="quote"

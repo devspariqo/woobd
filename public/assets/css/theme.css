@@ -2331,6 +2331,593 @@ body.no-scroll { overflow: hidden; }
 }
 
 /* --------------------------------------------------------------------------
+   Blog
+
+   Three surfaces share one card: the index, the homepage strip and the related
+   row. Keeping the card in one place means a change to it lands everywhere.
+   -------------------------------------------------------------------------- */
+.blog-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 34px;
+}
+
+.blog-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 260px;
+  max-width: 340px;
+}
+
+.blog-search svg {
+  position: absolute;
+  left: 14px;
+  width: 17px;
+  height: 17px;
+  color: var(--text-soft);
+  pointer-events: none;
+}
+
+.blog-search input {
+  width: 100%;
+  height: 44px;
+  padding: 0 16px 0 42px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: .9375rem;
+  color: var(--text);
+}
+
+.blog-search input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--chat-accent-soft, rgba(91, 33, 240, .1));
+}
+
+.blog-cats { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.blog-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 15px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: .8438rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast);
+}
+
+.blog-cat:hover { border-color: var(--primary); color: var(--primary); }
+
+.blog-cat.is-active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+.blog-cat span {
+  font-size: .6875rem;
+  opacity: .7;
+  font-variant-numeric: tabular-nums;
+}
+
+.blog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 26px;
+}
+
+.blog-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+.blog-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: transform var(--t), box-shadow var(--t), border-color var(--t);
+}
+
+.blog-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--border-strong);
+}
+
+.blog-card-media { display: block; background: var(--bg-alt); }
+
+.blog-card-media img {
+  display: block;
+  width: 100%;
+  /* 16:9 everywhere, so a row of cards lines up whatever was uploaded. */
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+.blog-card-blank {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  color: var(--primary);
+  background: var(--gradient-soft);
+}
+
+.blog-card-blank svg { width: 40px; height: 40px; }
+
+.blog-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 22px;
+  flex: 1;
+}
+
+.blog-card-cat {
+  align-self: flex-start;
+  font-size: .6875rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+.blog-card-title { font-size: 1.0625rem; line-height: 1.4; margin: 0; }
+.blog-card-title a { color: var(--text); }
+.blog-card-title a:hover { color: var(--primary); }
+
+.blog-card-text {
+  font-size: .9063rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+  margin: 0;
+  flex: 1;
+}
+
+.blog-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: .75rem;
+  color: var(--text-soft);
+}
+
+.blog-card-meta span { display: inline-flex; align-items: center; gap: 6px; }
+.blog-card-meta svg { width: 13px; height: 13px; }
+
+/* The newest post gets a wider card on the index, which gives the page a
+   focal point instead of nine identical tiles. */
+@media (min-width: 900px) {
+  .blog-card.is-lead { grid-column: span 2; }
+  .blog-card.is-lead .blog-card-title { font-size: 1.5rem; }
+  .blog-card.is-lead .blog-card-text { font-size: .9688rem; }
+}
+
+/* --------------------------------------------------------------------------
+   Single post — hero
+   -------------------------------------------------------------------------- */
+.post-hero {
+  position: relative;
+  padding: 54px 0 62px;
+  overflow: hidden;
+  background: var(--bg-alt);
+}
+
+.post-hero-bg { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+
+.post-hero-bg-image {
+  position: absolute;
+  /* Overscanned so the blur has pixels to sample at the edges. */
+  inset: -60px;
+  background-size: cover;
+  background-position: center;
+  filter: blur(26px) saturate(1.15);
+  transform: scale(1.06);
+}
+
+.post-hero-scrim {
+  position: absolute;
+  inset: 0;
+  /* The blurred image is the only thing behind the title, so the scrim is what
+     makes the text readable - not decoration. */
+  background: linear-gradient(120deg, rgba(10, 6, 30, .90) 0%, rgba(12, 7, 36, .82) 55%, rgba(10, 6, 30, .88) 100%);
+}
+
+.post-hero-inner {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1.15fr .85fr;
+  gap: 52px;
+  align-items: center;
+}
+
+.post-hero-text { min-width: 0; }
+
+.post-hero .breadcrumb,
+.post-hero .breadcrumb a { color: rgba(255, 255, 255, .72); }
+.post-hero .breadcrumb a:hover { color: #fff; }
+
+.post-hero-cat {
+  display: inline-block;
+  margin: 16px 0 14px;
+  padding: 5px 14px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, .16);
+  color: #fff;
+  font-size: .6875rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.post-hero h1 {
+  color: #fff;
+  font-size: 2.5rem;
+  line-height: 1.18;
+  letter-spacing: -.02em;
+  margin-bottom: 16px;
+}
+
+.post-hero-lead {
+  color: rgba(255, 255, 255, .84);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  margin-bottom: 24px;
+}
+
+.post-hero-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: .8438rem;
+  color: rgba(255, 255, 255, .78);
+}
+
+.post-hero-meta > span { display: inline-flex; align-items: center; gap: 7px; }
+.post-hero-meta svg { width: 15px; height: 15px; }
+.post-hero-dot { width: 4px; height: 4px; border-radius: 50%; background: rgba(255, 255, 255, .4); }
+
+.post-author-inline { display: inline-flex; align-items: center; gap: 10px; }
+.post-author-inline img,
+.post-author-fallback {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.post-author-fallback {
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, .2);
+  color: #fff;
+  font-size: .75rem;
+  font-weight: 700;
+}
+
+.post-author-inline strong { display: block; color: #fff; font-weight: 600; }
+.post-author-inline em { display: block; font-style: normal; font-size: .75rem; opacity: .75; }
+
+.post-hero-media {
+  margin: 0;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .38);
+  border: 1px solid rgba(255, 255, 255, .14);
+}
+
+.post-hero-media img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+@media (max-width: 900px) {
+  .post-hero-inner { grid-template-columns: 1fr; gap: 32px; }
+  .post-hero h1 { font-size: 1.875rem; }
+  /* Image first on a phone: it is the reason someone taps through, and the
+     title reads fine underneath it. */
+  .post-hero-media { order: -1; }
+}
+
+/* --------------------------------------------------------------------------
+   Single post — body
+   -------------------------------------------------------------------------- */
+.post-body-section { padding-top: 54px; }
+
+.post-layout {
+  display: grid;
+  grid-template-columns: 65fr 35fr;
+  gap: 54px;
+  align-items: start;
+}
+
+.post-main { min-width: 0; }
+
+/* --- Table of contents ---------------------------------------------------- */
+.post-toc {
+  margin-bottom: 30px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-alt);
+  overflow: hidden;
+}
+
+.post-toc summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  cursor: pointer;
+  list-style: none;
+  font-size: .875rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.post-toc summary::-webkit-details-marker { display: none; }
+.post-toc-label { display: inline-flex; align-items: center; gap: 9px; }
+.post-toc-label svg { width: 16px; height: 16px; color: var(--primary); }
+.post-toc-caret { width: 16px; height: 16px; color: var(--text-soft); transition: transform var(--t-fast); }
+.post-toc[open] .post-toc-caret { transform: rotate(180deg); }
+
+.post-toc ol {
+  list-style: none;
+  margin: 0;
+  padding: 0 18px 16px;
+  counter-reset: toc;
+}
+
+.post-toc li { counter-increment: toc; padding: 5px 0; }
+.post-toc li a {
+  display: flex;
+  gap: 10px;
+  font-size: .875rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.post-toc li a::before {
+  content: counter(toc) '.';
+  color: var(--primary);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.post-toc li a:hover { color: var(--primary); }
+/* Sub-headings indent under their parent. */
+.post-toc-l3 { padding-left: 22px; }
+.post-toc-l3 a { font-size: .8438rem; }
+
+/* --- Share ---------------------------------------------------------------- */
+.post-share {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin: 38px 0 0;
+  padding: 20px 22px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+}
+
+.post-share-label { font-size: .875rem; font-weight: 700; color: var(--text); }
+.post-share-row { display: flex; gap: 9px; }
+
+.post-share-row a,
+.post-share-row button {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast), transform var(--t-fast);
+}
+
+.post-share-row svg { width: 17px; height: 17px; }
+.post-share-row a:hover,
+.post-share-row button:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+/* --- Author card ---------------------------------------------------------- */
+.post-author-card {
+  display: flex;
+  gap: 20px;
+  margin-top: 30px;
+  padding: 26px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.post-author-card img,
+.post-author-card-fallback {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.post-author-card-fallback {
+  display: grid;
+  place-items: center;
+  background: var(--gradient);
+  color: #fff;
+  font-size: 1.375rem;
+  font-weight: 700;
+}
+
+.post-author-card-label {
+  display: block;
+  font-size: .6875rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  margin-bottom: 5px;
+}
+
+.post-author-card h3 { font-size: 1.0625rem; margin-bottom: 8px; }
+.post-author-card p { font-size: .9063rem; line-height: 1.65; color: var(--text-muted); margin-bottom: 12px; }
+.post-author-card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: .875rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+.post-author-card-link svg { width: 15px; height: 15px; }
+.post-author-card-link:hover svg { transform: translateX(3px); }
+
+/* --- Sidebar -------------------------------------------------------------- */
+.post-side { min-width: 0; }
+
+/* Sticky so it stays beside the article rather than scrolling away from it.
+   The offset clears the site header. */
+.post-side-sticky {
+  position: sticky;
+  top: 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.post-widget {
+  padding: 22px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.post-widget-title {
+  font-size: .9375rem;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.post-rank-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+
+.post-rank-list li { display: flex; gap: 12px; align-items: flex-start; }
+
+.post-rank {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: var(--bg-alt);
+  color: var(--primary);
+  font-size: .6875rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.post-rank-list li:first-child .post-rank { background: var(--primary); color: #fff; }
+.post-rank-list a { font-size: .875rem; line-height: 1.45; font-weight: 500; color: var(--text); }
+.post-rank-list a:hover { color: var(--primary); }
+
+.post-cat-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.post-cat-list a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  font-size: .875rem;
+  color: var(--text-muted);
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.post-cat-list a:hover { background: var(--bg-alt); color: var(--primary); }
+
+.post-cat-count {
+  font-size: .6875rem;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-alt);
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.post-recent-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.post-recent-list a { display: flex; gap: 12px; align-items: center; }
+
+.post-recent-list img,
+.post-recent-blank {
+  width: 62px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--bg-alt);
+}
+
+.post-recent-blank { display: grid; place-items: center; color: var(--primary); }
+.post-recent-blank svg { width: 18px; height: 18px; }
+
+.post-recent-list strong {
+  display: block;
+  font-size: .8438rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text);
+}
+.post-recent-list a:hover strong { color: var(--primary); }
+.post-recent-list em {
+  display: block;
+  font-style: normal;
+  font-size: .6875rem;
+  color: var(--text-soft);
+  margin-top: 3px;
+}
+
+.post-widget-cta { background: var(--gradient-soft); border-color: transparent; }
+.post-widget-cta h3 { font-size: 1rem; margin-bottom: 9px; }
+.post-widget-cta p { font-size: .875rem; line-height: 1.6; color: var(--text-muted); margin-bottom: 16px; }
+
+@media (max-width: 1024px) {
+  /* One column. The sidebar moves below the article and stops being sticky -
+     a sticky panel at the bottom of a phone screen would cover the text. */
+  .post-layout { grid-template-columns: 1fr; gap: 44px; }
+  .post-side-sticky { position: static; }
+  .blog-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .blog-grid, .blog-grid-3 { grid-template-columns: 1fr; }
+  .blog-card.is-lead { grid-column: auto; }
+  .blog-card.is-lead .blog-card-title { font-size: 1.125rem; }
+  .post-hero { padding: 36px 0 44px; }
+  .post-hero h1 { font-size: 1.5rem; }
+  .post-author-card { flex-direction: column; gap: 16px; }
+  .post-share { flex-direction: column; align-items: flex-start; }
+}
+
+/* --------------------------------------------------------------------------
    CTA background image
 
    Optional. When set, the section keeps its gradient as the base and the photo

@@ -1,0 +1,91 @@
+<%#
+  Blog index.
+
+  Cards rather than a plain list: the featured image is the only thing that
+  makes a grid of articles scannable, and every post is required to have one.
+%>
+<%- include('../partials/page-hero', {
+  pageTitle: category ? category : 'Blog',
+  lead: category
+    ? `Every article filed under ${category}.`
+    : 'Practical writing on selling online in Bangladesh — what works, what does not, and why.',
+  crumbs: [{ label: 'Blog', url: '/blog' }, category ? { label: category } : null].filter(Boolean)
+}) %>
+
+<section class="section">
+  <div class="container">
+
+    <%# Search and categories share a row so the page has one filter area rather
+        than two competing ones. %>
+    <div class="blog-toolbar" data-reveal>
+      <form class="blog-search" method="get" action="<%= helpers.url('/blog') %>">
+        <svg><use href="#i-search"/></svg>
+        <input type="search" name="q" value="<%= search %>" placeholder="Search articles…" aria-label="Search articles">
+        <% if (category) { %><input type="hidden" name="category" value="<%= category %>"><% } %>
+      </form>
+
+      <% if (categories.length) { %>
+        <div class="blog-cats">
+          <a href="<%= helpers.url('/blog') %>" class="blog-cat<%= !category ? ' is-active' : '' %>">All</a>
+          <% categories.forEach(function (cat) { %>
+            <a href="<%= helpers.url('/blog?category=' + encodeURIComponent(cat.category)) %>"
+               class="blog-cat<%= category === cat.category ? ' is-active' : '' %>">
+              <%= cat.category %> <span><%= cat.total %></span>
+            </a>
+          <% }); %>
+        </div>
+      <% } %>
+    </div>
+
+    <% if (posts.length) { %>
+      <div class="blog-grid">
+        <% posts.forEach(function (post, i) { %>
+          <article class="blog-card<%= i === 0 && !search && !category ? ' is-lead' : '' %>" data-reveal>
+            <a class="blog-card-media" href="<%= helpers.url('/blog/' + post.slug) %>" tabindex="-1" aria-hidden="true">
+              <% if (post.featured_image) { %>
+                <img src="<%= helpers.url(post.featured_image) %>" alt="<%= post.title %>" loading="<%= i < 3 ? 'eager' : 'lazy' %>" width="800" height="450">
+              <% } else { %>
+                <span class="blog-card-blank"><svg><use href="#i-edit"/></svg></span>
+              <% } %>
+            </a>
+
+            <div class="blog-card-body">
+              <% if (post.category) { %>
+                <a class="blog-card-cat" href="<%= helpers.url('/blog?category=' + encodeURIComponent(post.category)) %>"><%= post.category %></a>
+              <% } %>
+
+              <h2 class="blog-card-title">
+                <a href="<%= helpers.url('/blog/' + post.slug) %>"><%= post.title %></a>
+              </h2>
+
+              <p class="blog-card-text"><%= helpers.excerpt(post.excerpt || post.content, 132) %></p>
+
+              <div class="blog-card-meta">
+                <span><svg><use href="#i-user"/></svg><%= post.author_name || site.name %></span>
+                <span><svg><use href="#i-calendar"/></svg><%= helpers.formatDate(post.published_at || post.created_at) %></span>
+              </div>
+            </div>
+          </article>
+        <% }); %>
+      </div>
+
+      <%- include('../partials/pagination', { pager: pager, baseUrl: '/blog' }) %>
+
+    <% } else { %>
+      <div class="empty-state" style="padding:60px 20px">
+        <div class="ico"><svg><use href="#i-edit"/></svg></div>
+        <h3 style="font-size:1.0625rem">
+          <% if (search) { %>Nothing matched “<%= search %>”<% } else if (category) { %>No articles in <%= category %> yet<% } else { %>No articles yet<% } %>
+        </h3>
+        <p style="font-size:.9375rem">
+          <% if (search || category) { %>
+            <a href="<%= helpers.url('/blog') %>">Show every article</a>
+          <% } else { %>
+            The first one is being written. Check back soon.
+          <% } %>
+        </p>
+      </div>
+    <% } %>
+
+  </div>
+</section>

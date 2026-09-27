@@ -330,6 +330,74 @@ const RESOURCES = {
   },
 
   // -------------------------------------------------------------------------
+  // Blog posts
+  //
+  // The table and model existed from the start but there was no admin screen,
+  // so the blog could not be written in. This is that screen.
+  // -------------------------------------------------------------------------
+  posts: {
+    label: 'Blog',
+    singular: 'Post',
+    description: 'Articles, guides and announcements.',
+    icon: 'i-edit',
+    listMode: 'paginated',
+    uploadFolder: 'posts',
+    model: {
+      list: 'listPosts',
+      find: 'findPostById',
+      create: 'createPost',
+      update: 'updatePost',
+      remove: 'deletePost',
+    },
+    titleField: 'title',
+    searchFields: ['title', 'slug', 'excerpt', 'content'],
+    filters: [
+      { key: 'status', label: 'Status', options: PUBLISH_OPTIONS, param: 'status' },
+      { key: 'featured', label: 'Featured', options: [{ value: '1', label: 'Featured only' }], param: 'featured' },
+    ],
+    columns: [
+      { key: 'title', label: 'Post', type: 'product', image: 'featured_image' },
+      { key: 'category', label: 'Category' },
+      { key: 'published_at', label: 'Published', type: 'date' },
+      { key: 'view_count', label: 'Views', type: 'number' },
+      { key: 'status', label: 'Status', type: 'status' },
+    ],
+    fields: [
+      { key: 'title', label: 'Post title', type: 'text', required: true, maxlength: 200 },
+      { key: 'slug', label: 'URL slug', type: 'slug', source: 'title', required: true, help: 'The post is served at /blog/<slug>.' },
+      { key: 'category', label: 'Category', type: 'text', maxlength: 80, help: 'One word or short phrase, such as Guides or News. Used for the category list on every post page.' },
+      { key: 'excerpt', label: 'Summary', type: 'textarea', rows: 2, maxlength: 500, group: 'Content', help: 'One or two sentences. Shown on the blog list, in search results and when the post is shared.' },
+      { key: 'content', label: 'Content', type: 'html', rows: 22, group: 'Content', help: 'Headings become the table of contents automatically.' },
+      { key: 'featured_image', label: 'Featured image', type: 'image', group: 'Media', help: 'Shown at 16:9 across the site. 1600x900 or larger works best.' },
+      { key: 'reading_minutes', label: 'Reading time (minutes)', type: 'number', group: 'Media', default: '0', help: 'Leave 0 to work it out from the length of the content.' },
+      { key: 'author_id', label: 'Author', type: 'select', optionsFrom: 'staff', group: 'Publishing', help: 'Shown on the post and in the author card.' },
+      { key: 'status', label: 'Status', type: 'select', options: PUBLISH_OPTIONS, default: 'draft', group: 'Publishing' },
+      { key: 'published_at', label: 'Publish date', type: 'date', group: 'Publishing', help: 'Set a future date to schedule the post.' },
+      { key: 'is_featured', label: 'Feature on the homepage', type: 'boolean', group: 'Publishing' },
+
+      // --- SEO -------------------------------------------------------------
+      { key: 'seo_title', label: 'SEO title', type: 'text', maxlength: 200, group: 'SEO', help: 'Falls back to the post title.' },
+      { key: 'seo_description', label: 'SEO description', type: 'textarea', rows: 2, maxlength: 320, group: 'SEO', help: 'The snippet in search results. Around 155 characters before it is cut off.' },
+      { key: 'meta_keywords', label: 'Keywords', type: 'text', maxlength: 320, group: 'SEO', help: 'Comma separated. Google ignores these; other engines still read them.' },
+      { key: 'canonical_url', label: 'Canonical URL', type: 'text', maxlength: 500, group: 'SEO', help: 'Only if the same article is reachable elsewhere.' },
+      {
+        key: 'robots',
+        label: 'Search engine indexing',
+        type: 'select',
+        group: 'SEO',
+        default: 'index,follow',
+        options: ['index,follow', 'index,nofollow', 'noindex,follow', 'noindex,nofollow'],
+        help: 'Choose noindex for posts you do not want in search results.',
+      },
+
+      // --- Social -----------------------------------------------------------
+      { key: 'og_title', label: 'Social share title', type: 'text', maxlength: 200, group: 'Social', help: 'Falls back to the SEO title.' },
+      { key: 'og_description', label: 'Social share description', type: 'textarea', rows: 2, maxlength: 320, group: 'Social' },
+      { key: 'og_image', label: 'Social share image', type: 'image', group: 'Social', help: '1200 x 630 works everywhere. Falls back to the featured image.' },
+    ],
+  },
+
+  // -------------------------------------------------------------------------
   // Menus
   // -------------------------------------------------------------------------
   menus: {

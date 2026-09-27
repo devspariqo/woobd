@@ -555,6 +555,17 @@ async function loadOptionSets(resource, { excludeId = null } = {}) {
       sets[field.key] = await content.listCategories({ onlyActive: false });
     }
 
+    if (field.optionsFrom === 'staff') {
+      // Author picker for blog posts. Active accounts only - a suspended or
+      // removed member should not be assignable to new writing.
+      const userModel = require('../models/user.model');
+      const staff = await userModel.listStaff({ perPage: 100, status: 'active' });
+      sets[field.key] = (staff.rows || []).map((row) => ({
+        id: row.id,
+        name: `${row.name} (${row.role})`,
+      }));
+    }
+
     if (field.optionsFrom === 'menuParents') {
       // Only top-level items qualify: the header and mobile partials render one
       // level of nesting, so a child of a child would never appear.

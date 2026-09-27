@@ -358,7 +358,7 @@ async function deletePage(id) {
   return db.query('DELETE FROM pages WHERE id = ?', [id]);
 }
 
-async function listPosts({ page = 1, perPage = 9, search = '', status = '' } = {}) {
+async function listPosts({ page = 1, perPage = 9, search = '', status = '', featured = '' } = {}) {
   const conditions = [];
   const params = [];
   if (search) {
@@ -369,6 +369,7 @@ async function listPosts({ page = 1, perPage = 9, search = '', status = '' } = {
     conditions.push('p.status = ?');
     params.push(status);
   }
+  if (featured === '1') conditions.push('p.is_featured = 1');
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
   return paginate({
@@ -385,14 +386,153 @@ async function listPosts({ page = 1, perPage = 9, search = '', status = '' } = {
 
 async function findPostBySlug(slug) {
   return db.queryOne(
-    `SELECT p.*, u.name AS author_name FROM posts p
-     LEFT JOIN users u ON u.id = p.author_id WHERE p.slug = ? LIMIT 1`,
+    `SELECT p.*, u.name AS author_name, u.role AS author_role, u.avatar AS author_avatar
+       FROM posts p
+       LEFT JOIN users u ON u.id = p.author_id
+      WHERE p.slug = ? LIMIT 1`,
     [slug]
   );
 }
 
 async function findPostById(id) {
-  return db.queryOne('SELECT * FROM posts WHERE id = ? LIMIT 1', [id]);
+  return db.queryOne(
+    `SELECT p.*, u.name AS author_name FROM posts p
+       LEFT JOIN users u ON u.id = p.author_id
+      WHERE p.id = ? LIMIT 1`,
+    [id]
+  );
+}
+
+/**
+ * A post is public when it is published AND its date has arrived.
+ *
+ * The date check is what makes scheduling work: setting a future publish date
+ * holds the post back without needing a cron job to flip its status.
+ */
+const PUBLIC_POST_SQL = "p.status = 'published' AND (p.published_at IS NULL OR p.published_at <= NOW())";
+
+/** Published posts, newest first, with paging and an optional search. */
+async function listPublishedPosts({ page = 1, perPage = 9, search = '', category = '' } = {}) {
+  const conditions = [PUBLIC_POST_SQL];
+  const params = [];
+
+  if (search) {
+    conditions.push('(p.title LIKE ? OR p.excerpt LIKE ? OR p.content LIKE ?)');
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+  }
+  if (category) {
+    conditions.push('p.category = ?');
+    params.push(category);
+  }
+
+  const where = `WHERE ${conditions.join(' AND ')}`;
+
+  return paginate({
+    countSql: `SELECT COUNT(*) AS total FROM posts p ${where}`,
+    countParams: params,
+    rowSql: `SELECT p.*, u.name AS author_name FROM posts p
+             LEFT JOIN users u ON u.id = p.author_id
+             ${where} ORDER BY COALESCE(p.published_at, p.created_at) DESC LIMIT ? OFFSET ?`,
+    rowParams: params,
+    page,
+    perPage,
+  });
+}
+
+/** Posts flagged for the homepage, newest first. */
+async function featuredPosts(limit = 3) {
+  return db.query(
+    `SELECT p.*, u.name AS author_name FROM posts p
+       LEFT JOIN users u ON u.id = p.author_id
+      WHERE ${PUBLIC_POST_SQL} AND p.is_featured = 1
+      ORDER BY COALESCE(p.published_at, p.created_at) DESC LIMIT ?`,
+    [limit]
+  );
+}
+
+/**
+ * Most-read posts, for the sidebar.
+ *
+ * Ordered by views, then by date, so a brand new blog with no traffic yet
+ * still shows something sensible instead of an empty box.
+ */
+async function topPosts(limit = 5) {
+  return db.query(
+    `SELECT p.id, p.title, p.slug, p.category, p.featured_image, p.published_at, p.view_count
+       FROM posts p WHERE ${PUBLIC_POST_SQL}
+      ORDER BY p.view_count DESC, COALESCE(p.published_at, p.created_at) DESC LIMIT ?`,
+    [limit]
+  );
+}
+
+/** Latest posts, for the sidebar. `excludeId` keeps the current post out of it. */
+async function recentPosts(limit = 7, excludeId = null) {
+  return db.query(
+    `SELECT p.id, p.title, p.slug, p.category, p.featured_image, p.published_at
+       FROM posts p WHERE ${PUBLIC_POST_SQL} ${excludeId ? 'AND p.id <> ?' : ''}
+      ORDER BY COALESCE(p.published_at, p.created_at) DESC LIMIT ?`,
+    excludeId ? [excludeId, limit] : [limit]
+  );
+}
+
+/** Categories in use, with how many posts each holds. */
+async function postCategories() {
+  return db.query(
+    `SELECT p.category, COUNT(*) AS total FROM posts p
+      WHERE ${PUBLIC_POST_SQL} AND category IS NOT NULL AND category <> ''
+      GROUP BY p.category ORDER BY total DESC, p.category ASC`
+  );
+}
+
+/**
+ * Posts related to the one being read.
+ *
+ * Same category first, then topped up with the latest posts so the row is never
+ * short - a single-category blog would otherwise show one or two cards under a
+ * heading that promises six.
+ */
+async function relatedPosts(post, limit = 6) {
+  const rows = await db.query(
+    `SELECT p.*, u.name AS author_name FROM posts p
+       LEFT JOIN users u ON u.id = p.author_id
+      WHERE ${PUBLIC_POST_SQL} AND p.id <> ?
+        ${post.category ? 'AND p.category = ?' : ''}
+      ORDER BY COALESCE(p.published_at, p.created_at) DESC LIMIT ?`,
+    post.category ? [post.id, post.category, limit] : [post.id, limit]
+  );
+
+  if (rows.length >= limit) return rows;
+
+  const seen = new Set([post.id, ...rows.map((r) => r.id)]);
+  const filler = await db.query(
+    `SELECT p.*, u.name AS author_name FROM posts p
+       LEFT JOIN users u ON u.id = p.author_id
+      WHERE ${PUBLIC_POST_SQL}
+      ORDER BY COALESCE(p.published_at, p.created_at) DESC LIMIT ?`,
+    [limit * 2]
+  );
+
+  for (const row of filler) {
+    if (rows.length >= limit) break;
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+/** Count a read. Fire-and-forget: a failed counter must not fail the page. */
+async function incrementPostViews(id) {
+  return db.query('UPDATE posts SET view_count = view_count + 1 WHERE id = ?', [id]);
+}
+
+/** Every published post, for the sitemap. */
+async function publishedPostIndex() {
+  return db.query(
+    `SELECT p.slug, p.updated_at FROM posts p WHERE ${PUBLIC_POST_SQL}
+      ORDER BY COALESCE(p.published_at, p.created_at) DESC`
+  );
 }
 
 async function createPost(data) {
@@ -494,6 +634,8 @@ module.exports = {
   listClients, findClientById, createClient, updateClient, deleteClient,
   findPageBySlug, findPageById, listPages, createPage, updatePage, deletePage,
   listPosts, findPostBySlug, findPostById, createPost, updatePost, deletePost,
+  listPublishedPosts, featuredPosts, topPosts, recentPosts, postCategories, relatedPosts,
+  incrementPostViews, publishedPostIndex,
   listMenus, findMenuById, createMenu, updateMenu, deleteMenu,
   listMedia, findMediaById, deleteMedia, mediaFolders,
 };

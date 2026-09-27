@@ -3362,6 +3362,122 @@ async function checkMaintenanceAndChat() {
   await db.close().catch(() => {});
 }
 
+/**
+ * Blog: the admin CMS, the public pages, and the SEO plumbing.
+ *
+ * The blog is the newest surface and the one most likely to break silently -
+ * a listing that renders but has no cards, or a post page that loses its
+ * sidebar, looks fine at a glance.
+ */
+async function checkBlog() {
+  section('21. Blog CMS and public pages');
+
+  const db = require('../src/config/database');
+
+  try {
+    // --- Admin ------------------------------------------------------------
+    const login = await adminLogin();
+    if (!login.ok) {
+      warn('admin sign-in', `${login.reason} - skipping`);
+      await db.close().catch(() => {});
+      return;
+    }
+
+    for (const [path, label] of [
+      [`/${ADMIN_SLUG}/posts`, 'the post list'],
+      [`/${ADMIN_SLUG}/posts/new`, 'the new-post form'],
+    ]) {
+      const page = await req(path);
+      if (page.status === 200) ok(`${label} renders`, `${path} → 200`);
+      else bad(`${label} renders`, `${path} → ${page.status}`);
+    }
+
+    // The form must carry the fields the design depends on.
+    const form = await req(`/${ADMIN_SLUG}/posts/new`);
+    const needed = ['featured_image', 'category', 'excerpt', 'content', 'author_id', 'og_image', 'robots'];
+    const missing = needed.filter((name) => !form.body.includes(`name="${name}"`));
+    if (!missing.length) ok('the post form has every field', needed.length + ' checked');
+    else bad('the post form has every field', `missing: ${missing.join(', ')}`);
+
+    // --- Public -----------------------------------------------------------
+    const index = await req('/blog');
+    if (index.status === 200) ok('the blog index renders', '200');
+    else bad('the blog index renders', `got ${index.status}`);
+
+    const cards = (index.body.match(/class="blog-card/g) || []).length;
+    if (cards > 0) ok('the index lists posts', `${cards} card(s)`);
+    else warn('the index lists posts', 'no cards - the blog may be empty');
+
+    // Pick a real published post to test the detail page against.
+    const row = await db.queryOne(
+      "SELECT slug FROM posts WHERE status = 'published' AND (published_at IS NULL OR published_at <= NOW()) ORDER BY id LIMIT 1"
+    );
+
+    if (!row) {
+      warn('a single post renders', 'no published posts to test against');
+    } else {
+      const post = await req(`/blog/${row.slug}`);
+
+      if (post.status === 200) ok('a single post renders', `/blog/${row.slug} → 200`);
+      else bad('a single post renders', `got ${post.status}`);
+
+      // The layout the brief specified, in the order it was specified.
+      const parts = [
+        ['table of contents', 'post-toc'],
+        ['share row', 'post-share'],
+        ['author card', 'post-author-card'],
+        ['sticky sidebar', 'post-side-sticky'],
+        ['sidebar widgets', 'post-widget'],
+        ['related posts', 'blog-grid-3'],
+      ];
+      const absent = parts.filter(([, cls]) => !post.body.includes(cls)).map(([label]) => label);
+      if (!absent.length) ok('the post page has every section', parts.length + ' sections');
+      else bad('the post page has every section', `missing: ${absent.join(', ')}`);
+
+      // Structured data, which is the whole point of the SEO work.
+      if (post.body.includes('"@type":"BlogPosting"')) ok('the post carries BlogPosting schema');
+      else bad('the post carries BlogPosting schema', 'not found in the page');
+
+      if (post.body.includes('"@type":"BreadcrumbList"')) ok('the post carries breadcrumb schema');
+      else bad('the post carries breadcrumb schema', 'not found in the page');
+
+      if (/rel="canonical"/.test(post.body)) ok('the post has a canonical URL');
+      else bad('the post has a canonical URL', 'no canonical link');
+
+      if (/property="og:type" content="article"/.test(post.body)) ok('the post is typed as an article');
+      else bad('the post is typed as an article', 'og:type is not article');
+    }
+
+    // --- SEO plumbing -----------------------------------------------------
+    const sitemap = await req('/sitemap.xml');
+    if (sitemap.status === 200 && sitemap.body.includes('<urlset')) {
+      const count = (sitemap.body.match(/<loc>/g) || []).length;
+      ok('the sitemap renders', `${count} URLs`);
+      if (sitemap.body.includes('/blog/')) ok('the sitemap includes blog posts');
+      else bad('the sitemap includes blog posts', 'no /blog/ URLs');
+    } else {
+      bad('the sitemap renders', `got ${sitemap.status}`);
+    }
+
+    const robots = await req('/robots.txt');
+    if (robots.status === 200 && robots.body.includes('Sitemap:')) {
+      ok('robots.txt points at the sitemap');
+    } else {
+      bad('robots.txt points at the sitemap', `got ${robots.status}`);
+    }
+
+    if (robots.body.includes(`Disallow: /${ADMIN_SLUG}/`)) {
+      ok('robots.txt keeps crawlers out of the panel');
+    } else {
+      bad('robots.txt keeps crawlers out of the panel', 'the admin path is crawlable');
+    }
+  } catch (err) {
+    bad('blog', err.message);
+  }
+
+  await db.close().catch(() => {});
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -3398,6 +3514,7 @@ async function main() {
     await checkCsrf();
     await checkAssets();
     await checkMaintenanceAndChat();
+    await checkBlog();
     // Last: it signs in, which would otherwise change the identity every
     // earlier guard test relies on being anonymous.
     await checkAdminSettings();

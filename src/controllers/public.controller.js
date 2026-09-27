@@ -7,6 +7,7 @@
  */
 'use strict';
 
+const config = require('../config');
 const content = require('../models/content.model');
 const orders = require('../models/order.model');
 const settings = require('../services/settings.service');
@@ -81,7 +82,7 @@ const SERVICE_DELIVERABLES = [
 
 exports.home = async (req, res, next) => {
   try {
-    const [services, portfolio, testimonials, faqs, clients] = await Promise.all([
+    const [services, portfolio, testimonials, faqs, clients, blogPosts] = await Promise.all([
       cached('home:services', 120000, () =>
         content.listServices({ status: 'active', featured: true, perPage: 6 })
       ),
@@ -93,6 +94,23 @@ exports.home = async (req, res, next) => {
       ),
       cached('home:faqs', 120000, () => content.listFaqs({ status: 'active', limit: 8 })),
       cached('home:clients', 300000, () => content.listClients({ status: 'active' })),
+      // Featured posts first, topped up with the newest so the section is not
+      // empty on a blog nobody has flagged anything on yet.
+      cached('home:blog', 120000, async () => {
+        const limit = Math.max(1, Math.min(6, Number(settings.get('blog_home_count')) || 3));
+        const featuredPosts = await content.featuredPosts(limit);
+        if (featuredPosts.length >= limit) return featuredPosts;
+
+        const seen = new Set(featuredPosts.map((p) => p.id));
+        const latest = await content.listPublishedPosts({ perPage: limit * 2 });
+        for (const row of latest.rows) {
+          if (featuredPosts.length >= limit) break;
+          if (seen.has(row.id)) continue;
+          seen.add(row.id);
+          featuredPosts.push(row);
+        }
+        return featuredPosts;
+      }),
     ]);
 
     // If nothing is flagged as featured yet, fall back to the newest packages so
@@ -112,6 +130,7 @@ exports.home = async (req, res, next) => {
       testimonials: testimonials,
       faqs: faqs,
       clients: clients,
+      blogPosts,
       whyChoose: WHY_CHOOSE,
       seo: {
         ...res.locals.seo,
@@ -484,6 +503,327 @@ exports.contactSubmit = async (req, res, next) => {
 // ---------------------------------------------------------------------------
 // Static / legal pages
 // ---------------------------------------------------------------------------
+
+/**
+ * XML sitemap.
+ *
+ * Covers every public URL the site can produce: the fixed pages, the CMS pages,
+ * packages, portfolio pieces and blog posts. Built from the database rather
+ * than a hand-maintained list, so a new package or article appears without
+ * anyone remembering to add it.
+ *
+ * `lastmod` is emitted only where the row has a real updated timestamp - a
+ * sitemap that claims everything changed today is ignored.
+ */
+exports.sitemap = async (req, res, next) => {
+  try {
+    const base = String(config.app.url || '').replace(/\/$/, '');
+    const urls = [];
+
+    const add = (path, lastmod, priority, changefreq) => {
+      urls.push({ loc: `${base}${path}`, lastmod, priority, changefreq });
+    };
+
+    // Fixed routes, in rough order of importance.
+    add('/', null, '1.0', 'weekly');
+    add('/services', null, '0.9', 'weekly');
+    add('/portfolio', null, '0.8', 'monthly');
+    add('/blog', null, '0.8', 'daily');
+    add('/contact', null, '0.6', 'yearly');
+    add('/live-chat', null, '0.4', 'yearly');
+
+    const iso = (value) => (value ? new Date(value).toISOString().slice(0, 10) : null);
+
+    const [services, portfolio, pages, posts] = await Promise.all([
+      content.listServices({ status: 'active', perPage: 500 }),
+      content.listPortfolio({ status: 'active', perPage: 500 }),
+      content.listPages({ status: 'published' }),
+      content.publishedPostIndex(),
+    ]);
+
+    for (const row of services.rows || []) add(`/services/${row.slug}`, iso(row.updated_at), '0.8', 'monthly');
+    for (const row of portfolio.rows || []) add(`/portfolio/${row.slug}`, iso(row.updated_at), '0.7', 'monthly');
+    for (const row of pages || []) add(`/page/${row.slug}`, iso(row.updated_at), '0.4', 'yearly');
+    for (const row of posts || []) add(`/blog/${row.slug}`, iso(row.updated_at), '0.7', 'monthly');
+
+    const body = urls
+      .map((entry) => {
+        const parts = [`    <loc>${res.locals.helpers.escapeHtml(entry.loc)}</loc>`];
+        if (entry.lastmod) parts.push(`    <lastmod>${entry.lastmod}</lastmod>`);
+        parts.push(`    <changefreq>${entry.changefreq}</changefreq>`);
+        parts.push(`    <priority>${entry.priority}</priority>`);
+        return `  <url>\n${parts.join('\n')}\n  </url>`;
+      })
+      .join('\n');
+
+    res.type('application/xml').send(
+      `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`
+    );
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * robots.txt.
+ *
+ * Points crawlers at the sitemap and keeps them out of the panel, the account
+ * area and anything with a query string - a filtered listing is a duplicate of
+ * the listing itself.
+ */
+exports.robots = (req, res) => {
+  const base = String(config.app.url || '').replace(/\/$/, '');
+  const adminPath = settings.get('admin_path_slug', 'dev-cp');
+
+  const lines = [
+    'User-agent: *',
+    'Allow: /',
+    `Disallow: /${adminPath}/`,
+    'Disallow: /account/',
+    'Disallow: /api/',
+    'Disallow: /*?q=',
+    'Disallow: /*?page=',
+    '',
+    `Sitemap: ${base}/sitemap.xml`,
+    '',
+  ];
+
+  res.type('text/plain').send(lines.join('\n'));
+};
+
+/**
+ * Turn headings in post content into a table of contents.
+ *
+ * Adds an id to each h2/h3 as it goes, so the links have something to point at.
+ * Skipped entirely when there are fewer than three headings - a two-item
+ * contents list is clutter, not navigation.
+ *
+ * @returns {{ html: string, toc: Array }}
+ */
+function buildTableOfContents(html) {
+  const source = String(html || '');
+  const toc = [];
+  const used = new Set();
+
+  const withIds = source.replace(
+    /<h([23])(\s[^>]*)?>([\s\S]*?)<\/h\1>/gi,
+    (match, level, attrs = '', inner) => {
+      const text = String(inner).replace(/<[^>]*>/g, '').trim();
+      if (!text) return match;
+
+      // A stable, readable anchor. De-duplicated, because two headings can
+      // legitimately read the same and a repeated id breaks the link.
+      let id = text
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .trim()
+        .replace(/\s+/g, '-')
+        .slice(0, 60) || 'section';
+
+      let unique = id;
+      let n = 2;
+      while (used.has(unique)) unique = `${id}-${n++}`;
+      used.add(unique);
+
+      toc.push({ id: unique, text, level: Number(level) });
+
+      // Preserve any attributes already on the heading.
+      const cleaned = String(attrs).replace(/\sid="[^"]*"/i, '');
+      return `<h${level}${cleaned} id="${unique}">${inner}</h${level}>`;
+    }
+  );
+
+  return { html: withIds, toc: toc.length >= 3 ? toc : [] };
+}
+
+/** Estimated reading time, when the editor has not set one. */
+function estimateReadingMinutes(html) {
+  const words = String(html || '')
+    .replace(/<[^>]*>/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean).length;
+  return Math.max(1, Math.round(words / 200));
+}
+
+/**
+ * The blog index.
+ *
+ * Category and search are query parameters, so the page has one canonical URL
+ * shape and the pager does not have to rebuild a path.
+ */
+exports.blogIndex = async (req, res, next) => {
+  try {
+    const perPage = 9;
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const search = String(req.query.q || '').slice(0, 80);
+    const category = String(req.query.category || '').slice(0, 80);
+
+    const [result, categories, popular] = await Promise.all([
+      content.listPublishedPosts({ page, perPage, search, category }),
+      content.postCategories(),
+      content.topPosts(5),
+    ]);
+
+    // A category or search that matches nothing is not a 404 - the page exists
+    // and can say so, which is friendlier than an error.
+    const canonical = `${res.locals.helpers.absoluteUrl('/blog')}`;
+
+    res.render('public/blog', {
+      layout: 'layouts/public',
+      pageTitle: category ? `${category} articles` : 'Blog',
+      lead: res.locals.seo.description,
+      crumbs: [{ label: 'Blog', url: '/blog' }, category ? { label: category } : null].filter(Boolean),
+      posts: result.rows,
+      pager: result,
+      categories,
+      popular,
+      search,
+      category,
+      seo: {
+        ...res.locals.seo,
+        title: category
+          ? `${category} — ${res.locals.site.name} blog`
+          : `Blog — ${res.locals.site.name}`,
+        description:
+          res.locals.seo.description ||
+          `Practical writing on selling online in Bangladesh from ${res.locals.site.name}.`,
+        canonical,
+        robots: search ? 'noindex,follow' : res.locals.seo.robots,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * A single post.
+ *
+ * Everything the layout needs is gathered here rather than in the view: the
+ * table of contents comes from the content itself, and the sidebar needs four
+ * separate queries that are better run together than in sequence.
+ */
+exports.blogPost = async (req, res, next) => {
+  try {
+    const slug = String(req.params.slug || '').trim();
+    const post = slug ? await content.findPostBySlug(slug) : null;
+
+    // A draft, a future-dated post or a missing slug all look the same from
+    // outside. Staff can preview their own drafts; everyone else gets a 404.
+    const isPublic =
+      post &&
+      post.status === 'published' &&
+      (!post.published_at || new Date(post.published_at) <= new Date());
+
+    if (!post || (!isPublic && !res.locals.isStaff)) {
+      return res.status(404).render('errors/404', {
+        layout: 'layouts/public',
+        title: 'Post not found',
+        requestedPath: req.originalUrl,
+      });
+    }
+
+    const { html: contentHtml, toc } = buildTableOfContents(post.content);
+
+    const [related, popular, recent, categories] = await Promise.all([
+      content.relatedPosts(post, 6),
+      content.topPosts(5),
+      content.recentPosts(7, post.id),
+      content.postCategories(),
+    ]);
+
+    // Counting a read must never delay the page or fail it.
+    if (isPublic) content.incrementPostViews(post.id).catch(() => {});
+
+    const absolute = (value) => (value ? res.locals.helpers.absoluteUrl(value) : '');
+
+    const canonical = post.canonical_url || absolute(`/blog/${post.slug}`);
+    const shareTitle = post.og_title || post.seo_title || post.title;
+    const shareDescription = post.og_description || post.seo_description || post.excerpt || '';
+    const shareImage = absolute(post.og_image || post.featured_image || '');
+
+    const readingMinutes =
+      Number(post.reading_minutes) > 0 ? Number(post.reading_minutes) : estimateReadingMinutes(post.content);
+
+    // BlogPosting + BreadcrumbList, so the article is eligible for a rich
+    // result. Passed through extraHead, which is the layout's channel for
+    // controller-built head markup, and escaped by helpers.jsonLd so an
+    // admin-authored title containing markup cannot break out of the block.
+    const schema = [
+      {
+        '@context': 'https://schema.org',
+        '@type': 'BlogPosting',
+        headline: post.title,
+        description: shareDescription,
+        image: shareImage ? [shareImage] : undefined,
+        datePublished: post.published_at ? new Date(post.published_at).toISOString() : undefined,
+        dateModified: post.updated_at ? new Date(post.updated_at).toISOString() : undefined,
+        author: post.author_name
+          ? { '@type': 'Person', name: post.author_name }
+          : { '@type': 'Organization', name: res.locals.site.name },
+        publisher: {
+          '@type': 'Organization',
+          name: res.locals.site.name,
+          logo: res.locals.site.logoLight
+            ? { '@type': 'ImageObject', url: absolute(res.locals.site.logoLight) }
+            : undefined,
+        },
+        mainEntityOfPage: { '@type': 'WebPage', '@id': canonical },
+        ...(post.category ? { articleSection: post.category } : {}),
+        ...(post.meta_keywords ? { keywords: post.meta_keywords } : {}),
+      },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: absolute('/') },
+          { '@type': 'ListItem', position: 2, name: 'Blog', item: absolute('/blog') },
+          { '@type': 'ListItem', position: 3, name: post.title, item: canonical },
+        ],
+      },
+    ];
+
+    // res.locals.helpers, not a module-level import: this controller does not
+    // import helpers directly, and the escaping in jsonLd is the whole reason
+    // an admin-authored title cannot break out of the script block.
+    const extraHead = schema
+      .map((payload) => `<script type="application/ld+json">${res.locals.helpers.jsonLd(payload)}</script>`)
+      .join('\n');
+
+    res.render('public/blog-post', {
+      layout: 'layouts/public',
+      pageTitle: shareTitle,
+      pageDescription: shareDescription,
+      pageRobots: post.robots || undefined,
+      pageCanonical: canonical,
+      ogType: 'article',
+      ogImage: shareImage || undefined,
+      extraHead,
+      lead: shareDescription,
+      crumbs: [{ label: 'Blog', url: '/blog' }, { label: post.title }],
+      post: { ...post, content: contentHtml },
+      toc,
+      related,
+      popular,
+      recent,
+      categories,
+      readingMinutes,
+      shareImage,
+      isPreview: !isPublic,
+      seo: {
+        ...res.locals.seo,
+        title: post.seo_title || `${post.title} — ${res.locals.site.name}`,
+        description: post.seo_description || post.excerpt || res.locals.seo.description,
+        keywords: post.meta_keywords || res.locals.seo.keywords,
+        canonical,
+        robots: post.robots || res.locals.seo.robots,
+        ogImage: shareImage || res.locals.seo.ogImage,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
 
 /**
  * Render a content page.
