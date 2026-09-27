@@ -38,12 +38,22 @@ async function verify(token, ip, action) {
   if (!secret || !siteKey) return { ok: true, skipped: true };
 
   if (!token) {
-    return { ok: false, message: 'Please complete the CAPTCHA verification.' };
+    // Logged, because a missing token and a rejected token look identical on
+    // screen and have completely different causes: one is a front-end problem,
+    // the other a key problem.
+    logger.warn('reCAPTCHA token missing from the submission', { action });
+    return { ok: false, message: 'The verification did not complete. Please try again.' };
   }
 
   try {
     const body = new URLSearchParams({ secret, response: String(token) });
-    if (ip) body.append('remoteip', ip);
+
+    // remoteip is optional and Google uses it only for risk scoring. It is
+    // deliberately NOT sent: behind a proxy or CDN it is frequently the load
+    // balancer's address rather than the visitor's, and a value that does not
+    // match the token can turn a valid submission into a rejection. There is
+    // nothing to gain from sending it and a working login to lose.
+    void ip;
 
     // Node 18+ has global fetch; no dependency needed.
     const controller = new AbortController();
@@ -64,15 +74,129 @@ async function verify(token, ip, action) {
     const codes = (result['error-codes'] || []).join(', ');
     logger.warn('reCAPTCHA rejected a submission', { action, codes });
 
-    if (codes.includes('timeout-or-duplicate')) {
-      return { ok: false, message: 'The CAPTCHA expired. Please tick the box again.' };
+    // Each Google code means something different, and they are not
+    // interchangeable. Saying which one it is turns "captcha is broken" into a
+    // fixable sentence.
+    if (codes.includes('invalid-input-secret')) {
+      return {
+        ok: false,
+        reason: 'invalid-secret',
+        message:
+          'The reCAPTCHA secret key was rejected. It must come from the same Google registration as the site key.',
+      };
     }
-    return { ok: false, message: 'CAPTCHA verification failed. Please try again.' };
+
+    if (codes.includes('invalid-keys')) {
+      return {
+        ok: false,
+        reason: 'invalid-keys',
+        message: 'Google did not recognise the reCAPTCHA keys. Check both the site key and the secret.',
+      };
+    }
+
+    if (codes.includes('missing-input-secret') || codes.includes('missing-input-response')) {
+      return {
+        ok: false,
+        reason: 'missing-input',
+        message: 'The verification did not reach Google. Please try again.',
+      };
+    }
+
+    if (codes.includes('timeout-or-duplicate')) {
+      return {
+        ok: false,
+        reason: 'expired',
+        message: 'The verification expired. Please complete it again.',
+      };
+    }
+
+    if (codes.includes('bad-request')) {
+      return {
+        ok: false,
+        reason: 'bad-request',
+        message:
+          'Google rejected the request. This usually means the site key is for a different reCAPTCHA type than the one selected here.',
+      };
+    }
+
+    return {
+      ok: false,
+      reason: 'rejected',
+      message: 'The verification was not accepted. Please try again.',
+    };
   } catch (err) {
     // Google being unreachable must not lock customers out of their accounts.
     // Log loudly but allow the request through.
     logger.error('reCAPTCHA verification request failed - allowing request', err);
     return { ok: true, degraded: true };
+  }
+}
+
+/**
+ * Check that the configured key pair is valid, without needing a browser.
+ *
+ * Sends a deliberately invalid token. Google's answer tells us what we need:
+ *
+ *   invalid-input-response -> the SECRET was accepted and the token was not.
+ *                             The keys are fine; a real visitor will pass.
+ *   invalid-input-secret   -> the secret is wrong, or belongs to a different
+ *                             registration than the site key.
+ *   invalid-keys           -> neither key is recognised.
+ *
+ * This exists because "captcha is not working" is unactionable. A wrong secret
+ * and an unsolved challenge look identical on screen, and the operator has no
+ * way to tell which they are looking at.
+ */
+async function selfTest() {
+  const secret = settings.secret('captcha_secret_key', process.env.RECAPTCHA_SECRET_KEY);
+  const siteKey = settings.secret('captcha_site_key', process.env.RECAPTCHA_SITE_KEY);
+
+  if (!secret || !siteKey) {
+    return { ok: false, message: 'No reCAPTCHA keys are saved yet. Add both, then test again.' };
+  }
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+
+    const response = await fetch(VERIFY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ secret, response: 'self-test-deliberately-invalid' }).toString(),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    const result = await response.json();
+    const codes = (result['error-codes'] || []).join(', ');
+
+    if (codes.includes('invalid-input-response')) {
+      return {
+        ok: true,
+        message: 'The secret key is valid and matches the site key. Verification is working.',
+      };
+    }
+
+    if (codes.includes('invalid-input-secret')) {
+      return {
+        ok: false,
+        message:
+          'The secret key was rejected. Copy it again from the same Google reCAPTCHA registration as the site key.',
+      };
+    }
+
+    if (codes.includes('invalid-keys')) {
+      return { ok: false, message: 'Google does not recognise these keys. Check both, then save and test again.' };
+    }
+
+    if (codes.includes('missing-input-secret')) {
+      return { ok: false, message: 'The secret key is empty. Save it again on this tab.' };
+    }
+
+    return { ok: false, message: `Google answered: ${codes || 'no error code'}.` };
+  } catch (err) {
+    logger.error('reCAPTCHA self-test could not reach Google', err);
+    return { ok: false, message: 'Could not reach Google. Check the server can make outbound requests.' };
   }
 }
 
@@ -108,4 +232,4 @@ function honeypot(fieldName = 'website') {
   };
 }
 
-module.exports = { verify, requireCaptcha, honeypot };
+module.exports = { verify, selfTest, requireCaptcha, honeypot };

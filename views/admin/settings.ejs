@@ -244,4 +244,23 @@
       </button>
     </div>
   </form>
+
+  <%#
+    Its own form, after the settings form closes. A button inside would submit
+    the settings form, and testing the keys should not also save every field on
+    the tab - or worse, save a half-filled one.
+  %>
+  <% if (group === 'security') { %>
+    <form method="post" action="<%= helpers.url('/' + adminPath + '/settings/test-captcha') %>"
+          style="margin-top:14px">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button type="submit" class="btn btn-outline">
+        <svg><use href="#i-shield"/></svg>
+        Test reCAPTCHA keys
+      </button>
+      <span style="margin-left:12px;font-size:.8125rem;color:var(--text-soft)">
+        Checks the saved keys against Google and tells you what it says.
+      </span>
+    </form>
+  <% } %>
 </div>

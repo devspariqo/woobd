@@ -140,6 +140,10 @@ router.get('/settings', auth.requireRole('admin'), ctrl.settings);
 // the CSRF token once multer has parsed the body.
 router.post('/settings', auth.requireRole('admin'), uploadSettings, ctrl.saveSettings);
 
+// Checks the saved reCAPTCHA keys against Google and reports the answer. No
+// upload middleware: it reads what is already stored.
+router.post('/settings/test-captcha', auth.requireRole('admin'), ctrl.testCaptcha);
+
 // ---------------------------------------------------------------------------
 // CMS resources - packages, portfolio, testimonials, FAQs, clients, pages, menus
 //

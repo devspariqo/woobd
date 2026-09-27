@@ -111,7 +111,11 @@ exports.loginSubmit = async (req, res, next) => {
     if (settings.getBool('captcha_on_admin')) {
       const outcome = await captcha.verify(req.body['g-recaptcha-response'], req.ip, 'admin');
       if (!outcome.ok && !outcome.degraded) {
-        return render({ captcha: 'Please complete the verification challenge.' });
+        // The reason from the verifier, not a generic line. "Please complete
+        // the challenge" was shown for a wrong secret key too, which sent the
+        // operator round in circles trying to solve a captcha that was never
+        // going to be accepted.
+        return render({ captcha: outcome.message || 'Please complete the verification challenge.' });
       }
     }
 
@@ -940,6 +944,26 @@ exports.settings = async (req, res, next) => {
  * so absence has to mean OFF rather than "unchanged". Every boolean in the
  * group is therefore written explicitly on each save.
  */
+/**
+ * Check the saved reCAPTCHA keys against Google.
+ *
+ * "Captcha is not working" cannot be acted on. A wrong secret and an unsolved
+ * challenge look identical on screen, so this answers the question directly and
+ * reports it as a flash message on the tab it was run from.
+ */
+exports.testCaptcha = async (req, res) => {
+  try {
+    const result = await captcha.selfTest();
+    if (result.ok) req.session.flashSuccess = result.message;
+    else req.session.flashError = result.message;
+  } catch (err) {
+    req.session.flashError = 'The test could not run. Check the server logs.';
+    logger.error('reCAPTCHA self-test failed', err);
+  }
+
+  return res.redirect(res.locals.helpers.url(`${res.locals.adminPath}/settings?group=security`));
+};
+
 exports.saveSettings = async (req, res, next) => {
   const group = resolveGroup(req.body.group);
 
