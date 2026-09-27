@@ -195,7 +195,11 @@ table { border-collapse: collapse; width: 100%; }
 .section-gradient { background: var(--gradient-soft); }
 
 .section-head {
-  max-width: 720px;
+  /* 720px was narrow enough that a normal section heading wrapped onto a
+     second line at its last word or two, which reads as a mistake rather than
+     a choice. The heading now gets the full width; the paragraph below keeps a
+     shorter measure, because body copy is what actually needs one. */
+  max-width: 940px;
   margin: 0 auto 56px;
   text-align: center;
 }
@@ -203,7 +207,15 @@ table { border-collapse: collapse; width: 100%; }
 .section-head.left { margin-left: 0; text-align: left; }
 
 .section-head h2 { margin-bottom: 14px; }
-.section-head p { font-size: 1.0625rem; }
+
+.section-head p {
+  font-size: 1.0625rem;
+  max-width: 660px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.section-head.left p { margin-left: 0; margin-right: 0; }
 
 .eyebrow {
   display: inline-flex;
@@ -1901,6 +1913,61 @@ body.no-scroll { overflow: hidden; }
 /* --------------------------------------------------------------------------
    14. CTA section
    -------------------------------------------------------------------------- */
+/* Accepted payment methods.
+   Logos sit in a fixed-height chip so a wide logo and a square one line up, and
+   the row wraps rather than squashing on a narrow screen. */
+.pay-methods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.pay-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  min-width: 66px;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: .8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.pay-chip-logo {
+  padding: 5px 12px;
+  background: #fff;
+}
+
+.pay-chip-logo img {
+  display: block;
+  max-height: 24px;
+  max-width: 78px;
+  width: auto;
+  object-fit: contain;
+}
+
+.pay-methods-sm .pay-chip { height: 34px; min-width: 56px; padding: 5px 11px; }
+.pay-methods-sm .pay-chip-logo img { max-height: 19px; max-width: 64px; }
+
+/* On a narrow screen the chips go full width so each one is a comfortable tap
+   target and a long method name cannot overflow its row. */
+@media (max-width: 420px) {
+  .pay-methods { gap: 8px; }
+  .pay-methods .pay-chip { flex: 1 1 calc(50% - 8px); min-width: 0; }
+  .pay-chip-logo img { max-width: 100%; }
+}
+
+/* Service detail: content column wider than the sidebar.
+   The ratio is here rather than inline on the element, so the responsive rule
+   that collapses .split to a single column can actually take effect. */
+.split-service { align-items: start; grid-template-columns: 1.6fr 1fr; }
+
 /* --------------------------------------------------------------------------
    CTA background image
 

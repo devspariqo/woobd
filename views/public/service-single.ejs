@@ -20,7 +20,13 @@
   <div class="container">
     <%- include('../partials/flash') %>
 
-    <div class="split" style="align-items:start;grid-template-columns:1.6fr 1fr">
+    <%#
+      The column ratio lives in a class, not an inline style.
+      It was inline, and an inline style cannot be overridden by a media query -
+      so the page stayed two cramped columns on a phone however narrow the
+      screen got. See .split-service in the stylesheet.
+    %>
+    <div class="split split-service">
       <div>
         <%# Hero image %>
         <div style="border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow);margin-bottom:38px">
@@ -141,12 +147,7 @@
         <div class="card card-flat mt-5">
           <div class="card-body">
             <h4 class="mb-4" style="font-size:1rem">Accepted payments</h4>
-            <div style="display:flex;flex-wrap:wrap;gap:8px">
-              <% if (payments.bkash.enabled) { %><span class="pill pill-muted no-dot">bKash</span><% } %>
-              <% if (payments.nagad.enabled) { %><span class="pill pill-muted no-dot">Nagad</span><% } %>
-              <% if (payments.rocket.enabled) { %><span class="pill pill-muted no-dot">Rocket</span><% } %>
-              <% if (payments.card.enabled) { %><span class="pill pill-muted no-dot">Card</span><% } %>
-            </div>
+            <%- include('../partials/payment-methods', { payments: payments }) %>
             <p style="font-size:.8125rem;color:var(--text-soft);margin-top:14px">
               Manual wallet transfers are verified within 24 hours.
             </p>

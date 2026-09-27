@@ -896,17 +896,56 @@
    * name from the widget's data-callback attribute.
    */
   var pendingCaptchaForm = null;
+  // Safety net so a form can never hang waiting for a callback that does not
+  // arrive - see initInvisibleCaptcha.
+  var pendingCaptchaTimer = null;
 
   window.onRecaptchaSolved = function () {
     if (!pendingCaptchaForm) return;
     var form = pendingCaptchaForm;
     pendingCaptchaForm = null;
+
+    // The safety timer has done its job.
+    if (pendingCaptchaTimer) {
+      window.clearTimeout(pendingCaptchaTimer);
+      pendingCaptchaTimer = null;
+    }
+
     // Set a flag rather than calling submit() directly, so the form's own
     // submit handlers run and validation still applies.
     form.dataset.recaptchaPassed = '1';
-    form.requestSubmit ? form.requestSubmit() : form.submit();
+
+    // The validation handler disables the submit button on the first submit as
+    // a double-click guard. requestSubmit() runs interactive validation, so put
+    // the button back before asking it to submit.
+    var button = form.querySelector('[type="submit"]');
+    if (button && button.disabled) button.removeAttribute('disabled');
+
+    if (form.requestSubmit) form.requestSubmit();
+    else form.submit();
   };
 
+  /**
+   * Invisible reCAPTCHA.
+   *
+   * The widget renders no box, so it cannot submit the form itself - it has to
+   * be told when to run. This intercepts the submit, asks Google for a token,
+   * and re-submits once the token arrives.
+   *
+   * Two failure modes shaped this code, both of which made the form do nothing
+   * at all, which is the worst outcome: the visitor sees no error and assumes
+   * the site is broken.
+   *
+   *   1. A reCAPTCHA v2 CHECKBOX key ignores data-size="invisible" and renders
+   *      a visible box anyway. The visitor ticks it, a token appears - and the
+   *      old code intercepted the submit regardless, called execute(), and
+   *      waited for a callback that never came. The check below for an existing
+   *      token means a solved checkbox is left alone.
+   *
+   *   2. If the reCAPTCHA script is blocked or slow, grecaptcha.execute() never
+   *      fires the callback. The safety timer submits anyway so the server can
+   *      answer with a real message rather than the page hanging.
+   */
   function initInvisibleCaptcha() {
     var widgets = $$('.g-recaptcha[data-size="invisible"]');
     if (!widgets.length) return;
@@ -919,6 +958,11 @@
         // Already verified - let it through.
         if (form.dataset.recaptchaPassed === '1') return;
 
+        // A token is already present: the visitor solved a visible checkbox, or
+        // this is a re-submit. Either way there is nothing to do.
+        var token = form.querySelector('[name="g-recaptcha-response"]');
+        if (token && token.value) return;
+
         if (typeof window.grecaptcha === 'undefined' || !window.grecaptcha.execute) {
           // The script did not load - a blocker, or offline. Let the submit
           // through rather than trapping the visitor on a form they cannot
@@ -929,10 +973,25 @@
         event.preventDefault();
         pendingCaptchaForm = form;
 
+        // Never leave the form hanging: if the callback does not arrive within
+        // a few seconds, submit anyway and let the server explain.
+        if (pendingCaptchaTimer) window.clearTimeout(pendingCaptchaTimer);
+        pendingCaptchaTimer = window.setTimeout(function () {
+          var stuck = pendingCaptchaForm;
+          pendingCaptchaForm = null;
+          pendingCaptchaTimer = null;
+          if (!stuck) return;
+          stuck.dataset.recaptchaPassed = '1';
+          if (stuck.requestSubmit) stuck.requestSubmit();
+          else stuck.submit();
+        }, 6000);
+
         try {
           window.grecaptcha.execute();
         } catch (err) {
           // If execution fails, do not leave them stuck.
+          window.clearTimeout(pendingCaptchaTimer);
+          pendingCaptchaTimer = null;
           pendingCaptchaForm = null;
           form.dataset.recaptchaPassed = '1';
           form.requestSubmit ? form.requestSubmit() : form.submit();
@@ -940,6 +999,7 @@
       });
     });
   }
+
 
   /**
    * Hero video.
