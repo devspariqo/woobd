@@ -13,14 +13,22 @@
 %>
 <%
   var featured = post.featured_image ? helpers.url(post.featured_image) : '';
+
+  // The article's own image wins. The page-level background is the fallback for
+  // a post published without one, so its header is a finished banner rather
+  // than a bare strip of theme colour.
+  var heroBackdrop = featured || (settings.hero_post_bg_image ? helpers.url(settings.hero_post_bg_image) : '');
+  var postHeroColor = settings.hero_post_bg_color || '';
+  var postHeroTint = !heroBackdrop && /^#[0-9a-f]{6}$/i.test(postHeroColor);
+
   var authorInitials = helpers.initials(post.author_name || site.name);
   var shareUrl = helpers.absoluteUrl('/blog/' + post.slug);
   var shareText = encodeURIComponent(post.title);
 %>
 
 <%# ---------------------------------------------------------------- HERO %>
-<section class="post-hero<%= featured ? ' has-image' : '' %>">
-  <% if (featured) { %>
+<section class="post-hero<%= heroBackdrop ? ' has-image' : '' %><%= postHeroTint ? ' has-custom-bg text-on-' + helpers.contrastText(postHeroColor) : '' %>"<% if (postHeroTint) { %> style="--hero-bg: <%= postHeroColor %>"<% } %>>
+  <% if (heroBackdrop) { %>
     <%#
       The blurred backdrop is the same file as the featured image, scaled up and
       blurred. Using the image itself rather than a colour means the header
@@ -28,7 +36,7 @@
       is what keeps the title readable.
     %>
     <div class="post-hero-bg" aria-hidden="true">
-      <div class="post-hero-bg-image" style="background-image: url('<%= featured %>')"></div>
+      <div class="post-hero-bg-image" style="background-image: url('<%= heroBackdrop %>')"></div>
       <div class="post-hero-scrim"></div>
     </div>
   <% } %>

@@ -1460,3 +1460,51 @@
   .dash-topbar-title p { display: none; }
   .stat-tile .ico { width: 40px; height: 40px; }
 }
+
+/* --------------------------------------------------------------------------
+   Connection status pills
+
+   Used inside the settings warnings, where the point is to show WHICH half of a
+   credential pair is present. A sentence saying "not configured" leaves the
+   operator re-pasting the value they already saved; two labelled pills make the
+   gap obvious at a glance.
+   -------------------------------------------------------------------------- */
+
+.conn-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 11px;
+}
+
+.conn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-size: .78125rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+/* Colour is never the only signal - the pill text says "saved" or "missing",
+   so this reads correctly to someone who cannot tell the two apart. */
+.conn-pill.is-ok {
+  background: rgba(15, 157, 88, .12);
+  border-color: rgba(15, 157, 88, .3);
+  color: var(--success);
+}
+
+.conn-pill.is-missing {
+  background: rgba(224, 43, 43, .1);
+  border-color: rgba(224, 43, 43, .28);
+  color: var(--danger);
+}
+
+.conn-pill.is-neutral {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text-soft);
+}

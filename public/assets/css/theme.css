@@ -3199,6 +3199,11 @@ body.no-scroll { overflow: hidden; }
    the image out, so it steps aside. */
 .cta-section.has-bg-image::before { display: none; }
 
+/* A flat colour chosen in the panel replaces the brand gradient. The glow is
+   for the gradient too, and on a flat fill it reads as a smudge. */
+.cta-section.has-custom-bg { background: var(--cta-bg); }
+.cta-section.has-custom-bg::before { display: none; }
+
 /* iOS ignores background-attachment: fixed. A scrolling cover image is a
    better outcome than a background that does not paint at all. */
 @media (hover: none), (max-width: 900px) {
@@ -3315,6 +3320,107 @@ body.no-scroll { overflow: hidden; }
 .page-hero .container { position: relative; z-index: 1; }
 .page-hero h1 { margin-bottom: 15px; }
 .page-hero .lead { font-size: 1.0625rem; max-width: 640px; line-height: 1.7; }
+
+/* --------------------------------------------------------------------------
+   Page hero backgrounds
+
+   Set per page in Settings -> Page Backgrounds. With nothing configured these
+   rules never apply and the hero renders from the theme exactly as before.
+
+   The image is its own layer rather than a background on the section, because
+   `filter: blur()` on the section would blur the heading and breadcrumb with
+   it - the text sits inside.
+   -------------------------------------------------------------------------- */
+
+.page-hero.has-custom-bg { background: var(--hero-bg); }
+
+/* A photograph makes the purple glow behind the heading read as a smudge on
+   top of it. */
+.page-hero-media::before,
+.page-hero.has-custom-bg::before,
+.post-hero.has-custom-bg::before { display: none; }
+
+.page-hero-media { border-bottom: 0; }
+.page-hero-media .container { z-index: 2; }
+
+.page-hero-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  z-index: 0;
+}
+
+/* The scrim. Its strength is what keeps white text legible over an arbitrary
+   photo, which is why the lightest option is still a visible wash. */
+.page-hero-media::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.hero-treat-dark-blur .page-hero-bg { filter: blur(7px); transform: scale(1.08); }
+.hero-treat-dark-blur::after { background: rgba(9, 10, 22, .66); }
+
+.hero-treat-dark .page-hero-bg { filter: none; transform: none; }
+.hero-treat-dark::after { background: rgba(9, 10, 22, .72); }
+
+.hero-treat-blur .page-hero-bg { filter: blur(7px); transform: scale(1.08); }
+.hero-treat-blur::after { background: rgba(9, 10, 22, .34); }
+
+.hero-treat-none .page-hero-bg { filter: none; transform: none; }
+.hero-treat-none::after { background: rgba(9, 10, 22, .2); }
+
+/* Text over an image or a chosen colour is white. The scrim above is what
+   makes that safe whatever the underlying brightness. */
+.page-hero-media h1,
+.page-hero-media .lead { color: #fff; }
+.page-hero-media .lead { color: rgba(255, 255, 255, .9); }
+
+.page-hero-media .breadcrumb,
+.page-hero-media .breadcrumb a { color: rgba(255, 255, 255, .82); }
+.page-hero-media .breadcrumb .current { color: #fff; }
+.page-hero-media .breadcrumb .sep { color: rgba(255, 255, 255, .5); }
+
+/* A chosen colour with no image has no scrim over it, so the text colour is
+   derived from the colour's luminance server-side and arrives as a class.
+   Guessing here would mean a dark pick leaving a dark-on-dark heading, which is
+   exactly what a mid-blue hero did before this existed. */
+.page-hero.has-custom-bg.text-on-light h1,
+.page-hero.has-custom-bg.text-on-light .lead,
+.page-hero.has-custom-bg.text-on-light .breadcrumb,
+.page-hero.has-custom-bg.text-on-light .breadcrumb a,
+.page-hero.has-custom-bg.text-on-light .breadcrumb .current { color: #fff; }
+
+.page-hero.has-custom-bg.text-on-light .lead { color: rgba(255, 255, 255, .9); }
+.page-hero.has-custom-bg.text-on-light .breadcrumb { color: rgba(255, 255, 255, .82); }
+.page-hero.has-custom-bg.text-on-light .breadcrumb .sep { color: rgba(255, 255, 255, .5); }
+
+.page-hero.has-custom-bg.text-on-dark h1 { color: var(--text); }
+.page-hero.has-custom-bg.text-on-dark .lead { color: var(--text-muted); }
+
+/* The CTA band already carries white text, so only the light-background case
+   needs overriding - everything else there is unchanged. */
+.cta-section.has-custom-bg.text-on-dark,
+.cta-section.has-custom-bg.text-on-dark h2,
+.cta-section.has-custom-bg.text-on-dark p,
+.cta-section.has-custom-bg.text-on-dark a { color: var(--text); }
+
+.cta-section.has-custom-bg.text-on-dark .btn-white {
+  background: var(--text);
+  color: var(--surface);
+}
+
+/* The blog post hero reuses its existing backdrop markup, so it only needs the
+   flat-colour case. */
+.post-hero.has-custom-bg { background: var(--hero-bg); }
+
+.post-hero.has-custom-bg.text-on-light .post-hero-text h1,
+.post-hero.has-custom-bg.text-on-light .post-hero-meta,
+.post-hero.has-custom-bg.text-on-light .breadcrumb,
+.post-hero.has-custom-bg.text-on-light .breadcrumb a { color: #fff; }
 
 .breadcrumb {
   display: flex;

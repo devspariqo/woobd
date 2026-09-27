@@ -18,6 +18,7 @@ const activity = require('../services/activity.service');
 const adminCtrl = require('./admin.controller');
 const db = require('../config/database');
 const config = require('../config');
+const { sqlValue } = require('../utils/sql');
 const storage = require('../lib/storage');
 const helpers = require('../utils/helpers');
 const { clean, validate } = require('../utils/validators');
@@ -553,22 +554,6 @@ exports.backup = async (req, res, next) => {
     next(err);
   }
 };
-
-/** Escape a value for a MySQL INSERT statement. */
-function sqlValue(value) {
-  if (value === null || value === undefined) return 'NULL';
-  if (typeof value === 'number') return String(value);
-  if (value instanceof Date) {
-    return `'${value.toISOString().slice(0, 19).replace('T', ' ')}'`;
-  }
-  if (Buffer.isBuffer(value)) return `0x${value.toString('hex')}`;
-  return `'${String(value)
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, "\\'")
-    .replace(/\n/g, '\\n')
-    .replace(/\r/g, '\\r')
-    .replace(/\0/g, '\\0')}'`;
-}
 
 /**
  * Stream a full SQL dump as a download.

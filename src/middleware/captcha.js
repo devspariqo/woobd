@@ -97,67 +97,104 @@ async function verify(token, ip, action) {
 
     const result = await response.json();
 
-    if (result.success) return { ok: true };
-
-    const codes = (result['error-codes'] || []).join(', ');
-    logger.warn('reCAPTCHA rejected a submission', { action, codes, keySource: keySource() });
-
-    // Each Google code means something different, and they are not
-    // interchangeable. Saying which one it is turns "captcha is broken" into a
-    // fixable sentence.
-    if (codes.includes('invalid-input-secret')) {
-      return {
-        ok: false,
-        reason: 'invalid-secret',
-        message:
-          'The reCAPTCHA secret key was rejected. It must come from the same Google registration as the site key.',
-      };
+    if (!result.success) {
+      const codes = (result['error-codes'] || []).join(', ');
+      logger.warn('reCAPTCHA rejected a submission', { action, codes, keySource: keySource() });
+      return failureForCodes(codes);
     }
 
-    if (codes.includes('invalid-keys')) {
-      return {
-        ok: false,
-        reason: 'invalid-keys',
-        message: 'Google did not recognise the reCAPTCHA keys. Check both the site key and the secret.',
-      };
+    // v3 answers with a score instead of a pass/fail. There is no challenge to
+    // fail, so without this check every submission would be accepted no matter
+    // how bot-like it looked - which is the same as having no CAPTCHA at all.
+    if (settings.get('captcha_version') === 'v3') {
+      const score = Number(result.score);
+      const minimum = Math.min(100, Math.max(0, settings.getInt('captcha_min_score', 50))) / 100;
+
+      logger.info('reCAPTCHA v3 scored a submission', { action, score, minimum });
+
+      if (!Number.isFinite(score)) {
+        // A v3 key answered without a score: almost always a v2 key being used
+        // under the v3 setting.
+        return {
+          ok: false,
+          reason: 'wrong-version',
+          message:
+            'Google did not return a v3 score. Check that "reCAPTCHA version" below matches the key you created — a v2 key cannot answer a v3 request.',
+        };
+      }
+
+      if (score < minimum) {
+        return {
+          ok: false,
+          reason: 'low-score',
+          message: 'That looked automated, so we did not send it. If you are a real person, please try again.',
+        };
+      }
     }
 
-    if (codes.includes('missing-input-secret') || codes.includes('missing-input-response')) {
-      return {
-        ok: false,
-        reason: 'missing-input',
-        message: 'The verification did not reach Google. Please try again.',
-      };
-    }
-
-    if (codes.includes('timeout-or-duplicate')) {
-      return {
-        ok: false,
-        reason: 'expired',
-        message: 'The verification expired. Please complete it again.',
-      };
-    }
-
-    if (codes.includes('bad-request')) {
-      return {
-        ok: false,
-        reason: 'bad-request',
-        message:
-          'Google rejected the request. This usually means the site key is for a different reCAPTCHA type than the one selected here.',
-      };
-    }
-
-    return {
-      ok: false,
-      reason: 'rejected',
-      message: 'The verification was not accepted. Please try again.',
-    };
+    return { ok: true };
   } catch (err) {
     // Google being unreachable must not lock customers out of their accounts.
     // Log loudly but allow the request through.
     logger.error('reCAPTCHA verification request failed - allowing request', err);
     return { ok: true, degraded: true };
   }
+}
+
+/**
+ * Map Google's error codes onto a sentence that names the fix.
+ *
+ * Each code means something different and they are not interchangeable. Saying
+ * which one it is turns "captcha is broken" into a fixable instruction.
+ */
+function failureForCodes(codes) {
+  if (codes.includes('invalid-input-secret')) {
+    return {
+      ok: false,
+      reason: 'invalid-secret',
+      message:
+        'The reCAPTCHA secret key was rejected. It must come from the same Google registration as the site key.',
+    };
+  }
+
+  if (codes.includes('invalid-keys')) {
+    return {
+      ok: false,
+      reason: 'invalid-keys',
+      message: 'Google did not recognise the reCAPTCHA keys. Check both the site key and the secret.',
+    };
+  }
+
+  if (codes.includes('missing-input-secret') || codes.includes('missing-input-response')) {
+    return {
+      ok: false,
+      reason: 'missing-input',
+      message: 'The verification did not reach Google. Please try again.',
+    };
+  }
+
+  if (codes.includes('timeout-or-duplicate')) {
+    return {
+      ok: false,
+      reason: 'expired',
+      message: 'The verification expired. Please complete it again.',
+    };
+  }
+
+  if (codes.includes('bad-request')) {
+    return {
+      ok: false,
+      reason: 'bad-request',
+      message:
+        'Google rejected the request. This usually means the site key is for a different reCAPTCHA type than the one selected here.',
+    };
+  }
+
+  return {
+    ok: false,
+    reason: 'rejected',
+    message: 'The verification was not accepted. Please try again.',
+  };
 }
 
 /**
@@ -178,9 +215,20 @@ async function verify(token, ip, action) {
 async function selfTest() {
   const secret = settings.secret('captcha_secret_key', process.env.RECAPTCHA_SECRET_KEY);
   const siteKey = settings.secret('captcha_site_key', process.env.RECAPTCHA_SITE_KEY);
+  const version = settings.get('captcha_version') === 'v3' ? 'v3' : 'v2';
 
   if (!secret || !siteKey) {
-    return { ok: false, message: 'No reCAPTCHA keys are saved yet. Add both, then test again.' };
+    // Name the half that is missing. "Add both" sends an operator who has
+    // already saved one of them round in circles.
+    const missing = [
+      !siteKey ? 'site key' : null,
+      !secret ? 'secret key' : null,
+    ].filter(Boolean).join(' and ');
+
+    return {
+      ok: false,
+      message: `The reCAPTCHA ${missing} is missing. Save it below, then test again.`,
+    };
   }
 
   try {
@@ -201,7 +249,7 @@ async function selfTest() {
     if (codes.includes('invalid-input-response')) {
       return {
         ok: true,
-        message: 'The secret key is valid and matches the site key. Verification is working.',
+        message: `Both keys are valid and Google accepted the secret (reCAPTCHA ${version}). The forms are protected — open one and check the widget appears.`,
       };
     }
 

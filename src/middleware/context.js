@@ -288,6 +288,10 @@ function viewContext() {
         // value other than the two known modes falls back to invisible, so a
         // typo cannot leave a form unprotected by rendering nothing.
         mode: settings.get('captcha_mode') === 'checkbox' ? 'checkbox' : 'invisible',
+        // v2 renders a widget; v3 is a score computed in the background with no
+        // widget at all. The two need different script URLs and different
+        // client code, and a key of one type cannot be used as the other.
+        version: settings.get('captcha_version') === 'v3' ? 'v3' : 'v2',
       };
 
       res.locals.googleAuth = {

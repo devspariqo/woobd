@@ -273,6 +273,25 @@ const SETTINGS = [
     help: 'Invisible shows no box — the challenge only appears if Google is unsure. It needs a key registered as "reCAPTCHA v2 - Invisible". Choose "checkbox" if your key is the standard tick-box type.',
   },
   { key: 'captcha_secret_key', type: 'text', group: 'security', default: '', public: false, label: 'reCAPTCHA secret key', help: 'Private key from the same registration. Never sent to the browser. Leave blank to keep the saved value.' },
+  {
+    key: 'captcha_version',
+    type: 'select',
+    group: 'security',
+    default: 'v2',
+    public: true,
+    label: 'reCAPTCHA version',
+    options: ['v2', 'v3'],
+    help: 'Must match the key you created. A v3 key cannot render a v2 widget at all — it fails with an error instead of showing a box — and a v2 key cannot produce a v3 token. If the widget shows nothing, this is the first thing to check.',
+  },
+  {
+    key: 'captcha_min_score',
+    type: 'number',
+    group: 'security',
+    default: '50',
+    public: false,
+    label: 'v3 minimum score (0-100)',
+    help: 'reCAPTCHA v3 only. Scores run 0 (almost certainly a bot) to 100 (almost certainly human). Anything below this is rejected. 50 is Google\'s recommended starting point; lower it if real customers are being turned away.',
+  },
   { key: 'force_https', type: 'boolean', group: 'security', default: '1', public: false, label: 'Force HTTPS redirect', help: 'Redirect plain-HTTP visitors to HTTPS. Leave on in production; it has no effect on localhost.' },
 
   // ---------------- Google auth ----------------
@@ -292,7 +311,25 @@ const SETTINGS = [
   { key: 'mail_from_name', type: 'text', group: 'smtp', default: 'WooBD.Com', public: false, label: 'From name' },
   { key: 'mail_from_email', type: 'text', group: 'smtp', default: 'hello@woobd.com', public: false, label: 'From email' },
   { key: 'notify_admin_new_order', type: 'boolean', group: 'smtp', default: '1', public: false, label: 'Email admin on new order' },
-  { key: 'notify_customer_order_status', type: 'boolean', group: 'smtp', default: '1', public: false, label: 'Email customer on status change' },
+  { key: 'notify_customer_order_status', type: 'boolean', group: 'smtp', default: '1', public: false, label: 'Email customer on status change', help: 'Sends the customer a message every time an order status changes — in progress, completed or cancelled — not only when the site goes live.' },
+  {
+    key: 'notify_admin_email',
+    type: 'text',
+    group: 'smtp',
+    default: '',
+    public: false,
+    label: 'Send admin notifications to',
+    help: 'Where new-order and contact-form alerts go. Leave blank to use the public contact address above. Set this when the contact address is a shared or public mailbox and you would rather alerts land somewhere private.',
+  },
+  {
+    key: 'notify_admin_contact',
+    type: 'boolean',
+    group: 'smtp',
+    default: '1',
+    public: false,
+    label: 'Email admin on contact form',
+    help: 'Sends an alert when someone submits the contact form or the homepage quote request. The customer always gets an acknowledgement either way.',
+  },
 
   // ---------------- Payments ----------------
   { key: 'payment_bkash_enabled', type: 'boolean', group: 'payments', default: '1', public: true, label: 'Enable bKash' },
@@ -345,7 +382,81 @@ const SETTINGS = [
   { key: 'default_delivery_days', type: 'number', group: 'orders', default: '7', public: false, label: 'Default delivery days' },
   { key: 'allow_customer_signup', type: 'boolean', group: 'orders', default: '1', public: true, label: 'Allow new customer registration' },
   { key: 'require_email_verify', type: 'boolean', group: 'orders', default: '0', public: false, label: 'Require email verification' },
+
+  // ---------------- Per-page hero backgrounds ----------------
+  //
+  // Generated rather than written out one row at a time: five pages times three
+  // settings is fifteen near-identical declarations, and typing them by hand is
+  // how one page quietly ends up with a setting the others do not have. The
+  // page keys here are the same strings the templates pass to the shared
+  // page-hero partial, so adding a page means adding one line to this list.
+  ...heroBackgrounds(),
+
+  // The CTA band already had an image and a treatment; it just had no way to
+  // set a flat colour for sites with no photography to hand.
+  {
+    key: 'cta_bg_color',
+    type: 'text',
+    group: 'homepage',
+    default: '',
+    public: true,
+    label: 'CTA background colour',
+    help: 'Used when no background image is set, and as a tint under one when it is. Leave blank for the theme default.',
+  },
 ];
+
+/**
+ * Background image, colour and treatment for each inner-page hero.
+ *
+ * Each hero falls back to the theme's alternate background when nothing is set,
+ * so an untouched page looks exactly as it did before this existed.
+ */
+function heroBackgrounds() {
+  const pages = [
+    ['services', 'Packages listing'],
+    ['service', 'Single package'],
+    ['about', 'About'],
+    ['portfolio', 'Portfolio listing'],
+    ['post', 'Single blog post'],
+  ];
+
+  const out = [];
+
+  for (const [key, label] of pages) {
+    out.push(
+      {
+        key: `hero_${key}_bg_image`,
+        type: 'file',
+        group: 'page_hero',
+        default: '',
+        public: true,
+        label: `${label} — background image`,
+        help: 'Wide photo, at least 1600px. It is darkened and blurred behind the heading so the text on top stays readable.',
+      },
+      {
+        key: `hero_${key}_bg_color`,
+        type: 'text',
+        group: 'page_hero',
+        default: '',
+        public: true,
+        label: `${label} — background colour`,
+        help: 'Used on its own when no image is set. Leave blank to keep the theme background.',
+      },
+      {
+        key: `hero_${key}_bg_overlay`,
+        type: 'select',
+        group: 'page_hero',
+        default: 'dark-blur',
+        public: true,
+        label: `${label} — image treatment`,
+        options: ['dark-blur', 'dark', 'blur', 'none'],
+        help: 'How heavily to treat the image. Use a heavier option if the photo is busy or light.',
+      }
+    );
+  }
+
+  return out;
+}
 
 /** Fast lookup by key. */
 const BY_KEY = SETTINGS.reduce((acc, item) => {
@@ -371,6 +482,7 @@ const GROUP_LABELS = {
   typography: 'Typography',
   seo: 'SEO & Analytics',
   seo_files: 'Robots & Sitemap',
+  page_hero: 'Page Backgrounds',
   header: 'Header & CTA',
   footer: 'Footer',
   social: 'Social Links',

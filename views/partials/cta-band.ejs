@@ -1,6 +1,21 @@
 <%# Reusable closing CTA band for inner pages. Keeps the message consistent
-    without repeating markup in every template. %>
-<section class="section cta-section">
+    without repeating markup in every template.
+
+    Reads the same CTA background settings as the homepage section, so a colour
+    or photo chosen once applies everywhere the band appears. %>
+<%
+  var bandColour = settings.cta_bg_color || '';
+  var bandFlat = !settings.cta_bg_image && /^#[0-9a-f]{6}$/i.test(bandColour);
+%>
+<section class="section cta-section<%= settings.cta_bg_image ? ' has-bg-image' : '' %><%= bandFlat ? ' has-custom-bg text-on-' + helpers.contrastText(bandColour) : '' %>"
+         <% if (bandFlat) { %>style="--cta-bg: <%= bandColour %>"<% } %>
+         data-overlay="<%= settings.cta_bg_overlay || 'dark-blur' %>">
+  <% if (settings.cta_bg_image) { %>
+    <div class="cta-bg" aria-hidden="true">
+      <div class="cta-bg-image" style="background-image: url('<%= helpers.url(settings.cta_bg_image) %>')"></div>
+      <div class="cta-bg-scrim"></div>
+    </div>
+  <% } %>
   <div class="container">
     <div style="max-width:760px;margin:0 auto;text-align:center" data-reveal>
       <h2><%= settings.cta_title %></h2>

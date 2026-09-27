@@ -211,6 +211,35 @@ function clean_list(value) {
     .filter(Boolean);
 }
 
+/**
+ * Which text colour to use on a given background.
+ *
+ * Returns `'light'` when the background is dark - so the text should be white -
+ * and `'dark'` when the background is light. An empty or malformed value
+ * returns `'dark'`, which is the theme's own text colour and therefore the
+ * safe default for a background that was never set.
+ *
+ * The weights are sRGB relative luminance, not a plain average. The eye is far
+ * more sensitive to green than to blue, so an unweighted mean calls a mid blue
+ * "light" and puts dark text on it - which is exactly how a dark navy hero ends
+ * up with a near-invisible heading.
+ */
+function contrastText(hex) {
+  const value = String(hex || '').trim();
+  if (!/^#[0-9a-f]{6}$/i.test(value)) return 'dark';
+
+  const r = parseInt(value.slice(1, 3), 16);
+  const g = parseInt(value.slice(3, 5), 16);
+  const b = parseInt(value.slice(5, 7), 16);
+
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+  // 140 of 255 is roughly where a background stops carrying dark text
+  // comfortably. Set slightly above the midpoint, because white text on a
+  // mid-tone reads better than near-black text does.
+  return luminance < 140 ? 'light' : 'dark';
+}
+
 /** Resolve an uploaded path to a public URL, falling back when unset. */
 function assetUrl(path, fallback) {
   if (path && String(path).trim()) return url(String(path).trim());
@@ -288,6 +317,7 @@ module.exports = {
   absoluteUrl,
   assetUrl,
   versioned,
+  contrastText,
   escapeHtml,
   jsonLd,
   money,

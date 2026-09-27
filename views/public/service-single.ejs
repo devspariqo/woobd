@@ -13,7 +13,8 @@
 <%- include('../partials/page-hero', {
   pageTitle: service.title,
   lead: service.short_description,
-  crumbs: [{ label: 'Packages', url: '/services' }, { label: service.title }]
+  crumbs: [{ label: 'Packages', url: '/services' }, { label: service.title }],
+  heroKey: 'service'
 }) %>
 
 <section class="section">

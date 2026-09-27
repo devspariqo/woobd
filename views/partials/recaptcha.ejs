@@ -1,23 +1,39 @@
 <%#
   reCAPTCHA widget.
 
-  Expects `captcha` = { siteKey, mode }. Renders nothing when no site key is
-  configured, so a form never shows a broken widget.
+  Expects `captcha` = { siteKey, mode, version }. Renders nothing when no site
+  key is configured, so a form never shows a broken widget.
 
-  Two modes, both reCAPTCHA v2:
+  Three shapes, and the version has to match the key or nothing works at all:
 
-    checkbox  - the familiar "I'm not a robot" box. Works with a standard v2 key.
-    invisible - no box at all. The challenge appears only when Google is unsure,
-                so a normal visitor sees nothing. Needs a key registered as
-                "reCAPTCHA v2 - Invisible" in the Google admin console.
+    v2 checkbox  - the familiar "I'm not a robot" box. Works with a standard v2 key.
+    v2 invisible - no box. The challenge appears only when Google is unsure, so a
+                   normal visitor sees nothing. Needs a key registered as
+                   "reCAPTCHA v2 - Invisible"; a checkbox key also works here,
+                   because Google ignores the request and draws the box anyway.
+    v3           - no widget and no challenge ever. Google scores the visit in
+                   the background and the server decides from the score. Needs a
+                   v3 key; a v2 key cannot answer a v3 request.
 
-  No data-callback here. The widget is rendered explicitly by main.js, which
+  No data-callback here. The v2 widget is rendered explicitly by main.js, which
   passes the callback in the render options - a callback named in the markup
   would have to be a global, and it could not tell one form's widget from
   another's on a page that carries two.
+
+  v3 has nothing to render. It just needs somewhere to put the token, which
+  main.js fills in on submit. The hidden field carries the site key so the
+  script can find it without a second lookup.
 %>
 <% if (captcha && captcha.siteKey) { %>
-  <% if (captcha.mode === 'invisible') { %>
+  <% if (captcha.version === 'v3') { %>
+    <div class="recaptcha-wrap recaptcha-v3">
+      <input type="hidden" name="g-recaptcha-response" value=""
+             data-recaptcha-v3="<%= captcha.siteKey %>">
+      <p class="form-hint" style="text-align:center">
+        Protected by reCAPTCHA. No action needed — verification is automatic.
+      </p>
+    </div>
+  <% } else if (captcha.mode === 'invisible') { %>
     <div class="recaptcha-wrap">
       <div class="g-recaptcha"
            data-sitekey="<%= captcha.siteKey %>"

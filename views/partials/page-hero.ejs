@@ -1,6 +1,43 @@
-<%# Shared breadcrumb + page hero for inner pages.
-    Expects: pageTitle, lead (optional), crumbs = [{label, url}] %>
-<section class="page-hero">
+<%#
+  Shared breadcrumb + page hero for inner pages.
+
+  Expects: pageTitle, lead (optional), crumbs = [{label, url}], heroKey (optional).
+
+  `heroKey` picks up the background settings for that page - hero_<key>_bg_image,
+  hero_<key>_bg_color and hero_<key>_bg_overlay. Passing the key rather than
+  reading a page-specific setting here keeps this partial shared: a page that
+  wants a background adds one word to its include, and a page that does not is
+  unchanged.
+
+  With nothing configured the hero renders exactly as it always did, from the
+  theme background.
+%>
+<%
+  var hero = (typeof heroKey !== 'undefined' && heroKey) ? String(heroKey) : '';
+  var heroImage = hero ? (settings['hero_' + hero + '_bg_image'] || '') : '';
+  var heroColor = hero ? (settings['hero_' + hero + '_bg_color'] || '') : '';
+  var heroTreat = hero ? (settings['hero_' + hero + '_bg_overlay'] || 'dark-blur') : '';
+  var isHex = /^#[0-9a-f]{6}$/i.test(heroColor);
+
+  var heroClasses = 'page-hero';
+  if (heroImage) heroClasses += ' page-hero-media hero-treat-' + heroTreat;
+  if (isHex) {
+    // A chosen colour has no scrim over it, so the text colour has to be
+    // derived from the colour itself. Without this a dark pick leaves the
+    // heading dark-on-dark and unreadable.
+    heroClasses += ' has-custom-bg text-on-' + helpers.contrastText(heroColor);
+  }
+%>
+<section class="<%= heroClasses %>"<% if (isHex) { %> style="--hero-bg: <%= heroColor %>"<% } %>>
+  <% if (heroImage) { %>
+    <%#
+      A separate layer rather than a CSS background on the section itself.
+      `filter: blur()` on the section would blur the heading and the breadcrumb
+      along with the image - the text sits inside it.
+    %>
+    <span class="page-hero-bg" style="background-image: url('<%= helpers.url(heroImage) %>')" aria-hidden="true"></span>
+  <% } %>
+
   <div class="container">
     <nav class="breadcrumb" aria-label="Breadcrumb">
       <a href="<%= helpers.url('/') %>">Home</a>

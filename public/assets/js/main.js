@@ -1185,6 +1185,61 @@
     whenRecaptchaReady(renderCaptchaWidgets);
   }
 
+  /**
+   * reCAPTCHA v3.
+   *
+   * Nothing is rendered and nothing is shown to the visitor. Google scores the
+   * visit in the background and the server accepts or rejects it from that
+   * score, so the whole job here is to fetch a token at submit time and put it
+   * in the hidden field the form already carries.
+   *
+   * A v3 key cannot be used as v2 and vice versa, which is worth knowing when
+   * nothing happens on a form: a v2 key under this path never produces a token,
+   * and the submission goes out without one.
+   */
+  function initRecaptchaV3() {
+    var fields = $$('input[data-recaptcha-v3]');
+    if (!fields.length) return;
+
+    fields.forEach(function (field) {
+      var siteKey = field.getAttribute('data-recaptcha-v3');
+      var form = field.closest('form');
+      if (!form || !siteKey) return;
+
+      form.addEventListener('submit', function (event) {
+        // Our own re-submit, after the token has been filled in.
+        if (form.dataset.recaptchaPassed === '1') return;
+
+        if (typeof window.grecaptcha === 'undefined' || typeof window.grecaptcha.execute !== 'function') {
+          // Blocked, offline, or still loading. Submit anyway rather than
+          // trapping the visitor on a form that does nothing; the server
+          // decides what to do about the missing token.
+          return;
+        }
+
+        event.preventDefault();
+
+        whenRecaptchaReady(function () {
+          window.grecaptcha
+            .execute(siteKey, { action: 'submit' })
+            .then(function (token) {
+              field.value = token;
+              form.dataset.recaptchaPassed = '1';
+              if (form.requestSubmit) form.requestSubmit();
+              else form.submit();
+            })
+            .catch(function () {
+              // No token available. Send it without one and let the server
+              // answer - a real error message beats a dead button.
+              form.dataset.recaptchaPassed = '1';
+              if (form.requestSubmit) form.requestSubmit();
+              else form.submit();
+            });
+        });
+      });
+    });
+  }
+
 
   /**
    * Term toggle on the packages section.
@@ -1280,6 +1335,7 @@
     initChat();
     initCarousel();
     initRecaptcha();
+    initRecaptchaV3();
     initCompare();
     initHeroVideo();
     initTermToggle();

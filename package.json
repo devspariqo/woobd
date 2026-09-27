@@ -17,6 +17,7 @@
     "smoke": "node scripts/smoke.js",
     "scan:secrets": "node scripts/scan-secrets.js",
     "scrub:install": "node scripts/scrub-install-sql.js",
+    "build:sql": "node scripts/build-install-sql.js",
     "preview": "node scripts/preview-settings.js",
     "preview:admin": "node scripts/preview-admin.js",
     "reset": "node scripts/setup.js --reset"

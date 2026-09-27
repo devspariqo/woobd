@@ -11,6 +11,8 @@
   var base = '/' + adminPath;
   var settingsUrl = helpers.url(base + '/settings');
   var isHexColour = function (v) { return typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v); };
+  // A setting whose key ends in _color is a colour even while it is empty.
+  var isColourField = function (key, value) { return /_color$/.test(key) || isHexColour(value); };
   var currentGroupLabel = 'Settings';
   groups.forEach(function (g) { if (g.key === group) currentGroupLabel = g.label; });
 
@@ -45,13 +47,80 @@
     <svg><use href="#i-alert"/></svg>
     <div>
       <strong>CAPTCHA is switched on but not configured.</strong>
-      Add both the reCAPTCHA site key and secret key below, or the checkbox will not
-      appear and submissions will not be verified. Until then the forms stay open,
-      which is the safe failure - nobody is locked out.
-      <div style="margin-top:7px;font-size:.8125rem">
-        Get keys at <a href="https://www.google.com/recaptcha/admin" target="_blank" rel="noopener noreferrer">google.com/recaptcha/admin</a>
-        — choose <strong>reCAPTCHA v2</strong> → <strong>"I'm not a robot" Checkbox</strong>.
+
+      <%#
+        Which half is missing, named. "Add both keys" is not an instruction
+        when one of them is already saved - the operator pastes the same value
+        twice and the warning does not change.
+      %>
+      <% if (!captchaSiteKeySet && !captchaSecretKeySet) { %>
+        <strong>Neither key is saved</strong>, so no challenge is shown on any form and nothing is
+        being verified. Add both below.
+      <% } else if (!captchaSiteKeySet) { %>
+        The <strong>site key is missing</strong>. That is the half the browser needs to draw the
+        widget, so no challenge appears anywhere — a secret key on its own does nothing at all.
+      <% } else { %>
+        The <strong>secret key is missing</strong>. The challenge would appear on the page, but the
+        server has nothing to verify the answer with, so it could not accept it.
+      <% } %>
+
+      <div class="conn-status">
+        <span class="conn-pill<%= captchaSiteKeySet ? ' is-ok' : ' is-missing' %>">
+          Site key <%= captchaSiteKeySet ? 'saved' : 'missing' %>
+        </span>
+        <span class="conn-pill<%= captchaSecretKeySet ? ' is-ok' : ' is-missing' %>">
+          Secret key <%= captchaSecretKeySet ? 'saved' : 'missing' %>
+        </span>
       </div>
+
+      <div style="margin-top:9px;font-size:.8125rem">
+        Get keys at <a href="https://www.google.com/recaptcha/admin/create" target="_blank" rel="noopener noreferrer">google.com/recaptcha/admin</a>.
+        Choose <strong>reCAPTCHA v2</strong>, then either key type works here —
+        <strong>"I'm not a robot" Checkbox</strong> is the simplest. Add the domain
+        <code><%= helpers.absoluteUrl('/').replace(/^https?:\/\//, '').replace(/\/$/, '') %></code> to it,
+        then paste both keys below and press <strong>Test reCAPTCHA keys</strong>.
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<% if (group === 'security' && captchaConfigured && captchaToggles.length) { %>
+  <div class="alert alert-success" role="status">
+    <svg><use href="#i-check-circle"/></svg>
+    <div>
+      <strong>CAPTCHA is configured</strong> and the forms you selected below are protected.
+      <div class="conn-status">
+        <span class="conn-pill is-ok">Site key saved</span>
+        <span class="conn-pill is-ok">Secret key saved</span>
+        <span class="conn-pill is-ok"><%= captchaToggles.length %> form<%= captchaToggles.length === 1 ? '' : 's' %> protected</span>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<% if (group === 'smtp' && !mailConfigured) { %>
+  <div class="alert alert-warning" role="status">
+    <svg><use href="#i-alert"/></svg>
+    <div>
+      <strong>Email is not configured, so nothing is being sent.</strong>
+      Missing: <strong><%= mailMissing.join(', ') %></strong>.
+      Order confirmations, status updates, contact-form alerts and quote requests are all skipped until
+      this is filled in — the site works, it just sends no mail.
+      <div style="margin-top:7px;font-size:.8125rem">
+        For Hostinger, use <code>smtp.hostinger.com</code> on port <code>465</code> with SSL on, and the
+        <strong>full email address</strong> as the username. The password field is a secret: leave it
+        blank to keep what is saved.
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<% if (group === 'smtp' && mailConfigured) { %>
+  <div class="alert alert-success" role="status">
+    <svg><use href="#i-check-circle"/></svg>
+    <div>
+      <strong>Email is configured.</strong> Send a test to confirm the credentials are accepted —
+      a saved password is not the same as a working one.
     </div>
   </div>
 <% } %>
@@ -212,13 +281,22 @@
               <input type="number" class="form-control" id="<%= controlId %>" name="<%= f.key %>"
                      value="<%= f.value %>" min="0" step="1">
 
-            <% } else if (isHexColour(f.value)) { %>
-              <%# A colour setting: keep the hex field authoritative, with a picker beside it. %>
+            <% } else if (isColourField(f.key, f.value)) { %>
+              <%#
+                A colour setting: the hex field stays authoritative, with a
+                picker beside it.
+
+                The check is on the key name as well as the value, so a colour
+                field that is still empty gets a picker too. Testing the value
+                alone meant a freshly added colour setting rendered as a plain
+                text box with no hint that a hex code was expected.
+              %>
               <div class="input-group">
                 <input type="text" class="form-control" id="<%= controlId %>" name="<%= f.key %>"
-                       value="<%= f.value %>" maxlength="7" spellcheck="false">
+                       value="<%= f.value %>" maxlength="7" spellcheck="false" placeholder="#5b21f0">
                 <input type="color" class="form-control" style="max-width:56px;padding:3px;cursor:pointer"
-                       value="<%= f.value %>" data-colour-picker="<%= controlId %>" aria-label="Pick <%= f.label %>">
+                       value="<%= isHexColour(f.value) ? f.value : '#ffffff' %>"
+                       data-colour-picker="<%= controlId %>" aria-label="Pick <%= f.label %>">
               </div>
 
             <% } else { %>
@@ -260,6 +338,29 @@
       </button>
       <span style="margin-left:12px;font-size:.8125rem;color:var(--text-soft)">
         Checks the saved keys against Google and tells you what it says.
+      </span>
+    </form>
+  <% } %>
+
+  <%#
+    Sending a test is the only way to tell "the password is saved" from "the
+    password works". Nodemailer's error names the exact failure - wrong
+    password, unreachable host, refused port - and none of that is visible from
+    the settings alone.
+  %>
+  <% if (group === 'smtp') { %>
+    <form method="post" action="<%= helpers.url('/' + adminPath + '/settings/test-mail') %>"
+          style="margin-top:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button type="submit" class="btn btn-outline">
+        <svg><use href="#i-mail"/></svg>
+        Send a test email
+      </button>
+      <label class="form-label" for="test_to" style="margin:0">Send it to</label>
+      <input type="email" id="test_to" name="to" class="form-control" style="max-width:260px"
+             placeholder="<%= settings.mail_from_email || site.email %>">
+      <span style="font-size:.8125rem;color:var(--text-soft)">
+        Leave blank to use the From address.
       </span>
     </form>
   <% } %>

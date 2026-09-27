@@ -143,6 +143,7 @@ router.post('/settings', auth.requireRole('admin'), uploadSettings, ctrl.saveSet
 // Checks the saved reCAPTCHA keys against Google and reports the answer. No
 // upload middleware: it reads what is already stored.
 router.post('/settings/test-captcha', auth.requireRole('admin'), ctrl.testCaptcha);
+router.post('/settings/test-mail', auth.requireRole('admin'), ctrl.testMail);
 
 // ---------------------------------------------------------------------------
 // CMS resources - packages, portfolio, testimonials, FAQs, clients, pages, menus

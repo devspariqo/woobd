@@ -1032,12 +1032,28 @@ async function checkAdminSettings() {
     'captcha_on_contact',
     'captcha_site_key',
     'captcha_secret_key',
+    'captcha_mode',
+    'captcha_version',
+    'captcha_min_score',
   ];
   const missingCaptcha = captchaKeys.filter((k) => !securityTab.body.includes(`name="${k}"`));
   if (!missingCaptcha.length) {
-    ok('Security tab exposes all 6 CAPTCHA controls', captchaKeys.join(', '));
+    ok(`Security tab exposes all ${captchaKeys.length} CAPTCHA controls`, captchaKeys.join(', '));
   } else {
-    bad('Security tab exposes all 6 CAPTCHA controls', `missing: ${missingCaptcha.join(', ')}`);
+    bad(`Security tab exposes all ${captchaKeys.length} CAPTCHA controls`, `missing: ${missingCaptcha.join(', ')}`);
+  }
+
+  // The warning has to name the missing half rather than say "not configured".
+  if (securityTab.body.includes('conn-pill')) {
+    const sitePill = /Site key (saved|missing)/.test(securityTab.body);
+    const secretPill = /Secret key (saved|missing)/.test(securityTab.body);
+    if (sitePill && secretPill) {
+      ok('the CAPTCHA warning names which key is missing', 'site key and secret key reported separately');
+    } else {
+      bad('the CAPTCHA warning names which key is missing', 'no per-key status found');
+    }
+  } else {
+    bad('the CAPTCHA warning names which key is missing', 'no status pills rendered');
   }
 
   // --- Secrets must never be rendered into the page ------------------------
@@ -1078,6 +1094,8 @@ async function checkAdminSettings() {
     // Select fields must be posted too: the save validates them against their
     // options, so an omitted one is rejected rather than left unchanged.
     captcha_mode: 'invisible',
+    captcha_version: 'v2',
+    captcha_min_score: '50',
     admin_path_slug: ADMIN_SLUG,
     max_login_attempts: '5',
     lockout_minutes: '15',
@@ -1133,6 +1151,8 @@ async function checkAdminSettings() {
     // Also required, or the restore POST is rejected and the flipped value
     // stays flipped - which makes the next run start from a different state.
     captcha_mode: 'invisible',
+    captcha_version: 'v2',
+    captcha_min_score: '50',
     admin_path_slug: ADMIN_SLUG,
     max_login_attempts: '5',
     lockout_minutes: '15',
@@ -3731,11 +3751,613 @@ async function checkCrawlerFilesAndCompare() {
   await db.close().catch(() => {});
 }
 
+/**
+ * Does the CAPTCHA actually render once keys exist?
+ *
+ * Every other CAPTCHA check in this file runs against a site with no keys, so
+ * they all pass whether or not the widget is wired up. That is precisely how a
+ * "captcha is broken" report survives four rounds of fixes: nothing was ever
+ * asserting that a widget appears.
+ *
+ * Google publishes a test key pair that always validates. Saving those turns
+ * the question into a measurable one - either the widget markup is on the form
+ * or it is not - without needing the operator's real keys, and the secret is
+ * live enough to prove the server half against Google itself.
+ *
+ *   site key   6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI
+ *   secret     6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe
+ *
+ * Everything is restored afterwards, by writing straight to the table: a blank
+ * secret in the settings form means "keep what is stored", so the form cannot
+ * clear it.
+ */
+async function checkCaptchaWiring() {
+  section('23. The CAPTCHA widget renders once keys are configured');
+
+  const db = require('../src/config/database');
+  const settingsSvc = require('../src/services/settings.service');
+  const captcha = require('../src/middleware/captcha');
+
+  const TEST_SITE_KEY = '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
+  const TEST_SECRET = '6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe';
+
+  try {
+    const login = await adminLogin();
+    if (!login.ok) {
+      warn('the CAPTCHA widget renders', `${login.reason} - skipping`);
+      await db.close().catch(() => {});
+      return;
+    }
+
+    const tab = await req(`/${ADMIN_SLUG}/settings?group=security`);
+    const csrf = tab.body.match(/name="_csrf"\s+value="([^"]+)"/);
+    if (!csrf) {
+      bad('the CAPTCHA widget renders', 'no CSRF token on the security tab');
+      await db.close().catch(() => {});
+      return;
+    }
+
+    const body = new URLSearchParams({
+      _csrf: csrf[1],
+      group: 'security',
+      captcha_on_login: '1',
+      captcha_on_signup: '1',
+      captcha_on_admin: '1',
+      captcha_on_contact: '1',
+      captcha_site_key: TEST_SITE_KEY,
+      captcha_secret_key: TEST_SECRET,
+      captcha_mode: 'invisible',
+      captcha_version: 'v2',
+      captcha_min_score: '50',
+      admin_path_slug: ADMIN_SLUG,
+      max_login_attempts: '5',
+      lockout_minutes: '15',
+      force_https: '1',
+    }).toString();
+
+    const saved = await req(`/${ADMIN_SLUG}/settings`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+
+    if (![301, 302, 303].includes(saved.status)) {
+      bad('the test keys save', `got ${saved.status}`);
+      await db.close().catch(() => {});
+      return;
+    }
+    ok('the test keys save', 'Google\'s published test pair');
+
+    settingsSvc.invalidate();
+    await settingsSvc.loadAll(true);
+
+    // --- The widget is on every form that should carry one -----------------
+    //
+    // The admin login page is checked last and signed out, because this run is
+    // already authenticated: the login route redirects a signed-in staff
+    // member straight to the dashboard, so requesting it with a session would
+    // measure the redirect rather than the form.
+    const forms = [
+      ['/signin', 'signin'],
+      ['/signup', 'signup'],
+      ['/contact', 'contact'],
+      ['/', 'homepage CTA'],
+      ['/forgot-password', 'forgot password'],
+    ];
+
+    for (const [path, label] of forms) {
+      const page = await req(path);
+      const hasWidget = page.body.includes('class="g-recaptcha"');
+      const hasScript = page.body.includes('recaptcha/api.js?render=explicit');
+
+      if (hasWidget && hasScript) ok(`the ${label} form carries the widget`, path);
+      else if (!hasWidget) bad(`the ${label} form carries the widget`, 'no .g-recaptcha element');
+      else bad(`the ${label} form carries the widget`, 'the widget is there but its script is not');
+    }
+
+    resetCookies();
+    const adminLoginPage = await req(`/${ADMIN_SLUG}/login`);
+    if (adminLoginPage.status !== 200) {
+      bad('the admin login form carries the widget', `expected 200 signed out, got ${adminLoginPage.status}`);
+    } else if (adminLoginPage.body.includes('class="g-recaptcha"') &&
+               adminLoginPage.body.includes('recaptcha/api.js')) {
+      ok('the admin login form carries the widget', `/${ADMIN_SLUG}/login`);
+    } else {
+      bad('the admin login form carries the widget', 'no widget on the admin sign-in form');
+    }
+
+    // --- The server half, against Google ------------------------------------
+    // The test secret always validates, so this proves the whole path: fetch,
+    // form encoding, Google's answer, and the decision made from it.
+    const outcome = await captcha.verify('smoke-test-token', '127.0.0.1', 'admin');
+
+    if (outcome.ok && outcome.degraded) {
+      warn('the server accepts a token Google validates', 'Google was unreachable - the check degraded to fail-open');
+    } else if (outcome.ok) {
+      ok('the server accepts a token Google validates', 'test secret accepted');
+    } else {
+      bad('the server accepts a token Google validates', outcome.message || 'rejected');
+    }
+
+    // --- A missing token must still be refused ------------------------------
+    const noToken = await captcha.verify(null, '127.0.0.1', 'admin');
+    if (!noToken.ok) ok('a submission with no token is refused', noToken.reason || 'rejected');
+    else bad('a submission with no token is refused', 'it was let through with keys configured');
+
+    // --- v3 mode does not render a widget -----------------------------------
+    await db.query("UPDATE settings SET setting_value = 'v3' WHERE setting_key = 'captcha_version'");
+    settingsSvc.invalidate();
+    await settingsSvc.loadAll(true);
+
+    const v3Page = await req('/signin');
+    if (v3Page.body.includes('data-recaptcha-v3')) {
+      ok('v3 mode switches to a hidden token field');
+    } else {
+      bad('v3 mode switches to a hidden token field', 'no data-recaptcha-v3 input');
+    }
+
+    if (v3Page.body.includes('recaptcha/api.js?render=' + TEST_SITE_KEY)) {
+      ok('v3 loads the script with the site key in the URL');
+    } else {
+      bad('v3 loads the script with the site key in the URL', 'the script URL is wrong for v3');
+    }
+
+    if (!v3Page.body.includes('class="g-recaptcha"')) {
+      ok('v3 renders no widget', 'nothing to click, as designed');
+    } else {
+      bad('v3 renders no widget', 'a v2 widget is still being rendered under a v3 key');
+    }
+  } catch (err) {
+    bad('the CAPTCHA widget renders', err.message);
+  }
+
+  // --- Restore ---------------------------------------------------------------
+  // Straight to the table. The settings form cannot clear a secret - a blank
+  // field there means "keep the stored value" - so it is the wrong tool here.
+  try {
+    await db.query(
+      "UPDATE settings SET setting_value = '' WHERE setting_key IN ('captcha_site_key', 'captcha_secret_key')"
+    );
+    await db.query("UPDATE settings SET setting_value = 'v2' WHERE setting_key = 'captcha_version'");
+    settingsSvc.invalidate();
+    await settingsSvc.loadAll(true);
+
+    const after = settingsSvc.get('captcha_site_key');
+    if (!after) ok('the test keys are cleared again', 'site key and secret emptied');
+    else warn('the test keys are cleared again', 'the site key is still set');
+  } catch (err) {
+    bad('the test keys are cleared again', err.message);
+  }
+
+  await db.close().catch(() => {});
+}
+
+/**
+ * Every notification reaches the right inboxes.
+ *
+ * The transport is replaced with one that records instead of sending, so the
+ * assertions are on the real recipients and subjects the application builds -
+ * not on a mock of the application.
+ *
+ * This exists because the order-status notification was silently gated on the
+ * order reaching `active`. Every other status change wrote to the database and
+ * told nobody, and nothing anywhere reported that. A test that only checked
+ * "mail is configured" would have passed throughout.
+ */
+async function checkMailNotifications() {
+  section('24. Every notification reaches the right inboxes');
+
+  const db = require('../src/config/database');
+  const settingsSvc = require('../src/services/settings.service');
+  const nodemailer = require('nodemailer');
+  const mail = require('../src/services/mail.service');
+
+  const sent = [];
+  const originalCreateTransport = nodemailer.createTransport;
+  const ALERT_ADDRESS = 'smoke-alerts@example.com';
+
+  try {
+    // A transport that records. `verify` resolves so the test-mail action can
+    // report success without a network round trip.
+    nodemailer.createTransport = () => ({
+      sendMail: async (message) => {
+        sent.push(message);
+        return { messageId: `smoke-${sent.length}` };
+      },
+      verify: async () => true,
+      close() {},
+    });
+
+    // Make SMTP look configured, or send() short-circuits before it builds
+    // anything worth asserting on.
+    await db.query("UPDATE settings SET setting_value = 'smoke-not-a-real-password' WHERE setting_key = 'smtp_password'");
+    await db.query("UPDATE settings SET setting_value = '1' WHERE setting_key = 'smtp_enabled'");
+    await db.query("UPDATE settings SET setting_value = '1' WHERE setting_key = 'notify_admin_new_order'");
+    await db.query("UPDATE settings SET setting_value = '1' WHERE setting_key = 'notify_customer_order_status'");
+    await db.query("UPDATE settings SET setting_value = '1' WHERE setting_key = 'notify_admin_contact'");
+    await db.query('UPDATE settings SET setting_value = ? WHERE setting_key = ?', [ALERT_ADDRESS, 'notify_admin_email']);
+
+    settingsSvc.invalidate();
+    await settingsSvc.loadAll(true);
+    mail.resetTransport();
+
+    const configured = await mail.verify();
+    if (configured.ok) ok('the transport reports healthy', 'stubbed');
+    else bad('the transport reports healthy', configured.error);
+
+    // --- Contact form, end to end over HTTP ---------------------------------
+    // Both the contact page and the homepage quote box post here, so this one
+    // request covers both.
+    const contactPage = await req('/contact');
+    const csrf = contactPage.body.match(/name="_csrf"\s+value="([^"]+)"/);
+    if (!csrf) {
+      bad('the contact form sends two emails', 'no CSRF token on /contact');
+    } else {
+      sent.length = 0;
+
+      const submit = await req('/contact', {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          _csrf: csrf[1],
+          name: 'Smoke Sender',
+          email: 'smoke-sender@example.com',
+          phone: '+8801700000000',
+          subject: 'Smoke test enquiry',
+          message: 'Checking that both notifications are sent.',
+          source: 'contact_page',
+        }).toString(),
+      });
+
+      if ([301, 302, 303].includes(submit.status)) {
+        ok('the contact form submits', `→ ${String(submit.location).replace(BASE, '')}`);
+      } else {
+        bad('the contact form submits', `got ${submit.status}`);
+      }
+
+      const toCustomer = sent.filter((m) => String(m.to).includes('smoke-sender@example.com'));
+      const toAdmin = sent.filter((m) => String(m.to).includes(ALERT_ADDRESS));
+
+      if (toCustomer.length) ok('the sender gets an acknowledgement', toCustomer[0].subject);
+      else bad('the sender gets an acknowledgement', 'nothing sent to the customer');
+
+      if (toAdmin.length) ok('the admin gets an enquiry alert', toAdmin[0].subject);
+      else bad('the admin gets an enquiry alert', `nothing sent to ${ALERT_ADDRESS}`);
+
+      // The reply-to is what makes the alert actionable - without it a reply
+      // goes to the site's own mailbox.
+      if (toAdmin.length && String(toAdmin[0].replyTo).includes('smoke-sender@example.com')) {
+        ok('the enquiry alert replies to the sender', toAdmin[0].replyTo);
+      } else if (toAdmin.length) {
+        warn('the enquiry alert replies to the sender', `reply-to is ${toAdmin[0].replyTo}`);
+      }
+    }
+
+    // --- New order reaches the admin and every active staff member ----------
+    sent.length = 0;
+    await mail.sendAdminNewOrder(
+      { order_number: 'WBD-SMOKE-1', service_title: 'Smoke Package', total: 1000, payment_status: 'unpaid' },
+      { name: 'Smoke Customer', email: 'smoke-buyer@example.com' }
+    );
+
+    if (sent.length) {
+      const recipients = String(sent[0].to);
+      if (recipients.includes(ALERT_ADDRESS)) ok('the new-order alert reaches the alert address');
+      else bad('the new-order alert reaches the alert address', recipients);
+
+      if (recipients.includes('@')) ok('the new-order alert has at least one recipient', recipients);
+      else bad('the new-order alert has at least one recipient', 'no recipients');
+    } else {
+      bad('the new-order alert is sent', 'nothing was sent');
+    }
+
+    // --- Order status change, over HTTP, for a non-active status ------------
+    // This is the regression: moving an order to `in_progress` used to change
+    // the status and notify nobody.
+    //
+    // Signed in here rather than earlier: the CAPTCHA section signs out on
+    // purpose to reach the admin login form, and the contact form above is
+    // public, so this is the first check that needs a staff session.
+    const login = await adminLogin();
+    if (!login.ok) {
+      warn('a status change notifies the customer', `${login.reason} - skipping`);
+    } else {
+      const order = await db.queryOne(
+        "SELECT id, order_number, status FROM orders WHERE status = 'pending' ORDER BY id DESC LIMIT 1"
+      );
+
+      if (!order) {
+        warn('a status change notifies the customer', 'no pending order to move');
+      } else {
+        const detail = await req(`/${ADMIN_SLUG}/orders/${order.id}`);
+        const orderCsrf = detail.body.match(/name="_csrf"\s+value="([^"]+)"/);
+
+        if (!orderCsrf) {
+          bad('a status change notifies the customer', `no CSRF token on the order page (status ${detail.status})`);
+        } else {
+          sent.length = 0;
+
+          const moved = await req(`/${ADMIN_SLUG}/orders/${order.id}`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              _csrf: orderCsrf[1],
+              status: 'in_progress',
+              note: 'Smoke test moved this order.',
+            }).toString(),
+          });
+
+          if ([301, 302, 303].includes(moved.status)) {
+            const after = await db.queryOne('SELECT status FROM orders WHERE id = ?', [order.id]);
+
+            if (after && after.status === 'in_progress') {
+              ok('the order status change is saved', `pending → ${after.status}`);
+            } else {
+              bad('the order status change is saved', `status is ${after && after.status}`);
+            }
+
+            if (sent.length) {
+              ok('a non-active status change still notifies the customer', sent[0].subject);
+            } else {
+              bad('a non-active status change still notifies the customer', 'no email was sent');
+            }
+
+            // Put it back so the run is repeatable.
+            await db.query("UPDATE orders SET status = 'pending' WHERE id = ?", [order.id]);
+          } else {
+            bad('a status change notifies the customer', `the update returned ${moved.status}`);
+          }
+        }
+      }
+    }
+
+    // --- The admin panel can test its own mail ------------------------------
+    {
+      const smtpTab = await req(`/${ADMIN_SLUG}/settings?group=smtp`);
+      if (smtpTab.body.includes('settings/test-mail')) {
+        ok('the SMTP tab offers a send-test action');
+      } else {
+        bad('the SMTP tab offers a send-test action', 'no form posting to test-mail');
+      }
+
+      const tabCsrf = smtpTab.body.match(/name="_csrf"\s+value="([^"]+)"/);
+      sent.length = 0;
+
+      const test = await req(`/${ADMIN_SLUG}/settings/test-mail`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ _csrf: tabCsrf ? tabCsrf[1] : '', to: 'smoke-test@example.com' }).toString(),
+      });
+
+      if ([301, 302, 303].includes(test.status) && sent.length) {
+        ok('the send-test action sends a message', sent[0].subject);
+      } else {
+        bad('the send-test action sends a message', `status ${test.status}, ${sent.length} sent`);
+      }
+    }
+  } catch (err) {
+    bad('mail notifications', err.message);
+  }
+
+  // --- Restore ---------------------------------------------------------------
+  nodemailer.createTransport = originalCreateTransport;
+
+  try {
+    await db.query("UPDATE settings SET setting_value = '' WHERE setting_key = 'smtp_password'");
+    await db.query("UPDATE settings SET setting_value = '' WHERE setting_key = 'notify_admin_email'");
+    settingsSvc.invalidate();
+    await settingsSvc.loadAll(true);
+    mail.resetTransport();
+    ok('the SMTP test values are cleared again');
+  } catch (err) {
+    bad('the SMTP test values are cleared again', err.message);
+  }
+
+  await db.close().catch(() => {});
+}
+
+/**
+ * Page hero backgrounds.
+ *
+ * Three states have to hold, and only the middle one is interesting: with
+ * nothing configured the hero must look exactly as it did before the feature
+ * existed, a colour must apply with a text colour that stays readable on it,
+ * and an image must land on its own layer.
+ *
+ * The contrast case is the one worth testing. A dark navy hero with the theme's
+ * dark text is unreadable, and nothing about the markup says so.
+ */
+async function checkHeroBackgrounds() {
+  section('25. Page hero backgrounds');
+
+  const db = require('../src/config/database');
+  const settingsSvc = require('../src/services/settings.service');
+
+  try {
+    // --- Unconfigured: unchanged -------------------------------------------
+    const plain = await req('/services');
+    if (plain.body.includes('class="page-hero"')) {
+      ok('an unconfigured hero renders plain', 'no background classes added');
+    } else {
+      bad('an unconfigured hero renders plain', 'the hero carries classes with nothing set');
+    }
+
+    // --- A dark colour gets white text --------------------------------------
+    await db.query("UPDATE settings SET setting_value = '#0f2a4a' WHERE setting_key = 'hero_about_bg_color'");
+    settingsSvc.invalidate();
+    await settingsSvc.loadAll(true);
+
+    const dark = await req('/about');
+    if (dark.body.includes('has-custom-bg') && dark.body.includes('--hero-bg: #0f2a4a')) {
+      ok('a chosen colour reaches the hero', '#0f2a4a');
+    } else {
+      bad('a chosen colour reaches the hero', 'the colour or the class is missing');
+    }
+
+    if (dark.body.includes('text-on-light')) {
+      ok('a dark hero switches to light text', 'dark navy → white text');
+    } else {
+      bad('a dark hero switches to light text', 'dark text on a dark background is unreadable');
+    }
+
+    // --- A light colour keeps dark text --------------------------------------
+    await db.query("UPDATE settings SET setting_value = '#fdf6e3' WHERE setting_key = 'hero_about_bg_color'");
+    settingsSvc.invalidate();
+    await settingsSvc.loadAll(true);
+
+    const light = await req('/about');
+    if (light.body.includes('text-on-dark')) {
+      ok('a light hero keeps dark text', 'cream → theme text colour');
+    } else {
+      bad('a light hero keeps dark text', 'white text on a light background is unreadable');
+    }
+
+    // --- The helper itself, at the boundaries --------------------------------
+    const helpers = require('../src/utils/helpers');
+    const cases = [
+      ['#000000', 'light'],
+      ['#ffffff', 'dark'],
+      ['#0f2a4a', 'light'],
+      ['#fdf6e3', 'dark'],
+      ['', 'dark'],
+      ['not-a-colour', 'dark'],
+    ];
+    const wrong = cases.filter(([input, expected]) => helpers.contrastText(input) !== expected);
+
+    if (!wrong.length) ok('contrastText handles the boundaries', `${cases.length} cases`);
+    else bad('contrastText handles the boundaries', wrong.map(([i, e]) => `${i} → expected ${e}`).join(', '));
+
+    // --- An image gets its own layer ----------------------------------------
+    await db.query("UPDATE settings SET setting_value = '#0f2a4a' WHERE setting_key = 'hero_about_bg_color'");
+    await db.query(
+      "UPDATE settings SET setting_value = '/assets/img/portfolio-default.svg' WHERE setting_key = 'hero_services_bg_image'"
+    );
+    settingsSvc.invalidate();
+    await settingsSvc.loadAll(true);
+
+    const media = await req('/services');
+    if (media.body.includes('page-hero-media') && media.body.includes('class="page-hero-bg"')) {
+      ok('a hero image renders on its own layer', 'so the blur does not touch the heading');
+    } else {
+      bad('a hero image renders on its own layer', 'no .page-hero-bg element');
+    }
+
+    if (/hero-treat-[a-z-]+/.test(media.body)) {
+      ok('the image treatment class is applied');
+    } else {
+      bad('the image treatment class is applied', 'no hero-treat-* class');
+    }
+  } catch (err) {
+    bad('page hero backgrounds', err.message);
+  }
+
+  // --- Restore ---------------------------------------------------------------
+  try {
+    await db.query(
+      "UPDATE settings SET setting_value = '' WHERE setting_key IN ('hero_about_bg_color', 'hero_services_bg_image', 'cta_bg_color')"
+    );
+    settingsSvc.invalidate();
+    await settingsSvc.loadAll(true);
+    ok('the hero test values are cleared again');
+  } catch (err) {
+    bad('the hero test values are cleared again', err.message);
+  }
+
+  await db.close().catch(() => {});
+}
+
+/**
+ * install.sql is importable, and carries no credentials.
+ *
+ * Both have failed before, in ways that are invisible until the moment someone
+ * needs the file. A phpMyAdmin export writes a bare `CREATE TABLE` with no
+ * matching `DROP`, so the second import stops at "table already exists" and
+ * leaves a half-populated database - and a raw export of the settings table
+ * publishes every credential, because it stores them unencrypted.
+ *
+ * Static, so it needs no database privileges beyond reading a file.
+ */
+function checkInstallSql() {
+  section('26. install.sql is importable and clean');
+
+  const fs = require('fs');
+  const path = require('path');
+  const schema = require('../src/config/settings-schema');
+
+  let sql;
+  try {
+    sql = fs.readFileSync(path.join(__dirname, '..', 'database', 'install.sql'), 'utf8');
+  } catch (err) {
+    bad('install.sql is readable', err.message);
+    return;
+  }
+
+  const creates = (sql.match(/^CREATE TABLE `([^`]+)`/gm) || []).map((line) => line.replace(/^CREATE TABLE `|`$/g, ''));
+  const drops = new Set((sql.match(/^DROP TABLE IF EXISTS `([^`]+)`;/gm) || []).map((line) => line.replace(/^DROP TABLE IF EXISTS `|`;$/g, '')));
+
+  if (creates.length) ok('install.sql declares its tables', `${creates.length} CREATE TABLE`);
+  else bad('install.sql declares its tables', 'no CREATE TABLE found');
+
+  const undropped = creates.filter((table) => !drops.has(table));
+  if (!undropped.length) {
+    ok('every table is dropped before it is created', `${drops.size} DROP TABLE`);
+  } else {
+    bad('every table is dropped before it is created', `missing DROP for: ${undropped.join(', ')}`);
+  }
+
+  // The drop block must come before the first create, or a re-import still
+  // fails on whichever table it reaches first.
+  const firstDrop = sql.indexOf('DROP TABLE IF EXISTS');
+  const firstCreate = sql.indexOf('CREATE TABLE');
+  if (firstDrop >= 0 && firstDrop < firstCreate) {
+    ok('the drops run before the creates');
+  } else {
+    bad('the drops run before the creates', 'the first CREATE comes first');
+  }
+
+  // No credential value may be present. The key name is fine - the row has to
+  // exist so the installer seeds it - but the value must be empty.
+  const leaked = [];
+  for (const key of schema.SECRET_KEYS) {
+    const pattern = new RegExp(",\\s*'" + key + "',\\s*'([^']*)'");
+    const match = sql.match(pattern);
+    if (match && match[1]) leaked.push(key);
+  }
+
+  if (!leaked.length) ok('no credential value is written into install.sql', `${schema.SECRET_KEYS.size} key(s) checked`);
+  else bad('no credential value is written into install.sql', `non-empty: ${leaked.join(', ')}`);
+
+  // The settings rows must still be there - a scrub that removed them would
+  // leave a site with no configuration at all.
+  //
+  // Counted across every settings statement, not the first: rows are written
+  // 100 to a statement, so a file with 200 settings has two of them and
+  // reading only the first under-reports by half.
+  const settingsBlocks = sql.match(/INSERT INTO `settings`[\s\S]*?;\n/g) || [];
+  const settingsRows = settingsBlocks.reduce(
+    (total, block) => total + (block.match(/^\(\d+, '/gm) || []).length,
+    0
+  );
+
+  if (settingsRows > 150) ok('the settings rows are present', `${settingsRows} row(s)`);
+  else bad('the settings rows are present', `only ${settingsRows} rows`);
+
+  // Sessions belong to one install. Their structure has to ship - the session
+  // store does not create its own table - but not their contents.
+  if (/CREATE TABLE `sessions`/.test(sql)) ok('the sessions table structure ships');
+  else bad('the sessions table structure ships', 'a fresh install would have no session table');
+
+  if (/INSERT INTO `sessions`/.test(sql)) {
+    bad('session rows are not seeded', 'live session ids are in a committed file');
+  } else {
+    ok('session rows are not seeded', 'structure only');
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
-async function main() {
-  console.log('\n  WooBD.Com smoke test');
+async function main() {  console.log('\n  WooBD.Com smoke test');
   console.log(`  Target : ${BASE}`);
   console.log(`  Admin  : /${ADMIN_SLUG}`);
 
@@ -3786,6 +4408,14 @@ async function main() {
     // Sends its own Accept-Encoding, so it must not run before the sections
     // that assume an uncompressed body.
     await checkCrawlerFilesAndCompare();
+    // Writes test keys and clears them again, so it runs after everything that
+    // depends on the site being unconfigured.
+    await checkCaptchaWiring();
+    await checkHeroBackgrounds();
+    // Last: it stubs the mail transport and writes SMTP settings, so nothing
+    // after it may depend on either.
+    await checkMailNotifications();
+    checkInstallSql();
   } catch (err) {
     console.error('\n  ✗ Smoke test aborted by an unexpected error');
     console.error(`    ${err.stack || err.message}\n`);

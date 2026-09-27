@@ -472,8 +472,15 @@
 <% } %>
 
 <%# ---------------------------------------------------- CTA + form %>
-<section class="section cta-section<%= settings.cta_bg_image ? ' has-bg-image' : '' %>"
+<%
+  // A flat colour replaces the brand gradient when one is chosen and there is
+  // no photo to show instead. The two are alternatives, not layers.
+  var ctaColour = settings.cta_bg_color || '';
+  var ctaFlat = !settings.cta_bg_image && /^#[0-9a-f]{6}$/i.test(ctaColour);
+%>
+<section class="section cta-section<%= settings.cta_bg_image ? ' has-bg-image' : '' %><%= ctaFlat ? ' has-custom-bg text-on-' + helpers.contrastText(ctaColour) : '' %>"
          id="quote"
+         <% if (ctaFlat) { %>style="--cta-bg: <%= ctaColour %>"<% } %>
          data-overlay="<%= settings.cta_bg_overlay || 'dark-blur' %>">
   <% if (settings.cta_bg_image) { %>
     <%#
@@ -551,8 +558,8 @@
           </div>
 
           <% if (captcha.enabled && settings.captcha_on_contact === '1') { %>
-            <%- include('../partials/recaptcha', { captcha: { siteKey: captcha.siteKey, mode: captcha.mode } }) %>
-<script src="https://www.google.com/recaptcha/api.js?render=explicit" async defer></script>
+            <%- include('../partials/recaptcha', { captcha: { siteKey: captcha.siteKey, mode: captcha.mode, version: captcha.version } }) %>
+            <%- include('../partials/recaptcha-script', { captcha: captcha }) %>
           <% } %>
 
           <button type="submit" class="btn btn-primary btn-block btn-lg">

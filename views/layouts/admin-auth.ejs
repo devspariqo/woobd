@@ -111,7 +111,7 @@
 
   <%- include('../partials/icons') %>
   <% if (typeof showCaptcha !== 'undefined' && showCaptcha) { %>
-    <script src="https://www.google.com/recaptcha/api.js?render=explicit" async defer></script>
+    <%- include('../partials/recaptcha-script', { captcha: captcha }) %>
   <% } %>
   <script src="<%= helpers.versioned('/assets/js/main.js') %>" defer></script>
 </body>

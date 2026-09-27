@@ -431,6 +431,12 @@ async function sendContactAcknowledgement(entry) {
 }
 
 async function sendContactNotification(entry) {
+  if (!settings.getBool('notify_admin_contact', true)) return { ok: false, skipped: true };
+
+  // `notify_admin_email` is where alerts should land when the public contact
+  // address is a shared mailbox. It is deliberately separate from
+  // contact_email, which is published on the website and receives customer
+  // mail - the two are not always the same inbox.
   const to = settings.get('notify_admin_email') || settings.get('contact_email');
   if (!to) return { ok: false, skipped: true };
   return send({
@@ -467,6 +473,12 @@ async function sendAdminNewOrder(order, customer) {
   if (!settings.getBool('notify_admin_new_order', true)) return { ok: false, skipped: true };
 
   const recipients = new Set();
+
+  // The configured alert address first, then the public contact address. Both
+  // are kept: an operator who sets a private alerts inbox still expects the
+  // public one to know about a new order.
+  const alertEmail = String(settings.get('notify_admin_email', '') || '').trim();
+  if (alertEmail) recipients.add(alertEmail);
 
   const contactEmail = String(settings.get('contact_email', '') || '').trim();
   if (contactEmail) recipients.add(contactEmail);

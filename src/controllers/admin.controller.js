@@ -460,31 +460,52 @@ exports.updateOrder = async (req, res, next) => {
 
     req.session.flashSuccess = `Order ${order.order_number} updated.`;
 
-    // Tell the customer when their site goes live and credentials are ready.
-    if (status === 'active' && status !== order.status) {
+    // Tell the customer about EVERY status change, not only the happy one.
+    //
+    // This used to fire only when the order reached `active`. Moving an order
+    // to "in progress", or cancelling it, changed the status in silence - so a
+    // customer whose build had been cancelled heard nothing at all, and one
+    // watching their order start work had no way to know it had. The status is
+    // the thing they are waiting on, whichever way it moved.
+    if (status && status !== order.status && settings.getBool('notify_customer_order_status', true)) {
       const customer = await userModel.findCustomerById(order.customer_id);
       const refreshed = await orderModel.findOrderById(orderId);
-      const items = await orderModel.listDeliverables(orderId);
 
-      Promise.allSettled([
-        mail.sendOrderStatusUpdate(customer, refreshed),
-        items.filter((i) => i.is_visible).length
-          ? mail.send({
-              to: customer.email,
-              subject: `Your website is live - ${refreshed.order_number}`,
-              html: mail.wrapLayout({
-                title: 'Your website is live',
-                body: `<p>Hi ${clean.str(customer.name, 60)}, <strong>${clean.str(refreshed.service_title, 120)}</strong> is now online.</p>
-                       <p>Your login details are waiting on your dashboard. Please sign in and save them somewhere secure.</p>`,
-                ctaText: 'Open my dashboard',
-                ctaUrl: `${config.app.url}${helpers.url('/account/orders/' + orderId)}`,
-              }),
-              text: `Your website ${refreshed.service_title} is live. Sign in to see your login details.`,
-            })
-          : Promise.resolve(),
-      ]).catch(() => {});
+      if (customer && customer.email) {
+        // The admin's note rides along - it is usually the actual explanation.
+        const sends = [mail.sendOrderStatusUpdate(customer, refreshed, note || undefined)];
 
-      req.session.flashSuccess = `Order ${order.order_number} is live and the customer has been notified.`;
+        // Going live also carries the credentials, so it gets its own message
+        // with a link straight to the dashboard.
+        if (status === 'active') {
+          const items = await orderModel.listDeliverables(orderId);
+
+          if (items.filter((item) => item.is_visible).length) {
+            sends.push(
+              mail.send({
+                to: customer.email,
+                subject: `Your website is live - ${refreshed.order_number}`,
+                html: mail.wrapLayout({
+                  title: 'Your website is live',
+                  body: `<p>Hi ${clean.str(customer.name, 60)}, <strong>${clean.str(refreshed.service_title, 120)}</strong> is now online.</p>
+                         <p>Your login details are waiting on your dashboard. Please sign in and save them somewhere secure.</p>`,
+                  ctaText: 'Open my dashboard',
+                  ctaUrl: `${config.app.url}${helpers.url('/account/orders/' + orderId)}`,
+                }),
+                text: `Your website ${refreshed.service_title} is live. Sign in to see your login details.`,
+              })
+            );
+          }
+        }
+
+        // allSettled and never awaited: the status change is already written,
+        // and a mail failure must not turn a successful update into an error.
+        Promise.allSettled(sends).catch(() => {});
+
+        req.session.flashSuccess = status === 'active'
+          ? `Order ${order.order_number} is live and the customer has been notified.`
+          : `Order ${order.order_number} updated and the customer has been notified.`;
+      }
     }
 
     return res.redirect(res.locals.helpers.url(`${res.locals.adminPath}/orders/${orderId}`));
@@ -898,6 +919,19 @@ async function settingsView(res, { group, errors = null }) {
     };
   });
 
+  // Which half of each key pair is present, reported separately.
+  //
+  // "Not configured" is not actionable: an operator who has pasted the secret
+  // and not the site key gets told to "add both keys", pastes the secret again,
+  // and is back where they started. Naming the missing half is the difference
+  // between a warning and an instruction.
+  const captchaSiteKey = settings.secret('captcha_site_key', config.recaptcha.siteKey);
+  const captchaSecretKey = settings.secret('captcha_secret_key', config.recaptcha.secretKey);
+
+  const smtpHost = settings.secret('smtp_host', config.smtp.host);
+  const smtpUser = settings.secret('smtp_user', config.smtp.user);
+  const smtpPassword = settings.secret('smtp_password', config.smtp.password);
+
   return {
     group,
     groups: SETTINGS_GROUPS.map((key) => ({
@@ -908,14 +942,19 @@ async function settingsView(res, { group, errors = null }) {
     fields,
     errors,
     // Surfaced so the UI can warn when a toggle is on but has no credentials.
-    captchaConfigured: Boolean(
-      settings.secret('captcha_site_key', config.recaptcha.siteKey) &&
-        settings.secret('captcha_secret_key', config.recaptcha.secretKey)
-    ),
+    captchaConfigured: Boolean(captchaSiteKey && captchaSecretKey),
+    captchaSiteKeySet: Boolean(captchaSiteKey),
+    captchaSecretKeySet: Boolean(captchaSecretKey),
     googleConfigured: Boolean(
       settings.secret('google_client_id', config.google.clientId) &&
         settings.secret('google_client_secret', config.google.clientSecret)
     ),
+    mailConfigured: Boolean(smtpHost && smtpUser && smtpPassword),
+    mailMissing: [
+      !smtpHost ? 'host' : null,
+      !smtpUser ? 'username' : null,
+      !smtpPassword ? 'password' : null,
+    ].filter(Boolean),
   };
 }
 
@@ -962,6 +1001,81 @@ exports.testCaptcha = async (req, res) => {
   }
 
   return res.redirect(res.locals.helpers.url(`${res.locals.adminPath}/settings?group=security`));
+};
+
+/**
+ * Turn a nodemailer error into something an operator can act on.
+ *
+ * The raw messages are accurate and useless: "Invalid login: 535 5.7.8
+ * Authentication failed" does not say which field to check, and every provider
+ * words it differently. These map the common ones onto the fix.
+ */
+function describeMailError(message) {
+  const text = String(message || '');
+  const lower = text.toLowerCase();
+
+  if (lower.includes('invalid login') || lower.includes('authentication failed') || lower.includes('535')) {
+    return 'The mail server rejected the username or password. For Hostinger the username is the full email address, and the password is the mailbox password — not your hosting account password.';
+  }
+  if (lower.includes('etimedout') || lower.includes('timeout')) {
+    return 'The mail server did not answer in time. Check the host name and that the port is not blocked by the host.';
+  }
+  if (lower.includes('econnrefused') || lower.includes('connection refused')) {
+    return 'The mail server refused the connection. Port 465 needs SSL switched on; port 587 needs it off.';
+  }
+  if (lower.includes('enotfound') || lower.includes('getaddrinfo')) {
+    return 'The mail server host name could not be resolved. Check it for a typo.';
+  }
+  if (lower.includes('self signed') || lower.includes('certificate')) {
+    return 'The mail server presented a certificate that could not be verified. Check the host name matches the certificate.';
+  }
+  if (lower.includes('sender address rejected') || lower.includes('from address')) {
+    return 'The mail server rejected the From address. It has to be a mailbox on the same domain as the username.';
+  }
+
+  return text || 'The mail server refused the message without explaining why.';
+}
+
+/**
+ * Test outgoing mail.
+ *
+ * Two steps on purpose: `verify()` opens a real connection and authenticates
+ * without sending anything, so a credentials problem is reported as a
+ * credentials problem rather than as a failed delivery. Only when that passes
+ * is a message actually sent, because a saved password and a working password
+ * are not the same thing.
+ */
+exports.testMail = async (req, res) => {
+  const back = res.locals.helpers.url(`${res.locals.adminPath}/settings?group=smtp`);
+
+  try {
+    const to = String(req.body.to || '').trim() || settings.get('mail_from_email', config.smtp.fromEmail);
+
+    if (!to) {
+      req.session.flashError = 'No recipient. Fill in the From address on this tab, or type one in the test box.';
+      return res.redirect(back);
+    }
+
+    const connection = await mail.verify();
+    if (!connection.ok) {
+      req.session.flashError = `Could not connect to the mail server. ${describeMailError(connection.error)}`;
+      return res.redirect(back);
+    }
+
+    const result = await mail.sendTest(to);
+    if (result.ok) {
+      req.session.flashSuccess = `Test email sent to ${to}. Check the inbox and the spam folder — if it arrives, order and contact notifications will too.`;
+    } else if (result.skipped) {
+      req.session.flashError = 'Mail is switched off, or the SMTP details are incomplete. Fill in host, username and password above, then save.';
+    } else {
+      req.session.flashError = `The server connected but refused the message. ${describeMailError(result.error)}`;
+    }
+  } catch (err) {
+    logger.error('SMTP test failed', err);
+    req.session.flashError = 'The test could not run. Check the server logs.';
+  }
+
+  return res.redirect(back);
 };
 
 exports.saveSettings = async (req, res, next) => {

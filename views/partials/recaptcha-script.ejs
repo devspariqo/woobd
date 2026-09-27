@@ -1,0 +1,25 @@
+<%#
+  The reCAPTCHA script tag, in the flavour the configured key needs.
+
+  Expects `captcha` = { siteKey, version }. Emits nothing without a site key, so
+  a site that has the toggles on but no keys never pulls Google's script.
+
+  The two versions need different URLs and neither works with the other's key:
+
+    v3       - the site key goes IN the URL, and Google starts scoring
+               immediately on load.
+    v2       - `render=explicit` tells Google not to touch the markup, so
+               main.js can render each widget itself and hold the widget ids.
+               With auto-render, `grecaptcha.execute()` falls back to "the first
+               widget on the page", which is wrong the moment a page has two.
+
+  Kept in one file because the six templates that need it were each carrying
+  their own copy, and they had already drifted apart once.
+%>
+<% if (captcha && captcha.siteKey) { %>
+  <% if (captcha.version === 'v3') { %>
+    <script src="https://www.google.com/recaptcha/api.js?render=<%= encodeURIComponent(captcha.siteKey) %>" async defer></script>
+  <% } else { %>
+    <script src="https://www.google.com/recaptcha/api.js?render=explicit" async defer></script>
+  <% } %>
+<% } %>
