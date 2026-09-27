@@ -177,6 +177,7 @@ async function attempt({ apiKey, baseUrl, model, messages, timeoutMs }) {
     // Some models wrap reasoning in  thinking tags; strip before showing.
     if (typeof reply === 'string') {
       reply = reply.replace(/<think[\s\S]*?<\/think>/gi, '').trim();
+      reply = toPlainText(reply);
     }
 
     if (!reply) {
@@ -320,6 +321,55 @@ async function getConversation(id) {
     [id]
   );
   return { conversation, messages };
+}
+
+/**
+ * Turn a markdown reply into the plain text the chat bubble expects.
+ *
+ * The widget renders replies with `textContent`, so markdown arrives on screen
+ * literally - a visitor reads "**Starter Package**" with the asterisks in it.
+ * Rendering HTML instead would mean trusting model output inside the page, so
+ * the formatting is removed and the words kept.
+ *
+ * Deliberately conservative: it only strips markers that would look like noise.
+ * Anything that could be legitimate text is left alone.
+ */
+function toPlainText(input) {
+  let text = String(input || '');
+
+  // Fenced code blocks keep their contents but lose the fences.
+  text = text.replace(/```[a-z0-9]*\n?/gi, '');
+
+  // Inline code, bold and italic. Order matters: the doubled markers go first,
+  // or `**bold**` would be left as `*bold*` by the italic pass.
+  text = text.replace(/\*\*\*(.+?)\*\*\*/g, '$1');
+  text = text.replace(/\*\*(.+?)\*\*/g, '$1');
+  text = text.replace(/(^|\W)__(.+?)__(?=\W|$)/g, '$1$2');
+  text = text.replace(/(^|\W)\*(.+?)\*(?=\W|$)/g, '$1$2');
+  text = text.replace(/(^|\W)_(.+?)_(?=\W|$)/g, '$1$2');
+  text = text.replace(/`([^`]+)`/g, '$1');
+
+  // Headings: drop the hashes, keep the heading text on its own line.
+  text = text.replace(/^#{1,6}\s+(.*)$/gm, '$1');
+
+  // Bullets become a real bullet character, which reads better than a hyphen
+  // and cannot be mistaken for punctuation.
+  text = text.replace(/^\s*[-*+]\s+/gm, '• ');
+
+  // Block quotes.
+  text = text.replace(/^\s*>\s?/gm, '');
+
+  // Horizontal rules.
+  text = text.replace(/^\s*([-*_])\s*\1\s*\1[\s\-*_]*$/gm, '');
+
+  // Markdown links keep the label; the URL is rarely useful in a chat bubble.
+  text = text.replace(/\[([^\]]+)\]\((?:[^)]+)\)/g, '$1');
+
+  // Tidy the whitespace the removals leave behind.
+  text = text.replace(/[ \t]+$/gm, '');
+  text = text.replace(/\n{3,}/g, '\n\n');
+
+  return text.trim();
 }
 
 module.exports = {

@@ -155,6 +155,7 @@ const FOLDER_RULES = {
   payments: { types: [...IMAGE_TYPES, ...DOC_TYPES], maxMb: 5 },
   tickets: { types: [...IMAGE_TYPES, ...DOC_TYPES], maxMb: 5 },
   posts: { types: IMAGE_TYPES, maxMb: config.uploads.maxSizeMb },
+  pages: { types: IMAGE_TYPES, maxMb: config.uploads.maxSizeMb },
 };
 
 /** Ensure the upload root and every subfolder exist. */

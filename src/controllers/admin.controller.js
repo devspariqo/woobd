@@ -206,10 +206,9 @@ exports.dashboard = async (req, res, next) => {
       recentOrders,
       recentPayments,
       recentTickets,
-      trend,
-      byService,
+      staffList,
+      topCustomers,
       pendingPayments,
-      activityFeed,
     ] = await Promise.all([
       orderModel.orderCounts(),
       orderModel.paymentCounts(),
@@ -219,10 +218,9 @@ exports.dashboard = async (req, res, next) => {
       orderModel.recentOrders(8),
       orderModel.listPayments({ perPage: 6, status: 'pending' }),
       orderModel.listTickets({ perPage: 6 }),
-      orderModel.orderTrend(8),
-      orderModel.revenueByService(6),
+      userModel.listStaff({ perPage: 8 }),
+      orderModel.topCustomers(10),
       orderModel.paymentCounts(),
-      activity.recent(10),
     ]);
 
     setNav(res, 'dashboard', { badges: await badgeCounts() });
@@ -239,10 +237,9 @@ exports.dashboard = async (req, res, next) => {
       recentOrders,
       recentPayments: recentPayments.rows,
       recentTickets: recentTickets.rows,
-      trend,
-      byService,
+      staffList: staffList.rows,
+      topCustomers,
       pendingPaymentCount: pendingPayments ? Number(pendingPayments.pending) : 0,
-      activityFeed,
       seo: { ...res.locals.seo, title: 'Admin dashboard', robots: 'noindex,nofollow' },
     });
   } catch (err) {

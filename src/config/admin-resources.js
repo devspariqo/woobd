@@ -286,6 +286,7 @@ const RESOURCES = {
     },
     titleField: 'title',
     searchFields: ['title', 'slug', 'content'],
+    uploadFolder: 'pages',
     filters: [
       { key: 'status', label: 'Status', options: PUBLISH_OPTIONS, param: 'status' },
       { key: 'footer', label: 'Footer', options: [{ value: '1', label: 'In footer only' }], param: 'footer' },
@@ -299,11 +300,32 @@ const RESOURCES = {
     fields: [
       { key: 'title', label: 'Page title', type: 'text', required: true, maxlength: 200 },
       { key: 'slug', label: 'URL slug', type: 'slug', source: 'title', required: true, help: 'The page is served at /page/<slug>.' },
+      { key: 'featured_image', label: 'Featured image', type: 'image', group: 'Media', help: 'Shown at the top of the page and used as the social share image when no OG image is set.' },
       { key: 'content', label: 'Content', type: 'html', rows: 18, group: 'Content' },
       { key: 'show_in_footer', label: 'Link from the footer', type: 'boolean', group: 'Visibility' },
       { key: 'status', label: 'Status', type: 'select', options: PUBLISH_OPTIONS, default: 'published' },
-      { key: 'meta_title', label: 'SEO title', type: 'text', maxlength: 200, group: 'SEO' },
-      { key: 'meta_description', label: 'SEO description', type: 'textarea', rows: 2, maxlength: 320 },
+
+      // --- SEO ------------------------------------------------------------
+      // Split into its own group so the search-facing fields are not buried
+      // among the content ones.
+      { key: 'meta_title', label: 'SEO title', type: 'text', maxlength: 200, group: 'SEO', help: 'Shown in the browser tab and as the search result headline. Falls back to the page title.' },
+      { key: 'meta_description', label: 'SEO description', type: 'textarea', rows: 2, maxlength: 320, group: 'SEO', help: 'The snippet under the headline in search results. Around 155 characters is the practical limit before it is cut off.' },
+      { key: 'meta_keywords', label: 'Keywords', type: 'text', maxlength: 320, group: 'SEO', help: 'Comma separated. Google ignores these; other engines and internal search still read them.' },
+      { key: 'canonical_url', label: 'Canonical URL', type: 'text', maxlength: 500, group: 'SEO', help: 'Set this only if the same content is reachable at another address, so search engines credit one of them.' },
+      {
+        key: 'robots',
+        label: 'Search engine indexing',
+        type: 'select',
+        group: 'SEO',
+        default: 'index,follow',
+        options: ['index,follow', 'index,nofollow', 'noindex,follow', 'noindex,nofollow'],
+        help: 'Choose noindex for pages you do not want in search results, such as a thank-you page.',
+      },
+
+      // --- Social sharing -------------------------------------------------
+      { key: 'og_title', label: 'Social share title', type: 'text', maxlength: 200, group: 'Social', help: 'The headline used when the page is shared. Falls back to the SEO title.' },
+      { key: 'og_description', label: 'Social share description', type: 'textarea', rows: 2, maxlength: 320, group: 'Social' },
+      { key: 'og_image', label: 'Social share image', type: 'image', group: 'Social', help: '1200 x 630 works everywhere. Falls back to the featured image.' },
     ],
   },
 

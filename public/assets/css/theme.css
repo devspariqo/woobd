@@ -863,7 +863,12 @@ select.form-control {
   position: absolute;
   top: calc(100% + 10px);
   left: 0;
-  min-width: 260px;
+  /* 260px was tight enough that ordinary menu labels wrapped onto a second
+     line. The max-width stops a long label stretching the panel across the
+     page, which looks worse than a wrap. */
+  min-width: 300px;
+  max-width: 380px;
+  width: max-content;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -871,8 +876,16 @@ select.form-control {
   padding: 9px;
   opacity: 0;
   visibility: hidden;
-  transform: translateY(10px);
-  transition: opacity var(--t), transform var(--t), visibility var(--t);
+  /* A small rise plus a slight scale reads as the panel growing out of the
+     nav item. Animating transform and opacity only keeps it on the compositor,
+     so it stays smooth even while the page is busy. */
+  transform: translateY(12px) scale(.97);
+  transform-origin: top left;
+  transition:
+    opacity .2s var(--ease-out),
+    transform .28s var(--ease-out),
+    visibility .28s;
+  will-change: opacity, transform;
   z-index: 50;
 }
 
@@ -880,7 +893,13 @@ select.form-control {
 .nav-item:focus-within .dropdown {
   opacity: 1;
   visibility: visible;
-  transform: translateY(0);
+  transform: translateY(0) scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dropdown { transition: opacity .01s, visibility .01s; transform: none; }
+  .nav-item:hover .dropdown,
+  .nav-item:focus-within .dropdown { transform: none; }
 }
 
 /* A hover bridge so moving the cursor from the link into the panel does not
@@ -2169,6 +2188,18 @@ body.no-scroll { overflow: hidden; }
 .footer-bottom a:hover { color: #fff; }
 
 .footer-legal { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+
+/* Featured image on a CMS page. Rounded and ratio-locked, so an odd-sized
+   upload cannot push the heading off the fold. */
+.page-featured {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1200 / 630;
+  object-fit: cover;
+  border-radius: var(--radius-lg);
+  margin-bottom: 34px;
+  border: 1px solid var(--border);
+}
 
 /* --------------------------------------------------------------------------
    17b. Staff-only maintenance banner

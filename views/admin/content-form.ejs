@@ -184,7 +184,14 @@
                            src="<%= val ? helpers.url(val) : helpers.url('/assets/img/service-default.svg') %>"
                            alt="">
                       <div style="flex:1;min-width:0">
-                        <input type="file" class="form-control" id="<%= id %>" name="upload"
+                        <%#
+                          Named after the field key, not a generic "upload".
+                          A resource can have more than one image field - a page
+                          has a featured image and a social share image - and
+                          with a shared name the browser posts both under the
+                          same key, so only one could ever be saved.
+                        %>
+                        <input type="file" class="form-control" id="<%= id %>" name="<%= field.key %>"
                                accept="image/*" data-preview="<%= id %>-preview"
                                data-max-mb="<%= uploadLimits[resource.uploadFolder].maxMb %>"
                                <% if (field.required && !val) { %>required<% } %>>

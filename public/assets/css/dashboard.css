@@ -412,8 +412,105 @@
 }
 
 .table-product { display: flex; align-items: center; gap: 13px; min-width: 200px; }
+
+/* Row thumbnail.
+   There was no rule for this at all, so every image rendered at its natural
+   size - a 1600px-wide package photo filled the row and shoved the name off
+   screen. Fixed dimensions with object-fit mean any upload looks the same,
+   whatever its shape. */
+.table-product img {
+  width: 46px;
+  height: 46px;
+  object-fit: cover;
+  border-radius: var(--radius-sm, 8px);
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  flex-shrink: 0;
+  display: block;
+}
+
+/* The placeholder SVGs are drawn to fit their box, so cropping them with
+   `cover` cuts off part of the mark. `contain` keeps the whole thing. */
+.table-product img[src*="default"] { object-fit: contain; padding: 5px; }
+
 .table-product .name { font-weight: 600; color: var(--text); line-height: 1.35; }
 .table-product .meta { font-size: .75rem; color: var(--text-soft); }
+
+/* --------------------------------------------------------------------------
+   Dashboard list rows (staff, top customers)
+
+   A compact row rather than a table: these panels sit side by side, and a
+   table would either overflow or squeeze the name column to nothing.
+   -------------------------------------------------------------------------- */
+.dash-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+}
+
+.dash-row:last-child { border-bottom: 0; }
+
+.dash-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  flex-shrink: 0;
+  display: block;
+}
+
+/* The placeholder mark is drawn to fit, so it should not be cropped. */
+.dash-avatar[src*="default"] { object-fit: contain; padding: 4px; }
+
+.dash-row-main { flex: 1; min-width: 0; }
+
+.dash-row-title {
+  font-size: .875rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dash-row-sub {
+  font-size: .75rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dash-row-value {
+  font-size: .875rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Position badge for the top-customers ranking. Tabular figures keep 1 and 10
+   the same width, so the names below stay aligned. */
+.dash-rank {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: .6875rem;
+  font-weight: 700;
+  background: var(--bg-alt);
+  color: var(--text-muted);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-row:first-child .dash-rank { background: var(--primary); color: #fff; }
 
 /* --------------------------------------------------------------------------
    Toolbar (search + filters)

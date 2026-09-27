@@ -246,6 +246,29 @@ async function revenueByService(limit = 8) {
   );
 }
 
+/**
+ * The customers who have spent the most, for the dashboard.
+ *
+ * Cancelled orders are excluded from both the total and the count - a
+ * cancelled order is not revenue and should not inflate a customer's standing.
+ * Customers with no orders are omitted entirely rather than listed at zero,
+ * which is what an INNER JOIN gives and what makes the panel useful.
+ */
+async function topCustomers(limit = 10) {
+  return db.query(
+    `SELECT c.id, c.name, c.email, c.avatar, c.status,
+            COUNT(o.id) AS orders,
+            COALESCE(SUM(o.total), 0) AS spent,
+            MAX(o.created_at) AS last_order_at
+       FROM customers c
+       JOIN orders o ON o.customer_id = c.id AND o.status != 'cancelled'
+      GROUP BY c.id, c.name, c.email, c.avatar, c.status
+      ORDER BY spent DESC, orders DESC
+      LIMIT ?`,
+    [limit]
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Deliverables - the credentials handed over when an order goes live
 // ---------------------------------------------------------------------------
@@ -831,7 +854,7 @@ async function listSubscribers({ page = 1, perPage = 30 } = {}) {
 module.exports = {
   ORDER_TRANSITIONS, ORDER_STATUSES, canTransition,
   createOrder, findOrderById, findOrderByNumber, orderDetail, listOrders,
-  updateOrderStatus, updateOrder, deleteOrder, orderCounts, recentOrders, orderTrend, revenueByService,
+  updateOrderStatus, updateOrder, deleteOrder, orderCounts, recentOrders, orderTrend, revenueByService, topCustomers,
 
   listDeliverables, createDeliverable, updateDeliverable, deleteDeliverable, replaceDeliverables,
 

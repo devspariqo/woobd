@@ -485,9 +485,22 @@ exports.contactSubmit = async (req, res, next) => {
 // Static / legal pages
 // ---------------------------------------------------------------------------
 
+/**
+ * Render a content page.
+ *
+ * `slug` is optional: when omitted the slug comes from the route parameter.
+ * That distinction matters — `/page/:slug` was registered as
+ * `staticPage()` with no argument, so this closed over `undefined`, looked up a
+ * page that could not exist, and 404'd every page in the CMS while the admin
+ * screens reported the content saved correctly.
+ *
+ * @param {string} [slug] fixed slug, for routes like /live-chat that have no
+ *                        parameter of their own
+ */
 exports.staticPage = (slug) => async (req, res, next) => {
   try {
-    let page = await content.findPageBySlug(slug);
+    const wanted = String(slug || (req.params && req.params.slug) || '').trim();
+    let page = wanted ? await content.findPageBySlug(wanted) : null;
 
     // Ship the mandatory pages even on a fresh install where the admin has not
     // filled them in yet. Better a sensible placeholder than a 404 on a link
@@ -526,7 +539,7 @@ exports.staticPage = (slug) => async (req, res, next) => {
           meta_description: `Chat with the ${res.locals.site.name} team about your project, pricing or support.`,
           content: defaultLiveChat(res.locals),        },
       };
-      page = fallbacks[slug];
+      page = fallbacks[wanted];
       if (page) page.updated_at = new Date();
     }
 
@@ -538,9 +551,27 @@ exports.staticPage = (slug) => async (req, res, next) => {
       });
     }
 
+    // Absolute URLs for the canonical and share tags: relative paths are
+    // invalid in Open Graph and are ignored by crawlers.
+    const absolute = (value) => (value ? res.locals.helpers.absoluteUrl(value) : '');
+
+    const canonical = page.canonical_url || absolute(`/page/${page.slug}`);
+
+    // Fallback chain, most specific first: a field set for sharing, then the
+    // SEO field, then the page's own content. Each step is something a person
+    // deliberately typed, so the last resort is the only guess.
+    const shareTitle = page.og_title || page.meta_title || page.title;
+    const shareDescription = page.og_description || page.meta_description || res.locals.seo.description;
+    const shareImage = absolute(page.og_image || page.featured_image || '');
+
     res.render('public/page', {
       layout: 'layouts/public',
-      pageTitle: page.title,
+      pageTitle: shareTitle,
+      pageDescription: shareDescription,
+      pageRobots: page.robots || undefined,
+      pageCanonical: canonical,
+      ogType: 'article',
+      ogImage: shareImage || undefined,
       lead: page.meta_description,
       crumbs: [{ label: page.title }],
       page,
@@ -548,6 +579,10 @@ exports.staticPage = (slug) => async (req, res, next) => {
         ...res.locals.seo,
         title: page.meta_title || `${page.title} - ${res.locals.site.name}`,
         description: page.meta_description || res.locals.seo.description,
+        keywords: page.meta_keywords || res.locals.seo.keywords,
+        canonical,
+        robots: page.robots || res.locals.seo.robots,
+        ogImage: shareImage || res.locals.seo.ogImage,
       },
     });
   } catch (err) {

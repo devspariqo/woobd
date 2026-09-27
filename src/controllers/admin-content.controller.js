@@ -19,7 +19,7 @@ const { RESOURCES } = require('../config/admin-resources');
 const { clean } = require('../utils/validators');
 const { paginate, fromQuery } = require('../utils/paginator');
 const storage = require('../lib/storage');
-const { uploadGuarded } = require('../middleware/upload');
+const { uploadGuardedAny } = require('../middleware/upload');
 const helpers = require('../utils/helpers');
 const logger = require('../utils/logger');
 
@@ -161,17 +161,38 @@ function buildRow(resource, body, files, existing = null) {
     row[field.key] = value;
   }
 
-  const uploaded = files && files.length ? files[0] : null;
-  const imageField = resource.fields.find((f) => f.type === 'image');
+  // Files arrive named after the field they belong to, so each is matched back
+  // to its own field. This used to take files[0] and assign it to the first
+  // image field, which meant a resource with two image fields - a page has a
+  // featured image and a social share image - could only ever save one of them,
+  // and the second failed silently.
+  const byField = new Map();
+  for (const file of files || []) byField.set(file.fieldname, file);
 
-  if (uploaded && imageField) {
-    row[imageField.key] = `${require('../config').uploads.publicPath}/${resource.uploadFolder}/${uploaded.filename}`;
-  } else if (imageField && existing && existing[imageField.key]) {
-    // A file input cannot post "unchanged", so an edit with no new file must
-    // carry the stored path forward. Without this, saving any other field on
-    // the form blanks the image - and on a required field it fails validation
-    // outright, making the record uneditable.
-    row[imageField.key] = existing[imageField.key];
+  for (const field of resource.fields) {
+    if (field.type !== 'image') continue;
+
+    const uploaded = byField.get(field.key);
+
+    if (uploaded && uploaded.length) {
+      row[field.key] = `${require('../config').uploads.publicPath}/${resource.uploadFolder}/${uploaded.filename}`;
+    } else if (existing && existing[field.key]) {
+      // A file input cannot post "unchanged", so an edit with no new file must
+      // carry the stored path forward. Without this, saving any other field on
+      // the form blanks the image - and on a required field it fails validation
+      // outright, making the record uneditable.
+      row[field.key] = existing[field.key];
+    }
+  }
+
+  // Fallback for a form still posting a single generic "upload" field: apply it
+  // to the first image field, which is how every resource behaved before.
+  const legacy = byField.get('upload');
+  if (legacy) {
+    const first = resource.fields.find((f) => f.type === 'image');
+    if (first && !byField.has(first.key)) {
+      row[first.key] = `${require('../config').uploads.publicPath}/${resource.uploadFolder}/${legacy.filename}`;
+    }
   }
 
   // A declared-required image must have either a new upload or an existing path.
@@ -180,7 +201,7 @@ function buildRow(resource, body, files, existing = null) {
     errors[requiredImage.key] = `${requiredImage.label} is required.`;
   }
 
-  return { row, errors, uploaded };
+  return { row, errors, uploaded: files || [] };
 }
 
 // ---------------------------------------------------------------------------
@@ -395,7 +416,7 @@ exports.contentSave = async (req, res, next) => {
     // Record the upload in the media library so it is not orphaned.
     if (uploaded) {
       try {
-        const records = storage.toMediaRecords([uploaded], {
+        const records = storage.toMediaRecords(uploaded, {
           folder: resource.uploadFolder,
           uploaderId: req.session.staff ? req.session.staff.id : null,
           uploaderType: 'staff',
@@ -556,9 +577,13 @@ exports.uploadFor = (key) => {
   const resource = RESOURCES[key];
   const hasImage = resource && resource.fields.some((f) => f.type === 'image');
   if (!hasImage) return (req, res, next) => next();
-  // uploadGuarded, not raw multer: multipart bodies are CSRF-checked here
+  // 'any', not a single named field: each image field posts under its own key,
+  // so a resource with two of them needs both accepted. The controller then
+  // matches each file back to its field.
+  //
+  // uploadGuardedAny, not raw multer: multipart bodies are CSRF-checked here
   // because the global middleware runs before multer has parsed them.
-  return uploadGuarded(resource.uploadFolder, 'upload');
+  return uploadGuardedAny(resource.uploadFolder);
 };
 
 module.exports = exports;

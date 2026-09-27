@@ -2,7 +2,6 @@
   const num = function (v) { return Number(v || 0); };
   const cur = site.currency;
   const money = helpers.money;
-  const maxRevenue = Math.max(1, (trend || []).reduce(function (m, row) { return Math.max(m, Number(row.revenue)); }, 0));
 %>
 
 <div class="stat-grid">
@@ -99,68 +98,85 @@
 <% } %>
 
 <div class="two-col" style="margin-bottom:22px">
-  <%# ---- Revenue trend: CSS bars, no chart library (no-CDN requirement) ---- %>
+  <%# ---- Admin staff ----------------------------------------------------
+      Who can get into this panel, and when they last did. Placed here rather
+      than only on the Staff screen because "who has access" is a question an
+      operator wants answered at a glance. %>
   <div class="panel">
     <div class="panel-head">
       <div>
-        <h3>Revenue trend</h3>
-        <p>Order value per month, cancelled orders excluded.</p>
+        <h3>Admin staff</h3>
+        <p>People with access to this panel.</p>
       </div>
-      <a href="<%= helpers.url('/' + adminPath + '/analytics') %>" class="btn btn-outline btn-sm">Full report</a>
+      <a href="<%= helpers.url('/' + adminPath + '/staff') %>" class="btn btn-outline btn-sm">Manage</a>
     </div>
-    <div class="panel-body">
-      <% if (trend && trend.length) { %>
-        <div style="display:flex;align-items:flex-end;gap:11px;height:190px;padding-top:10px">
-          <% trend.forEach(function (row) { %>
-            <%
-              var height = Math.max(4, Math.round((Number(row.revenue) / maxRevenue) * 100));
-              var label = String(row.period || '').slice(5);
-            %>
-            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0" title="<%= row.period %>: <%= money(row.revenue, cur) %> from <%= row.orders %> order(s)">
-              <span style="font-size:.6875rem;color:var(--text-soft);white-space:nowrap"><%= money(row.revenue, cur) %></span>
-              <div style="width:100%;height:<%= height %>%;min-height:6px;border-radius:6px 6px 0 0;background:linear-gradient(180deg, var(--primary), var(--primary-dark));transition:opacity var(--t)"></div>
-              <span style="font-size:.75rem;color:var(--text-soft);font-weight:600"><%= label %></span>
+    <div class="panel-body" style="padding-top:6px;padding-bottom:6px">
+      <% if (staffList && staffList.length) { %>
+        <% staffList.forEach(function (member) { %>
+          <div class="dash-row">
+            <img class="dash-avatar"
+                 src="<%= member.avatar ? helpers.url(member.avatar) : helpers.url('/assets/img/client-default.svg') %>"
+                 alt="" loading="lazy">
+            <div class="dash-row-main">
+              <div class="dash-row-title">
+                <%= member.name %>
+                <% if (member.status !== 'active') { %>
+                  <span class="pill pill-warn" style="margin-left:6px">Inactive</span>
+                <% } %>
+              </div>
+              <div class="dash-row-sub"><%= member.email %></div>
             </div>
-          <% }); %>
-        </div>
+            <div style="text-align:right;flex-shrink:0">
+              <div class="pill pill-info"><%= member.role %></div>
+              <div class="dash-row-sub" style="margin-top:5px">
+                <% if (member.last_login_at) { %>
+                  Seen <%= helpers.timeAgo(member.last_login_at) %>
+                <% } else { %>
+                  Never signed in
+                <% } %>
+              </div>
+            </div>
+          </div>
+        <% }); %>
       <% } else { %>
-        <div class="empty-state" style="padding:38px 16px">
-          <div class="ico"><svg><use href="#i-bar-chart"/></svg></div>
-          <h3 style="font-size:1rem">No revenue yet</h3>
-          <p style="font-size:.875rem">Numbers appear here once orders start coming in.</p>
-        </div>
+        <p style="font-size:.875rem;color:var(--text-soft);margin:14px 0">No staff accounts found.</p>
       <% } %>
     </div>
   </div>
 
-  <%# ---- Top packages ---- %>
+  <%# ---- Top customers -------------------------------------------------- %>
   <div class="panel">
     <div class="panel-head">
-      <div><h3>Top packages</h3></div>
+      <div>
+        <h3>Top customers</h3>
+        <p>By total order value, cancellations excluded.</p>
+      </div>
+      <a href="<%= helpers.url('/' + adminPath + '/customers') %>" class="btn btn-outline btn-sm">All customers</a>
     </div>
-    <div class="panel-body">
-      <% if (byService && byService.length) { %>
-        <%
-          var maxServiceRevenue = Math.max(1, byService.reduce(function (m, row) {
-            return Math.max(m, Number(row.revenue));
-          }, 0));
-        %>
-        <% byService.forEach(function (row, i) { %>
-          <div style="margin-bottom:<%= i === byService.length - 1 ? '0' : '15px' %>">
-            <div class="row-between" style="gap:9px;margin-bottom:6px">
-              <span style="font-size:.875rem;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-                <%= helpers.excerpt(row.service_title, 30) %>
-              </span>
-              <span style="font-size:.8125rem;font-weight:700;white-space:nowrap"><%= money(row.revenue, cur) %></span>
+    <div class="panel-body" style="padding-top:6px;padding-bottom:6px">
+      <% if (topCustomers && topCustomers.length) { %>
+        <% topCustomers.forEach(function (row, i) { %>
+          <div class="dash-row">
+            <span class="dash-rank"><%= i + 1 %></span>
+            <img class="dash-avatar"
+                 src="<%= row.avatar ? helpers.url(row.avatar) : helpers.url('/assets/img/client-default.svg') %>"
+                 alt="" loading="lazy">
+            <div class="dash-row-main">
+              <div class="dash-row-title"><%= row.name %></div>
+              <div class="dash-row-sub">
+                <%= row.orders %> order<%= Number(row.orders) === 1 ? '' : 's' %>
+                <% if (row.last_order_at) { %>· last <%= helpers.timeAgo(row.last_order_at) %><% } %>
+              </div>
             </div>
-            <div style="height:5px;border-radius:999px;background:var(--bg-alt);overflow:hidden">
-              <div style="height:100%;width:<%= Math.round((Number(row.revenue) / maxServiceRevenue) * 100) %>%;background:var(--primary);border-radius:999px"></div>
-            </div>
-            <div style="font-size:.75rem;color:var(--text-soft);margin-top:4px"><%= row.orders %> order(s)</div>
+            <div class="dash-row-value"><%= money(row.spent, cur) %></div>
           </div>
         <% }); %>
       <% } else { %>
-        <p style="font-size:.875rem;color:var(--text-soft);margin:0">No package sales recorded yet.</p>
+        <div class="empty-state" style="padding:30px 16px">
+          <div class="ico"><svg><use href="#i-users"/></svg></div>
+          <h3 style="font-size:1rem">No customer orders yet</h3>
+          <p style="font-size:.875rem">The people who spend the most appear here once orders come in.</p>
+        </div>
       <% } %>
     </div>
   </div>
@@ -277,28 +293,8 @@
   </div>
 </div>
 
-<%# ---- Activity feed ---- %>
-<% if (activityFeed && activityFeed.length) { %>
-  <div class="panel" style="margin-top:22px">
-    <div class="panel-head">
-      <div>
-        <h3>Recent activity</h3>
-      </div>
-      <a href="<%= helpers.url('/' + adminPath + '/activity') %>" class="btn btn-outline btn-sm">Full log</a>
-    </div>
-    <div class="panel-body">
-      <div class="timeline">
-        <% activityFeed.forEach(function (entry) { %>
-          <div class="timeline-item done">
-            <div class="title" style="font-size:.9063rem"><%= helpers.humanise(String(entry.action || '').replace(/[._]/g, ' ')) %></div>
-            <div class="desc">
-              <time data-relative datetime="<%= new Date(entry.created_at).toISOString() %>"><%= helpers.timeAgo(entry.created_at) %></time>
-              <% if (entry.actor_name) { %> · <%= entry.actor_name %><% } %>
-              <% if (entry.description) { %> — <%= helpers.excerpt(entry.description, 110) %><% } %>
-            </div>
-          </div>
-        <% }); %>
-      </div>
-    </div>
-  </div>
-<% } %>
+<%#
+  The activity feed used to sit here. Removed: there is a dedicated Activity log
+  screen linked from the sidebar, and repeating the last ten entries pushed the
+  panels an operator actually works from further down the page.
+%>
