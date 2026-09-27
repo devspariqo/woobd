@@ -865,7 +865,7 @@ INSERT INTO `settings` (`id`, `setting_key`, `setting_value`, `setting_group`, `
 (70, 'hero_primary_cta_link', '/services', 'homepage', 'text', '2026-09-26 15:21:38'),
 (71, 'hero_secondary_cta_text', 'Talk to Us', 'homepage', 'text', '2026-09-26 15:21:38'),
 (72, 'hero_secondary_cta_link', '/contact', 'homepage', 'text', '2026-09-26 15:21:38'),
-(73, 'hero_bullets', 'Free consultation & strategy call,No hidden charges — fixed pricing,Money-back guarantee on delivery', 'homepage', 'textarea', '2026-09-26 15:21:38'),
+(73, 'hero_bullets', 'Free consultation & strategy call,No hidden charges — fixed pricing,Money-back guarantee on delivery,Support in Bangla and English', 'homepage', 'textarea', '2026-09-26 15:21:38'),
 (74, 'hero_image', '', 'homepage', 'file', '2026-09-26 13:59:39'),
 (75, 'trustbar_title', 'Trusted by growing brands across Bangladesh', 'homepage', 'text', '2026-09-26 15:21:38'),
 (76, 'about_title', 'A design studio that understands Bangladeshi e-commerce', 'homepage', 'text', '2026-09-26 15:21:38'),
@@ -949,7 +949,9 @@ INSERT INTO `settings` (`id`, `setting_key`, `setting_value`, `setting_group`, `
 (26059, 'hero_video_url', 'https://woobd.com/WooBD_Product_Video.mp4', 'homepage', 'text', '2026-09-26 15:21:38'),
 (26060, 'hero_video_autoplay', '1', 'homepage', 'boolean', '2026-09-26 15:22:38'),
 (26061, 'hero_video_loop', '1', 'homepage', 'boolean', '2026-09-26 15:22:38'),
-(26062, 'hero_video_controls', '1', 'homepage', 'boolean', '2026-09-26 15:22:38');
+(26062, 'hero_video_controls', '1', 'homepage', 'boolean', '2026-09-26 15:22:38'),
+(26064, 'cta_bg_overlay', 'dark-blur', 'homepage', 'select', '2026-09-27 06:37:35'),
+(26063, 'cta_bg_image', '', 'homepage', 'file', '2026-09-27 06:37:35');
 
 -- --------------------------------------------------------
 

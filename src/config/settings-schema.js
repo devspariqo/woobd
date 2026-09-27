@@ -103,7 +103,7 @@ const SETTINGS = [
   { key: 'hero_primary_cta_link', type: 'text', group: 'homepage', default: '/services', public: true, label: 'Hero primary CTA link' },
   { key: 'hero_secondary_cta_text', type: 'text', group: 'homepage', default: 'Talk to Us', public: true, label: 'Hero secondary CTA text' },
   { key: 'hero_secondary_cta_link', type: 'text', group: 'homepage', default: '/contact', public: true, label: 'Hero secondary CTA link' },
-  { key: 'hero_bullets', type: 'textarea', group: 'homepage', default: 'Free consultation & strategy call,No hidden charges — fixed pricing,Money-back guarantee on delivery', public: true, label: 'Hero bullets (comma separated)' },
+  { key: 'hero_bullets', type: 'textarea', group: 'homepage', default: 'Free consultation & strategy call,No hidden charges — fixed pricing,Money-back guarantee on delivery,Support in Bangla and English', public: true, label: 'Hero bullets (comma separated)', help: 'Four works best — they sit in a two-column grid.' },
   { key: 'hero_image', type: 'file', group: 'homepage', default: '', public: true, label: 'Hero image', help: 'Used when the hero media type is "Image", and as the video poster.' },
   {
     key: 'hero_media_type',
@@ -146,6 +146,25 @@ const SETTINGS = [
   { key: 'about_rating', type: 'text', group: 'homepage', default: '4.9', public: true, label: 'About stat: rating' },
   { key: 'cta_title', type: 'text', group: 'homepage', default: 'Ready to launch your online store?', public: true, label: 'CTA section title' },
   { key: 'cta_text', type: 'textarea', group: 'homepage', default: 'Tell us about your business and we will send a free quote within one business day.', public: true, label: 'CTA section text' },
+  {
+    key: 'cta_bg_image',
+    type: 'file',
+    group: 'homepage',
+    default: '',
+    public: true,
+    label: 'CTA background image',
+    help: 'Sits behind the call-to-action section and stays put as the page scrolls. A wide photo, at least 1600px, works best. It is darkened and blurred automatically so the text on top stays readable.',
+  },
+  {
+    key: 'cta_bg_overlay',
+    type: 'select',
+    group: 'homepage',
+    default: 'dark-blur',
+    public: true,
+    label: 'CTA background treatment',
+    options: ['dark-blur', 'dark', 'blur', 'none'],
+    help: 'How heavily to treat the image. Use a heavier option if your photo is busy or light — the white text sits directly on it.',
+  },
 
   // ---------------- Maintenance ----------------
   { key: 'maintenance_mode', type: 'boolean', group: 'maintenance', default: '0', public: true, label: 'Enable maintenance mode' },

@@ -1277,8 +1277,11 @@ body.no-scroll { overflow: hidden; }
 
 .hero h1 { margin-bottom: 18px; }
 
-/* The typed word. A caret is drawn with a border so it animates cleanly. */
-.typed-wrap { display: inline; }
+/* The typed word. A caret is drawn with a border so it animates cleanly.
+   On its own line: the static half of the headline reads as one statement and
+   the animated half as the answer to it, which only works if they are not
+   sharing a line and reflowing as the word grows. */
+.typed-wrap { display: block; margin-top: .12em; }
 
 .typed-text {
   color: var(--primary);
@@ -1318,29 +1321,53 @@ body.no-scroll { overflow: hidden; }
 
 .hero-cta { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 34px; }
 
-.hero-bullets { display: flex; flex-wrap: wrap; gap: 12px 26px; }
+/* Hero trust points.
+   A two-column grid rather than a wrapping row: four items in a row either
+   crowd onto one line or break unevenly, and the eye cannot scan them. Two
+   columns hold a readable shape at every width down to the mobile breakpoint. */
+.hero-bullets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 18px;
+  max-width: 560px;
+}
 
 .hero-bullets li {
   display: flex;
-  align-items: center;
-  gap: 9px;
-  font-size: .9063rem;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: .875rem;
+  line-height: 1.45;
   color: var(--text-muted);
   font-weight: 500;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  transition: border-color var(--t-fast), background var(--t-fast);
 }
 
+.hero-bullets li:hover { border-color: var(--border-strong); }
+
 .hero-bullets .tick {
-  width: 21px;
-  height: 21px;
+  width: 20px;
+  height: 20px;
   display: grid;
   place-items: center;
   border-radius: 50%;
   background: rgba(15, 157, 88, .13);
   color: var(--success);
   flex-shrink: 0;
+  /* Nudged to sit on the first line of text rather than the middle of a
+     two-line item. */
+  margin-top: 1px;
 }
 
-.hero-bullets .tick svg { width: 12px; height: 12px; }
+.hero-bullets .tick svg { width: 11px; height: 11px; }
+
+@media (max-width: 560px) {
+  .hero-bullets { grid-template-columns: 1fr; }
+}
 
 .hero-visual { position: relative; }
 
@@ -1571,7 +1598,15 @@ body.no-scroll { overflow: hidden; }
   flex: 1;
 }
 
-.review-author { display: flex; align-items: center; gap: 13px; padding-top: 20px; border-top: 1px solid var(--border); }
+.review-author {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  margin-top: auto;
+}
+
 .review-avatar {
   width: 46px;
   height: 46px;
@@ -1579,6 +1614,9 @@ body.no-scroll { overflow: hidden; }
   object-fit: cover;
   flex-shrink: 0;
   background: var(--gradient-soft);
+  /* A ring separates the photo from the card behind it, which matters when the
+     avatar and the card are a similar tone. */
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--border);
 }
 
 .review-avatar-fallback {
@@ -1592,10 +1630,28 @@ body.no-scroll { overflow: hidden; }
   font-weight: 700;
   font-size: 1rem;
   flex-shrink: 0;
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--border);
 }
 
-.review-name { font-weight: 600; font-size: .9375rem; color: var(--text); line-height: 1.3; }
-.review-role { font-size: .8125rem; color: var(--text-soft); }
+/* Name and role stack.
+   They were inline spans, so the role ran on after the name on one line and
+   the pair read as a single run-on string. Block makes the name the heading and
+   the role its caption. */
+.review-name {
+  display: block;
+  font-weight: 600;
+  font-size: .9375rem;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.review-role {
+  display: block;
+  font-size: .8125rem;
+  color: var(--text-soft);
+  line-height: 1.4;
+  margin-top: 2px;
+}
 
 /* --------------------------------------------------------------------------
    Reviews carousel
@@ -1845,6 +1901,76 @@ body.no-scroll { overflow: hidden; }
 /* --------------------------------------------------------------------------
    14. CTA section
    -------------------------------------------------------------------------- */
+/* --------------------------------------------------------------------------
+   CTA background image
+
+   Optional. When set, the section keeps its gradient as the base and the photo
+   sits on top of it behind a scrim. The scrim is the important part: white text
+   over an untreated photo is a lottery, and this guarantees contrast whatever
+   the client uploads.
+   -------------------------------------------------------------------------- */
+.cta-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.cta-bg-image {
+  position: absolute;
+  /* Overscanned, so the blur has pixels to sample at the edges and does not
+     fade to transparent there. */
+  inset: -24px;
+  background-size: cover;
+  background-position: center;
+  /* Fixed gives the parallax as the page scrolls. */
+  background-attachment: fixed;
+}
+
+.cta-bg-scrim {
+  position: absolute;
+  inset: 0;
+}
+
+/* Treatments, chosen in the admin panel. The default suits a photo of any
+   brightness, which is why it is the default. */
+.cta-section[data-overlay='dark-blur'] .cta-bg-image { filter: blur(9px) saturate(1.05); }
+.cta-section[data-overlay='dark-blur'] .cta-bg-scrim {
+  background: linear-gradient(115deg, rgba(12, 6, 40, .82) 0%, rgba(18, 8, 56, .70) 55%, rgba(10, 5, 32, .80) 100%);
+}
+
+.cta-section[data-overlay='dark'] .cta-bg-scrim {
+  background: linear-gradient(115deg, rgba(12, 6, 40, .86) 0%, rgba(18, 8, 56, .76) 55%, rgba(10, 5, 32, .86) 100%);
+}
+
+.cta-section[data-overlay='blur'] .cta-bg-image { filter: blur(11px) saturate(1.05); }
+.cta-section[data-overlay='blur'] .cta-bg-scrim {
+  background: linear-gradient(115deg, rgba(30, 12, 90, .58) 0%, rgba(20, 8, 60, .48) 100%);
+}
+
+.cta-section[data-overlay='none'] .cta-bg-scrim {
+  background: linear-gradient(115deg, rgba(12, 6, 40, .55) 0%, rgba(10, 5, 32, .45) 100%);
+}
+
+/* With a photo behind it, the flat gradient would show through the scrim and
+   muddy the colours. The photo and scrim do the work instead. */
+.cta-section.has-bg-image { background: #0a0618; }
+
+/* The decorative white glow is for the gradient. Over a photo it just washes
+   the image out, so it steps aside. */
+.cta-section.has-bg-image::before { display: none; }
+
+/* iOS ignores background-attachment: fixed. A scrolling cover image is a
+   better outcome than a background that does not paint at all. */
+@media (hover: none), (max-width: 900px) {
+  .cta-bg-image { background-attachment: scroll; inset: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cta-bg-image { background-attachment: scroll; }
+}
+
 .cta-section {
   position: relative;
   /* Layered rather than a flat two-stop gradient: a warm brand glow top-right,

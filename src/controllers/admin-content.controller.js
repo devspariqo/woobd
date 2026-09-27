@@ -172,9 +172,12 @@ function buildRow(resource, body, files, existing = null) {
   for (const field of resource.fields) {
     if (field.type !== 'image') continue;
 
+    // `uploaded` here is a multer file object, not a list - a truthiness check
+    // is correct. (It briefly read `uploaded.length`, from a find-and-replace
+    // meant for the caller, which silently stopped every image from saving.)
     const uploaded = byField.get(field.key);
 
-    if (uploaded && uploaded.length) {
+    if (uploaded) {
       row[field.key] = `${require('../config').uploads.publicPath}/${resource.uploadFolder}/${uploaded.filename}`;
     } else if (existing && existing[field.key]) {
       // A file input cannot post "unchanged", so an edit with no new file must
@@ -414,7 +417,9 @@ exports.contentSave = async (req, res, next) => {
     }
 
     // Record the upload in the media library so it is not orphaned.
-    if (uploaded) {
+    // `uploaded` is the list of files from buildRow, so a length check is right
+    // here - an empty array is truthy and would run the loop for nothing.
+    if (uploaded && uploaded.length) {
       try {
         const records = storage.toMediaRecords(uploaded, {
           folder: resource.uploadFolder,

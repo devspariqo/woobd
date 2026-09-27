@@ -359,7 +359,27 @@
 <% } %>
 
 <%# ---------------------------------------------------- CTA + form %>
-<section class="section cta-section" id="quote">
+<section class="section cta-section<%= settings.cta_bg_image ? ' has-bg-image' : '' %>"
+         id="quote"
+         data-overlay="<%= settings.cta_bg_overlay || 'dark-blur' %>">
+  <% if (settings.cta_bg_image) { %>
+    <%#
+      The image is its own layer rather than a CSS background on the section,
+      for two reasons: `filter: blur()` on a background cannot be applied
+      without blurring the text too, and `background-attachment: fixed` is
+      ignored on iOS - so this layer is positioned fixed by hand and falls back
+      to a scrolling cover image where that is unsupported.
+
+      The dark scrim sits over the image, under the content, and is what makes
+      the white text readable. Without it a light photo leaves the text
+      unreadable however attractive the image is.
+    %>
+    <div class="cta-bg" aria-hidden="true">
+      <div class="cta-bg-image" style="background-image: url('<%= helpers.url(settings.cta_bg_image) %>')"></div>
+      <div class="cta-bg-scrim"></div>
+    </div>
+  <% } %>
+
   <div class="container">
     <div class="cta-grid">
       <div data-reveal>
