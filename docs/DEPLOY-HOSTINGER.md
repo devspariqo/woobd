@@ -48,6 +48,27 @@ script, the Node range, that `PORT` and `HOST` come from the environment, that
 `UPLOAD_DIR` and `TRUST_PROXY` are wired up, and that no real credentials are sitting in
 `.env.example`. Run it locally first.
 
+### The build does not need devDependencies
+
+`npm run build` also minifies the public CSS and JavaScript, and the two minifiers
+(`clean-css`, `terser`) are devDependencies — which a production install does not
+fetch. That is deliberate and it is safe:
+
+- **The minified files are committed.** `public/assets/css/theme.min.css` and its three
+  siblings are in the repository, so a deployment already has them.
+- **A missing minifier is skipped, not fatal.** The script reports that it kept the
+  committed build and exits 0, so the deploy carries on.
+- **A stale build cannot be served anyway.** `helpers.versioned()` compares the minified
+  file's mtime against its source and serves the source whenever the minified one is
+  older — so forgetting to rebuild degrades to the unminified file, never to an
+  out-of-date one.
+
+If you would rather the build always regenerate them, install with devDependencies
+(`npm install` without `NODE_ENV=production`, or `npm ci --include=dev`) and run
+`npm run build:assets` before committing. Moving the two packages into `dependencies`
+would also work, at the cost of shipping a few megabytes of build tooling that nothing
+at runtime uses.
+
 ---
 
 ## Contents

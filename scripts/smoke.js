@@ -5983,6 +5983,83 @@ async function checkSslcommerz() {
   await db.close().catch(() => {});
 }
 
+/**
+ * The build must not need the devDependencies.
+ *
+ * `npm run build` runs on the deployment, and a deployment installs production
+ * dependencies only - so anything the build reaches for at load time has to be
+ * a runtime dependency or nothing at all. The minifiers are devDependencies,
+ * and requiring them unconditionally took the whole deploy down with
+ * "Cannot find module 'clean-css'".
+ *
+ * The check runs the real script in a real child process with those two modules
+ * made unresolvable, which is the closest thing to the deployment's actual
+ * condition that can be reproduced locally. A static grep would pass just as
+ * happily on a `require` that is merely wrapped in a function nobody calls.
+ */
+async function checkBuildWithoutDevDependencies() {
+  section('33. The build runs without devDependencies');
+
+  const { spawn } = require('child_process');
+  const path = require('path');
+
+  const ROOT = path.join(__dirname, '..');
+
+  const harness = [
+    "const Module = require('module');",
+    'const original = Module._resolveFilename;',
+    'Module._resolveFilename = function (request, ...rest) {',
+    "  if (request === 'clean-css' || request === 'terser') {",
+    "    const err = new Error('Cannot find module ' + request);",
+    "    err.code = 'MODULE_NOT_FOUND';",
+    '    throw err;',
+    '  }',
+    '  return original.call(this, request, ...rest);',
+    '};',
+    "require(" + JSON.stringify(path.join(ROOT, 'scripts', 'minify-assets.js')) + ');',
+  ].join('\n');
+
+  // Async spawn, not spawnSync: on Windows spawnSync against the very binary
+  // that is running fails with EBUSY, which looks exactly like the build
+  // failing for the reason this check exists to rule out.
+  const run = await new Promise((resolve) => {
+    const child = spawn(process.execPath, ['-e', harness], { cwd: ROOT });
+
+    let out = '';
+    let err = '';
+    child.stdout.on('data', (chunk) => { out += chunk; });
+    child.stderr.on('data', (chunk) => { err += chunk; });
+
+    child.on('error', (e) => resolve({ code: null, out, err: err + 'spawn error: ' + e.message }));
+    child.on('close', (code) => resolve({ code, out, err }));
+  });
+
+  if (run.code === 0) {
+    ok('minifying degrades when the minifiers are absent', 'the committed builds are kept, exit 0');
+  } else {
+    bad(
+      'minifying degrades when the minifiers are absent',
+      `exit ${run.code}: ${String(run.err || run.out || '').trim().split('\n').slice(-2).join(' | ')}`
+    );
+  }
+
+  // And the outputs it falls back to must actually be in the repository, or the
+  // fallback is "serve nothing".
+  const fs = require('fs');
+  const missing = [
+    'public/assets/css/theme.min.css',
+    'public/assets/css/dashboard.min.css',
+    'public/assets/js/main.min.js',
+    'public/assets/js/dashboard.min.js',
+  ].filter((file) => !fs.existsSync(path.join(ROOT, file)));
+
+  if (!missing.length) {
+    ok('the minified builds are committed', 'so a deploy has them without running the build');
+  } else {
+    bad('the minified builds are committed', `missing: ${missing.join(', ')}`);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -6061,6 +6138,7 @@ async function main() {
     await checkPaymentMethods();
     await checkAccountRecovery();
     await checkSslcommerz();
+    await checkBuildWithoutDevDependencies();
     checkInstallSql();
 
 
