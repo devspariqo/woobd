@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "build": "node scripts/build-check.js",
+    "build": "node scripts/minify-assets.js && node scripts/build-check.js",
     "postinstall": "node scripts/postinstall.js",
     "setup": "node scripts/setup.js",
     "setup:docker": "node scripts/setup.js --docker",
@@ -21,7 +21,8 @@
     "build:sql": "node scripts/build-install-sql.js",
     "preview": "node scripts/preview-settings.js",
     "preview:admin": "node scripts/preview-admin.js",
-    "reset": "node scripts/setup.js --reset"
+    "reset": "node scripts/setup.js --reset",
+    "build:assets": "node scripts/minify-assets.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -32,8 +33,12 @@
     "express-ejs-layouts": "^2.5.1",
     "express-rate-limit": "^7.4.0",
     "express-session": "^1.18.0",
-    "mysql2": "^3.11.0",
     "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.11.0",
     "nodemailer": "^6.9.14"
+  },
+  "devDependencies": {
+    "clean-css": "^5.3.3",
+    "terser": "^5.51.2"
   }
 }

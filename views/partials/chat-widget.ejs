@@ -18,19 +18,40 @@
     '--chat-accent-shadow-strong:rgba(' + r + ',' + g + ',' + b + ',.48)'
   ].join(';');
 %>
+<%#
+  No aria-hidden on the widget itself.
+
+  It used to carry aria-hidden="true" while closed, which hid the whole thing
+  from assistive technology - including the launcher. A screen reader user could
+  not tell the chat existed, let alone open it, and the launcher was focusable
+  inside a hidden subtree, which is a contradiction browsers resolve by dropping
+  the element entirely.
+
+  The launcher has to stay in the accessibility tree; it is the affordance. Only
+  the panel is hidden while closed, and the panel is already visibility:hidden
+  in that state, so nothing inside it is reachable by keyboard either.
+%>
 <div class="chat-widget <%= chat.position === 'left' ? 'left' : '' %>" id="chatWidget"
      style="<%= accentVars %>"
      data-endpoint="<%= helpers.url('/api/chat') %>"
-     data-greeting="<%= chat.greeting %>"
-     aria-hidden="true">
+     data-greeting="<%= chat.greeting %>">
 
-  <button type="button" class="chat-launcher" aria-label="Open the chat assistant">
-    <svg class="icon-chat"><use href="#i-chat"/></svg>
-    <svg class="icon-close"><use href="#i-x"/></svg>
+  <%
+    // The badge is visible text inside the button, so it has to appear in the
+    // accessible name - a button whose name does not match what it says is
+    // announced inconsistently across screen readers. The label carries the
+    // same count, and main.js drops that clause once the badge is hidden.
+  %>
+  <button type="button" class="chat-launcher"
+          aria-label="Open the chat assistant, 1 new message"
+          aria-expanded="false"
+          aria-controls="chatPanel">
+    <svg class="icon-chat" aria-hidden="true"><use href="#i-chat"/></svg>
+    <svg class="icon-close" aria-hidden="true"><use href="#i-x"/></svg>
     <span class="chat-badge">1</span>
   </button>
 
-  <div class="chat-panel" role="dialog" aria-label="Chat assistant">
+  <div class="chat-panel" id="chatPanel" role="dialog" aria-label="Chat assistant" aria-hidden="true">
     <div class="chat-head">
       <span class="avatar"><svg><use href="#i-chat"/></svg></span>
       <div class="info">

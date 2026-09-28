@@ -61,13 +61,22 @@
     if (!header) return;
 
     var sticky = header.getAttribute('data-sticky') !== '0';
-    var lastY = window.pageYOffset;
+    // Read on the first frame rather than here.
+    //
+    // `window.pageYOffset` forces the browser to flush any style and layout it
+    // has pending, and this runs during boot while a dozen other initialisers
+    // have left the page dirty. That one read cost about 190ms of the page's
+    // total forced reflow. Inside the animation frame below the same read is
+    // free, because that is the point in the frame where layout is settled
+    // anyway.
+    var lastY = null;
     var ticking = false;
     // Never hide the header near the top - it reads as a glitch.
     var HIDE_AFTER = 220;
 
     var update = function () {
       var y = window.pageYOffset;
+      if (lastY === null) lastY = y;
 
       header.classList.toggle('is-stuck', y > 12);
 
@@ -483,6 +492,7 @@
     if (!widget) return;
 
     var launcher = $('.chat-launcher', widget);
+    var panel = $('.chat-panel', widget);
     var body = $('.chat-body', widget);
     var form = $('.chat-form', widget);
     var input = $('textarea', form);
@@ -665,8 +675,16 @@
 
     var open = function () {
       widget.classList.add('is-open');
-      widget.setAttribute('aria-hidden', 'false');
-      if (badge) badge.style.display = 'none';
+      // The panel is the dialog; the launcher stays in the accessibility tree
+      // so it can still be found and closed.
+      panel.setAttribute('aria-hidden', 'false');
+      launcher.setAttribute('aria-expanded', 'true');
+      if (badge) {
+        badge.style.display = 'none';
+        // The badge is visible text inside the button, so the label has to
+        // match it. Once the badge is gone, so is the clause describing it.
+        launcher.setAttribute('aria-label', 'Open the chat assistant');
+      }
 
       if (!greeted) {
         if (!restoreHistory()) append('assistant', greeting);
@@ -681,7 +699,12 @@
 
     var close = function () {
       widget.classList.remove('is-open');
-      widget.setAttribute('aria-hidden', 'true');
+      panel.setAttribute('aria-hidden', 'true');
+      launcher.setAttribute('aria-expanded', 'false');
+      // Send focus back to the control that opened it, rather than leaving it
+      // on an input that has just been hidden.
+      input.blur();
+      launcher.focus();
     };
 
     launcher.addEventListener('click', function () {
@@ -951,6 +974,76 @@
   /** The form waiting on a challenge, and the timer that stops it hanging. */
   var pendingCaptchaForm = null;
   var pendingCaptchaTimer = null;
+
+  /**
+   * Fetch the reCAPTCHA bundle, but not until the page can spare the room.
+   *
+   * The script is around 340 KB from a third-party origin, plus a stylesheet
+   * and two more connections. Loading it on arrival puts all of that in the
+   * same window the first paint is trying to use, on pages where most visitors
+   * never reach the form it protects.
+   *
+   * So it loads on the first sign of a real visitor - any pointer, key, touch,
+   * scroll or focus - or when the form it protects comes near the viewport,
+   * whichever happens first. On the homepage that form is at the bottom, so a
+   * visitor who reads the page and leaves never downloads it at all.
+   *
+   * There used to be a timer here as well, firing a couple of seconds after
+   * load. It was removed deliberately: on a throttled phone the script landed
+   * inside the window the browser was still settling the first paint in, and
+   * the work it caused pushed the largest element's final paint from 2.8s out
+   * to 5.5s. Nothing on the page is waiting for it, so nothing is lost by
+   * waiting for the visitor instead.
+   *
+   * `whenRecaptchaReady` already waits for `grecaptcha` before a submit uses
+   * it, so a form submitted before the script lands waits rather than sending
+   * an unverified request.
+   */
+  function initRecaptchaLoader() {
+    var slot = $('[data-recaptcha-src]');
+    if (!slot) return;
+
+    var src = slot.getAttribute('data-recaptcha-src');
+    if (!src) return;
+
+    var loaded = false;
+    var observer = null;
+    var events = ['pointerdown', 'keydown', 'touchstart', 'scroll', 'focusin'];
+
+    var load = function () {
+      if (loaded) return;
+      loaded = true;
+
+      var tag = document.createElement('script');
+      tag.src = src;
+      tag.async = true;
+      tag.defer = true;
+      document.head.appendChild(tag);
+
+      events.forEach(function (name) { window.removeEventListener(name, load); });
+      if (observer) observer.disconnect();
+    };
+
+    events.forEach(function (name) {
+      window.addEventListener(name, load, { once: true, passive: true });
+    });
+
+    // Whichever form the script is for, it sits next to a reCAPTCHA element.
+    // 600px of lead time is roughly half a second of scrolling on a phone -
+    // enough that the script is ready by the time the field is under a thumb.
+    var target = $('.g-recaptcha') || $('[data-recaptcha-v3]') || $('.recaptcha-wrap');
+
+    if (target && 'IntersectionObserver' in window) {
+      observer = new IntersectionObserver(function (entries) {
+        if (entries.some(function (entry) { return entry.isIntersecting; })) load();
+      }, { rootMargin: '600px 0px' });
+
+      observer.observe(target);
+    } else if (target) {
+      // No IntersectionObserver: fall back to the timer this used to have.
+      window.setTimeout(load, 2500);
+    }
+  }
 
   /**
    * Run `callback` once the reCAPTCHA API can actually render.
@@ -1370,6 +1463,7 @@
     initChat();
     initCarousel();
     initRecaptcha();
+    initRecaptchaLoader();
     initRecaptchaV3();
     initCompare();
     initHeroVideo();

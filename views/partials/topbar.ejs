@@ -6,14 +6,22 @@
         <span><%= settings.topbar_text %></span>
       <% } %>
       <% if (settings.topbar_show_phone === '1') { %>
-        <a href="tel:<%= site.phone.replace(/\s/g, '') %>" class="topbar-hide-sm">
-          <svg><use href="#i-phone"/></svg>
+        <%#
+          The label is not redundant with the text beside it. `topbar-hide-sm`
+          hides that text on small screens, which leaves the link as an icon
+          with no accessible name at all - Lighthouse measures at mobile width,
+          where a screen reader would announce nothing.
+        %>
+        <a href="tel:<%= site.phone.replace(/\s/g, '') %>" class="topbar-hide-sm"
+           aria-label="Call us on <%= site.phone %>">
+          <svg aria-hidden="true"><use href="#i-phone"/></svg>
           <span><%= site.phone %></span>
         </a>
       <% } %>
       <% if (settings.topbar_show_email === '1') { %>
-        <a href="mailto:<%= site.email %>" class="topbar-hide-sm">
-          <svg><use href="#i-mail"/></svg>
+        <a href="mailto:<%= site.email %>" class="topbar-hide-sm"
+           aria-label="Email us at <%= site.email %>">
+          <svg aria-hidden="true"><use href="#i-mail"/></svg>
           <span><%= site.email %></span>
         </a>
       <% } %>

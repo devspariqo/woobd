@@ -48,9 +48,17 @@
            tabindex="0" role="region" aria-label="Client reviews">
         <% reviews.forEach(function (review) { %>
           <figure class="review-card" data-carousel-item>
-            <div class="review-stars" aria-label="<%= review.rating %> out of 5">
+            <%#
+              role="img" so the aria-label is allowed.
+
+              aria-label on a plain <div> is a prohibited attribute - the div
+              has no role, so there is nothing for the label to name and
+              assistive tech is entitled to ignore it. The five stars are
+              decorative; the label on the wrapper is what should be read.
+            %>
+            <div class="review-stars" role="img" aria-label="<%= review.rating %> out of 5">
               <% for (var i = 1; i <= 5; i += 1) { %>
-                <svg class="<%= i <= review.rating ? '' : 'empty' %>"><use href="#i-star"/></svg>
+                <svg class="<%= i <= review.rating ? '' : 'empty' %>" aria-hidden="true"><use href="#i-star"/></svg>
               <% } %>
             </div>
             <blockquote class="review-text"><%= review.message %></blockquote>

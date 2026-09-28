@@ -3723,14 +3723,44 @@ async function checkCrawlerFilesAndCompare() {
     }
 
     // --- Asset versioning -------------------------------------------------
+    //
+    // The name may be the source or the minified build, depending on whether
+    // one has been built and is current. What matters is that the URL is
+    // stamped, because an unstamped one cannot be cached for a year.
     const home = await req('/');
-    const cssUrl = (home.body.match(/assets\/css\/theme\.css\?v=\d+/) || [])[0];
+
+    const cssUrl = (home.body.match(/assets\/css\/theme(?:\.min)?\.css\?v=\d+/) || [])[0];
     if (cssUrl) ok('the stylesheet URL is version-stamped', cssUrl);
     else bad('the stylesheet URL is version-stamped', 'no ?v= on the stylesheet - it cannot be cached long');
 
-    const jsUrl = (home.body.match(/assets\/js\/main\.js\?v=\d+/) || [])[0];
+    const jsUrl = (home.body.match(/assets\/js\/main(?:\.min)?\.js\?v=\d+/) || [])[0];
     if (jsUrl) ok('the script URL is version-stamped', jsUrl);
     else bad('the script URL is version-stamped', 'no ?v= on the script');
+
+    // The minified build is what production should be serving. If it is missing
+    // or older than the source, versioned() falls back to the source on purpose
+    // - so this is a warning about a forgotten rebuild, not a broken page.
+    if (/theme\.min\.css\?v=\d+/.test(home.body) && /main\.min\.js\?v=\d+/.test(home.body)) {
+      ok('the minified build is served', 'theme.min.css and main.min.js');
+    } else {
+      warn('the minified build is served', 'serving the source - run "npm run build:assets"');
+    }
+
+    // The minified files must actually exist and be smaller, or the fallback
+    // above is hiding a build that never ran.
+    const path = require('path');
+    const fsMod = require('fs');
+    const pairs = [
+      ['assets/css/theme.css', 'assets/css/theme.min.css'],
+      ['assets/js/main.js', 'assets/js/main.min.js'],
+    ];
+    const missing = pairs.filter(([, min]) => !fsMod.existsSync(path.join(__dirname, '..', 'public', min)));
+
+    if (!missing.length) {
+      ok('both minified assets exist', pairs.map(([, m]) => path.basename(m)).join(', '));
+    } else {
+      warn('both minified assets exist', `missing: ${missing.map(([, m]) => m).join(', ')}`);
+    }
 
     if (home.body.includes('media="print"') && home.body.includes("onload=\"this.media='all'\"")) {
       ok('fonts load without blocking the first paint');

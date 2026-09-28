@@ -90,7 +90,8 @@
     <div class="marquee-track" data-marquee>
       <% clients.forEach(function (client) { %>
         <div class="marquee-item">
-          <img src="<%= helpers.url(client.logo) %>" alt="<%= client.name %>" loading="lazy" height="46">
+          <img src="<%= helpers.url(client.logo) %>" alt="<%= client.name %>"
+               loading="lazy" decoding="async" width="130" height="46">
         </div>
       <% }); %>
     </div>

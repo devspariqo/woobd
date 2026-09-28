@@ -180,10 +180,17 @@ app.use(
 
 // Uploads are mounted from wherever UPLOAD_DIR points, so they can live outside
 // the versioned build directory that Hostinger recreates on every deploy.
+//
+// A year, immutable. Every upload is written with a content hash in its name
+// (woobd-light-logo-c153cdef.png), so replacing a file produces a different
+// URL and the old one is simply never asked for again - which is exactly the
+// condition a long cache needs. The previous 30 days was the conservative
+// choice for a name that might be reused; these names are not.
 app.use(
   config.uploads.publicPath,
   express.static(config.uploads.dir, {
-    maxAge: config.isProd ? '30d' : 0,
+    maxAge: config.isProd ? '365d' : 0,
+    immutable: config.isProd,
     etag: true,
     index: false,
     dotfiles: 'deny',

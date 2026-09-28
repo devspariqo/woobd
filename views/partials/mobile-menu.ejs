@@ -3,8 +3,15 @@
 
   <aside class="mobile-menu-panel" role="dialog" aria-modal="true" aria-label="Site menu">
     <div class="mobile-menu-head">
-      <img src="<%= site.logoLight %>" alt="<%= site.name %>" class="logo-for-light" style="max-height:38px">
-      <img src="<%= site.logoDark %>" alt="<%= site.name %>" class="logo-for-dark" style="max-height:38px">
+      <%#
+        width/height as well as the max-height. The intrinsic ratio lets the
+        browser reserve the box before the file arrives; without it the head
+        grows as the logo lands and everything below it moves.
+      %>
+      <img src="<%= site.logoLight %>" alt="<%= site.name %>" class="logo-for-light"
+           style="max-height:38px" width="<%= site.logoWidth %>" height="38">
+      <img src="<%= site.logoDark %>" alt="<%= site.name %>" class="logo-for-dark"
+           style="max-height:38px" width="<%= site.logoWidth %>" height="38">
       <button type="button" class="mobile-menu-close" data-menu-close aria-label="Close menu">
         <svg><use href="#i-x"/></svg>
       </button>

@@ -1517,7 +1517,15 @@ body.no-scroll { overflow: hidden; }
 }
 
 .marquee-item:hover { opacity: 1; filter: grayscale(0); transform: scale(1.07); }
-.marquee-item img { max-height: 46px; width: auto; max-width: 160px; object-fit: contain; }
+/*
+  A definite box per logo, so nothing reflows when one arrives.
+
+  The image used to be width:auto under a 46px cap, which means the browser
+  reserved no space at all until the file landed - the row grew as the logos
+  came in. object-fit keeps each mark undistorted inside the box, and uniform
+  boxes read better in a marquee than ragged ones anyway.
+*/
+.marquee-item img { width: 130px; height: 46px; object-fit: contain; }
 
 /* --------------------------------------------------------------------------
    11. Stats / features
@@ -1660,7 +1668,9 @@ body.no-scroll { overflow: hidden; }
 .review-role {
   display: block;
   font-size: .8125rem;
-  color: var(--text-soft);
+  /* --text-soft is 3.2:1 on the card, which fails AA at this size. The muted
+     token is the same family one step darker, at 6.1:1. */
+  color: var(--text-muted);
   line-height: 1.4;
   margin-top: 2px;
 }
@@ -1763,26 +1773,50 @@ body.no-scroll { overflow: hidden; }
   margin-top: 18px;
 }
 
+/*
+  A 9px dot is a fine thing to look at and an impossible thing to hit. The
+  visible dot stays 9px; the button around it is 32px, which is what a finger
+  actually aims at. The negative margin keeps the row's visual spacing
+  unchanged, so the larger target costs nothing in layout.
+
+  Lighthouse measures the button, not the dot, which is the right way round -
+  the target is what the pointer has to land on.
+*/
 .carousel-dot {
+  width: 32px;
+  height: 32px;
+  margin: -11.5px 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background var(--t-fast), transform var(--t-fast);
+}
+
+/* The visible dot, drawn inside the target rather than being the target. */
+.carousel-dot::before {
+  content: '';
   width: 9px;
   height: 9px;
-  padding: 0;
   border-radius: 50%;
-  border: 0;
   background: var(--border-strong);
   transition: background var(--t-fast), transform var(--t-fast);
 }
 
-.carousel-dot:hover { background: var(--text-soft); }
+.carousel-dot:hover::before { background: var(--text-soft); }
 
-.carousel-dot.is-active {
+.carousel-dot.is-active::before {
   background: var(--primary);
   transform: scale(1.25);
 }
 
 .carousel-dot:focus-visible {
   outline: 2px solid var(--primary);
-  outline-offset: 3px;
+  outline-offset: -4px;
 }
 
 @media (max-width: 1024px) {
@@ -2066,8 +2100,16 @@ body.no-scroll { overflow: hidden; }
 
 .term-option:hover { color: var(--text); }
 
+/*
+  --primary-dark, not --primary, as the filled background.
+
+  White on the brand orange is 3.2:1, which fails WCAG AA for text this size -
+  the selected option was the least readable of the three. The darker shade of
+  the same hue is 5.4:1, so the state still reads as "selected" without the
+  label being the hardest thing on the control to read.
+*/
 .term-option.is-active {
-  background: var(--primary);
+  background: var(--primary-dark);
   color: #fff;
 }
 

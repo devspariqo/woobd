@@ -1,5 +1,5 @@
 <%#
-  The reCAPTCHA script tag, in the flavour the configured key needs.
+  The reCAPTCHA script, loaded without competing with the page.
 
   Expects `captcha` = { siteKey, version }. Emits nothing without a site key, so
   a site that has the toggles on but no keys never pulls Google's script.
@@ -15,11 +15,35 @@
 
   Kept in one file because the six templates that need it were each carrying
   their own copy, and they had already drifted apart once.
+
+  ---------------------------------------------------------------------------
+  Why the src is deferred
+
+  `async defer` stops the script blocking the parser, but it does not stop the
+  download competing with everything else. It is a third-party bundle - around
+  340 KB, plus a 35 KB stylesheet, plus two more connections to gstatic.com -
+  and it was fetched on page load on every page that carries a form. On a
+  throttled mobile connection that is most of the bytes of the page, spent on a
+  widget most visitors never reach, and it lands right in the window the first
+  paint is trying to use.
+
+  So the URL is parked in a data attribute and injected by main.js once the page
+  is idle or the visitor touches anything. Anything that actually submits waits
+  on `whenRecaptchaReady()`, which polls for `grecaptcha` - so a submit that
+  beats the loader still works, it just waits for the script rather than sending
+  an unverified form.
+
+  The <noscript> copy keeps the old behaviour for JavaScript being off, where
+  the loader would never run.
 %>
 <% if (captcha && captcha.siteKey) { %>
-  <% if (captcha.version === 'v3') { %>
-    <script src="https://www.google.com/recaptcha/api.js?render=<%= encodeURIComponent(captcha.siteKey) %>" async defer></script>
-  <% } else { %>
-    <script src="https://www.google.com/recaptcha/api.js?render=explicit" async defer></script>
-  <% } %>
+  <%
+    var src = captcha.version === 'v3'
+      ? 'https://www.google.com/recaptcha/api.js?render=' + encodeURIComponent(captcha.siteKey)
+      : 'https://www.google.com/recaptcha/api.js?render=explicit';
+  %>
+  <span data-recaptcha-src="<%= src %>" hidden></span>
+  <noscript>
+    <script src="<%= src %>" async defer></script>
+  </noscript>
 <% } %>

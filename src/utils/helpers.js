@@ -266,25 +266,55 @@ function assetUrl(path, fallback) {
  */
 const assetVersionCache = new Map();
 
+/**
+ * Pick the file to serve for an asset: the minified build when there is a
+ * current one, otherwise the source.
+ *
+ * `npm run build:assets` writes theme.min.css beside theme.css. Serving it is
+ * only safe while it is at least as new as the source it came from - an edited
+ * source that has not been rebuilt must serve itself, or a deploy would go out
+ * with a stylesheet that silently lacks the change, which reads as the deploy
+ * having failed.
+ *
+ * The stamp comes from the SOURCE either way, so editing the source changes the
+ * URL even though the minified filename never changes.
+ */
+function resolveAsset(relative) {
+  const minified = relative.replace(/\.(css|js)$/, '.min.$1');
+  if (minified === relative) return { file: relative, stampFrom: relative };
+
+  try {
+    const source = fs.statSync(path.join(__dirname, '..', '..', 'public', relative));
+    const min = fs.statSync(path.join(__dirname, '..', '..', 'public', minified));
+    if (min.mtimeMs >= source.mtimeMs) return { file: minified, stampFrom: relative };
+  } catch (err) {
+    // No minified build yet, or no source at all. Serve what was asked for.
+  }
+
+  return { file: relative, stampFrom: relative };
+}
+
 function versioned(assetPath) {
   const requested = String(assetPath || '');
   if (!requested) return url('/');
 
   const relative = requested.replace(/^\/+/, '').split('?')[0];
-  let stamp = assetVersionCache.get(relative);
+  const resolved = resolveAsset(relative);
+
+  let stamp = assetVersionCache.get(resolved.stampFrom);
 
   if (stamp === undefined) {
     try {
-      stamp = String(Math.floor(fs.statSync(path.join(__dirname, '..', '..', 'public', relative)).mtimeMs));
+      stamp = String(Math.floor(fs.statSync(path.join(__dirname, '..', '..', 'public', resolved.stampFrom)).mtimeMs));
     } catch (err) {
       // A missing file must not fail a render. The URL goes out unstamped and
       // the static handler falls back to revalidation for it.
       stamp = '';
     }
-    assetVersionCache.set(relative, stamp);
+    assetVersionCache.set(resolved.stampFrom, stamp);
   }
 
-  const base = url(requested);
+  const base = url('/' + resolved.file);
   if (!stamp) return base;
   return `${base}${base.includes('?') ? '&' : '?'}v=${stamp}`;
 }
