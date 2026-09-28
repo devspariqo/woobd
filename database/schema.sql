@@ -96,6 +96,11 @@ CREATE TABLE IF NOT EXISTS `services` (
   `min_months` INT UNSIGNED NOT NULL DEFAULT 1,
   `yearly_discount_percent` DECIMAL(5,2) NOT NULL DEFAULT 0.00,
   `features` JSON DEFAULT NULL,
+  -- Per-order commission, as [{"label":"Physical","percent":5}, ...]. Structured
+  -- rather than a line in `features` because it is a rate table, not a
+  -- checklist: the card renders it in its own inset box, and a percentage has
+  -- to be sortable and comparable rather than a sentence to be read.
+  `order_fees` JSON DEFAULT NULL,
   `is_featured` TINYINT(1) NOT NULL DEFAULT 0,
   `status` ENUM('active','inactive') NOT NULL DEFAULT 'active',
   `sort_order` INT NOT NULL DEFAULT 0,

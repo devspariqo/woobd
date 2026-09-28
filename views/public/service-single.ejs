@@ -2,6 +2,9 @@
   var price = service.sale_price && Number(service.sale_price) > 0 ? service.sale_price : service.price;
   var hasSale = service.sale_price && Number(service.sale_price) > 0 && Number(service.sale_price) < Number(service.price);
   var features = helpers.parseJson(service.features, []);
+  var orderFees = helpers.parseJson(service.order_fees, []).filter(function (fee) {
+    return fee && fee.label;
+  });
   var cycleLabels = { one_time: 'one-time payment', monthly: 'per month', yearly: 'per year' };
 
   // Recurring packages may carry a minimum commitment and a yearly discount.
@@ -60,6 +63,32 @@
               </li>
             <% }); %>
           </ul>
+        <% } %>
+
+        <%#
+          The per-order rates, shown here as well as on the card.
+
+          They are the part of the offer a seller actually pays, and this is the
+          page the "Get started" button leads to - hiding them behind the
+          homepage card meant the number that decides the purchase was the one
+          number the detail page did not have.
+        %>
+        <% if (orderFees.length) { %>
+          <h3 class="mb-4" style="margin-top:44px">Fees per order</h3>
+          <p style="color:var(--text-muted);margin-bottom:16px;font-size:.9375rem">
+            Charged on each completed order, on top of the
+            <%= cycleLabels[service.billing_cycle] || 'subscription' %>.
+          </p>
+          <div class="fee-table">
+            <% orderFees.forEach(function (fee) { %>
+              <div class="fee-row">
+                <span><%= fee.label %></span>
+                <strong class="<%= Number(fee.percent) === 0 ? 'is-free' : '' %>">
+                  <%= Number(fee.percent) === 0 ? 'No fee' : fee.percent + '%' %>
+                </strong>
+              </div>
+            <% }); %>
+          </div>
         <% } %>
 
         <% if (deliverables.length) { %>

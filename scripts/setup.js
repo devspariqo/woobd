@@ -1402,6 +1402,7 @@ const COLUMN_MIGRATIONS = [
   { table: 'services', column: 'min_months', definition: 'INT UNSIGNED NOT NULL DEFAULT 1 AFTER delivery_days' },
   { table: 'services', column: 'yearly_discount_percent', definition: 'DECIMAL(5,2) NOT NULL DEFAULT 0.00 AFTER min_months' },
   { table: 'orders', column: 'term_months', definition: 'INT UNSIGNED NOT NULL DEFAULT 1 AFTER billing_cycle' },
+  { table: 'services', column: 'order_fees', definition: 'JSON DEFAULT NULL AFTER features' },
 ];
 
 /**

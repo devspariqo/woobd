@@ -94,6 +94,12 @@ const RESOURCES = {
       { key: 'short_description', label: 'Short description', type: 'textarea', rows: 2, maxlength: 500, help: 'Shown on the package card.' },
       { key: 'description', label: 'Full description', type: 'html', rows: 10, group: 'Content' },
       { key: 'features', label: 'What is included', type: 'list', help: 'One item per line. Rendered as the feature checklist.' },
+      {
+        key: 'order_fees',
+        label: 'Fees per order',
+        type: 'fees',
+        help: 'One per line, as "Label: percent" — for example "Physical: 5". A percent of 0 shows as "No fee", which is not the same as leaving the row out.',
+      },
       { key: 'price', label: 'Price', type: 'decimal', required: true, group: 'Pricing & delivery' },
       { key: 'sale_price', label: 'Sale price', type: 'decimal', nullable: true, help: 'Leave blank for no discount.' },
       { key: 'billing_cycle', label: 'Billing cycle', type: 'select', options: BILLING_CYCLES, default: 'one_time' },

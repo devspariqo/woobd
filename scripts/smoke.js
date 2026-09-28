@@ -438,7 +438,11 @@ async function checkPublicContent() {
   // These only pass if scripts/setup.js actually ran and the templates read
   // from the database rather than hardcoding marketing copy.
   const expectations = [
-    ['/', 'a seeded service title', 'WooCommerce Web Design'],
+    // A feature line rather than a title. "Starter" and "Growth" are ordinary
+    // words that appear in other copy on the page, so a title would pass even
+    // if the package grid rendered nothing - this string can only come from the
+    // Free package's row in the database.
+    ['/', 'a seeded package feature', '20 products (10 own + 10 resell)'],
     ['/', 'a seeded testimonial author', 'Ariful Islam'],
     ['/', 'a seeded FAQ question', 'How long does it take'],
     ['/', 'the trust bar client name', 'Rangpur Fashion House'],
@@ -4900,6 +4904,215 @@ async function checkOrderHandoverLayout() {
   await db.close().catch(() => {});
 }
 
+/**
+ * The four self-serve packages.
+ *
+ * The homepage shows the first four featured packages, so "are the right four
+ * on the homepage" is a question about ordering as much as about data - and
+ * ordering is exactly what silently breaks when a package is added later with a
+ * sort_order that collides.
+ */
+async function checkPackages() {
+  section('29. The four packages on the homepage');
+
+  const db = require('../src/config/database');
+  const settingsSvc = require('../src/services/settings.service');
+
+  const EXPECTED = ['Free', 'Starter', 'Pro', 'Growth'];
+
+  try {
+    const home = await req('/');
+    if (home.status !== 200) {
+      bad('the homepage renders', `got ${home.status}`);
+      await db.close().catch(() => {});
+      return;
+    }
+
+    // The card titles, in the order they appear.
+    //
+    // Bounded to the grid. Splitting on the opening tag alone takes the whole
+    // rest of the page with it, and every later heading - portfolio titles,
+    // feature cards - gets counted as a package.
+    const grid = (home.body.split('class="price-grid')[1] || '').split('View all packages')[0];
+    const titles = [...grid.matchAll(/<h3>([^<]+)<\/h3>/g)].map((m) => m[1].trim());
+
+    if (titles.length === 4) {
+      ok('the homepage shows four packages', titles.join(', '));
+    } else {
+      bad('the homepage shows four packages', `${titles.length} rendered: ${titles.join(', ') || 'none'}`);
+    }
+
+    if (titles.join('|') === EXPECTED.join('|')) {
+      ok('they are the four in the intended order', EXPECTED.join(' → '));
+    } else {
+      bad('they are the four in the intended order', `got ${titles.join(', ')}`);
+    }
+
+    // Every one of them carries a fee table. A card whose fees silently
+    // vanished is the failure that matters: the rates decide the purchase.
+    const feeBoxes = (grid.match(/Fees per order/g) || []).length;
+    if (feeBoxes === 4) ok('every card shows its per-order fees');
+    else bad('every card shows its per-order fees', `${feeBoxes} of 4`);
+
+    // 0% must read as "No fee" rather than "0%". It is a selling point.
+    if (grid.includes('No fee')) ok('a zero rate reads as "No fee"', 'not "0%"');
+    else bad('a zero rate reads as "No fee"', 'no zero-rate row found');
+
+    // --- The term toggle ------------------------------------------------------
+    const six = settingsSvc.getInt('pricing_6mo_discount', 0);
+    const twelve = settingsSvc.getInt('pricing_12mo_discount', 0);
+
+    if (home.body.includes('data-term="term6"') && home.body.includes('data-term="term12"')) {
+      ok('the term toggle offers all three options', `6 months saves ${six}%, yearly saves ${twelve}%`);
+    } else {
+      bad('the term toggle offers all three options', 'a term button is missing');
+    }
+
+    if (six === 10 && twelve === 25) {
+      ok('the savings are the advertised ones', '10% and 25%');
+    } else {
+      bad('the savings are the advertised ones', `got ${six}% and ${twelve}%`);
+    }
+
+    // --- The highlighted card -------------------------------------------------
+    const popularIndex = settingsSvc.getInt('pricing_popular_index', 0);
+    if (popularIndex === 3 && /is-popular/.test(grid) && titles[2] === 'Pro') {
+      ok('the popular flag sits on Pro', 'index 3');
+    } else {
+      bad('the popular flag sits on Pro', `index ${popularIndex}, titles ${titles.join(', ')}`);
+    }
+
+    // --- Each one has a working detail page, with its fees --------------------
+    for (const slug of ['free', 'starter', 'pro', 'growth']) {
+      const page = await req(`/services/${slug}`);
+
+      if (page.status !== 200) {
+        bad(`${slug} has a detail page`, `got ${page.status}`);
+        continue;
+      }
+
+      if (page.body.includes('Fees per order') && page.body.includes('fee-row')) {
+        ok(`${slug} shows its fees on the detail page`);
+      } else {
+        bad(`${slug} shows its fees on the detail page`, 'the rates are missing where the CTA lands');
+      }
+    }
+
+    // --- The admin can edit them ---------------------------------------------
+    //
+    // The rates are only maintainable if the editor round-trips them, and the
+    // field parses "Label: percent" rather than taking JSON.
+    const login = await adminLogin();
+    if (!login.ok) {
+      warn('the package editor round-trips fees', `${login.reason} - skipping`);
+      await db.close().catch(() => {});
+      return;
+    }
+
+    const service = await db.queryOne("SELECT id, order_fees FROM services WHERE slug = 'pro'");
+    const before = JSON.stringify(service.order_fees);
+
+    // The editor lives at /edit; the bare /:id is the save endpoint.
+    const form = await req(`/${ADMIN_SLUG}/packages/${service.id}/edit`);
+    const csrf = form.body.match(/name="_csrf"\s+value="([^"]+)"/);
+
+    if (!csrf) {
+      bad('the package editor round-trips fees', 'no CSRF token on the package form');
+      await db.close().catch(() => {});
+      return;
+    }
+
+    // The textarea must show the current rates in the editable format.
+    if (form.body.includes('Physical: 0') && form.body.includes('Resell: 1')) {
+      ok('the fee field prefills in "Label: percent" form');
+    } else {
+      bad('the fee field prefills in "Label: percent" form', 'the textarea is empty or malformed');
+    }
+
+    // Save a changed rate, then put the original back.
+    const withTest = [
+      'Physical: 0',
+      'Digital: 4',
+      'Resell: 1',
+      'Smoke test: 2.5',
+    ].join('\n');
+
+    const saved = await req(`/${ADMIN_SLUG}/packages/${service.id}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        _csrf: csrf[1],
+        title: 'Pro',
+        slug: 'pro',
+        price: '1099',
+        billing_cycle: 'monthly',
+        min_months: '1',
+        yearly_discount_percent: '0',
+        delivery_days: '0',
+        sort_order: '2',
+        status: 'active',
+        is_featured: '1',
+        features: '2,000 products\nUnlimited preset themes',
+        order_fees: withTest,
+      }).toString(),
+    });
+
+    const after = await db.queryOne('SELECT order_fees FROM services WHERE id = ?', [service.id]);
+    const parsed = typeof after.order_fees === 'string' ? JSON.parse(after.order_fees) : after.order_fees;
+
+    if ([301, 302, 303].includes(saved.status) && Array.isArray(parsed) && parsed.length === 4) {
+      const added = parsed.find((fee) => fee.label === 'Smoke test');
+      if (added && Number(added.percent) === 2.5) {
+        ok('a fee saved from the editor is stored as a number', '2.5, not "2.5"');
+      } else {
+        bad('a fee saved from the editor is stored as a number', JSON.stringify(parsed));
+      }
+    } else {
+      bad('a fee saved from the editor is stored as a number', `status ${saved.status}, ${JSON.stringify(parsed)}`);
+    }
+
+    // A malformed line must be refused rather than silently dropped - a rate
+    // table that is quietly missing a row is worse than one that will not save.
+    const rejected = await req(`/${ADMIN_SLUG}/packages/${service.id}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        _csrf: csrf[1],
+        title: 'Pro',
+        slug: 'pro',
+        price: '1099',
+        billing_cycle: 'monthly',
+        order_fees: 'Physical 5',
+      }).toString(),
+    });
+
+    const still = await db.queryOne('SELECT order_fees FROM services WHERE id = ?', [service.id]);
+    const unchanged = JSON.stringify(still.order_fees) === JSON.stringify(after.order_fees);
+
+    // A 422 is the validation rejection; the point of the check is that the
+    // save did not go through and the stored rates are untouched.
+    if (rejected.status === 422 && unchanged) {
+      ok('a fee line without a colon is refused', '422, and the saved rates were left alone');
+    } else {
+      bad('a fee line without a colon is refused', `status ${rejected.status}, changed=${!unchanged}`);
+    }
+
+    // --- Restore --------------------------------------------------------------
+    await db.query('UPDATE services SET order_fees = ? WHERE id = ?', [before === 'null' ? null : before, service.id]);
+    const restored = await db.queryOne('SELECT order_fees FROM services WHERE id = ?', [service.id]);
+
+    if (JSON.stringify(restored.order_fees) === before) {
+      ok('the fee rates are restored', 'Pro back to 0 / 4 / 1');
+    } else {
+      bad('the fee rates are restored', JSON.stringify(restored.order_fees));
+    }
+  } catch (err) {
+    bad('the four packages', err.message);
+  }
+
+  await db.close().catch(() => {});
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -4974,6 +5187,7 @@ async function main() {
     await checkMailNotifications();
     await checkChatDashboard();
     await checkOrderHandoverLayout();
+    await checkPackages();
     checkInstallSql();
   } catch (err) {
     console.error('\n  ✗ Smoke test aborted by an unexpected error');

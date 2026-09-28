@@ -115,6 +115,39 @@ function coerce(field, body) {
       return { value: JSON.stringify(items) };
     }
 
+    case 'fees': {
+      // Per-order commission, edited as "Label: percent" per line and stored as
+      // [{"label":..., "percent":...}].
+      //
+      // A line without a colon, or with something that is not a number after
+      // it, is rejected rather than guessed at. Silently dropping it would save
+      // a rate table that is quietly missing a row, and the whole point of the
+      // table is that it is complete.
+      const lines = String(raw || '')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      const fees = [];
+      for (const line of lines) {
+        const at = line.lastIndexOf(':');
+        if (at < 1) return { error: `${field.label}: "${line}" needs a colon, as in "Physical: 5".` };
+
+        const label = line.slice(0, at).trim();
+        const percentText = line.slice(at + 1).replace(/%/g, '').trim();
+        const percent = Number(percentText);
+
+        if (!label) return { error: `${field.label}: "${line}" has no label before the colon.` };
+        if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
+          return { error: `${field.label}: "${percentText}" is not a percentage between 0 and 100.` };
+        }
+
+        fees.push({ label, percent: Math.round(percent * 100) / 100 });
+      }
+
+      return { value: JSON.stringify(fees) };
+    }
+
     case 'html':
       // Admin-authored markup. Keep line breaks and do not collapse whitespace.
       return { value: clean.text(raw, 100000) };

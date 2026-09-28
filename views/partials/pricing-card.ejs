@@ -22,13 +22,17 @@
 
   var features = helpers.parseJson(service.features, []);
 
-  // Five on the card, the rest one click away.
+  // Six on the card, the rest one click away.
   //
-  // Packages carry ten or eleven features. Listing them all makes the cards
-  // wildly different heights and buries the price comparison the section exists
-  // for; five is enough to convey what the package is, and the link gives the
-  // full list on the page where there is room for it.
-  var VISIBLE = 5;
+  // Six rather than five because the packages this section is built around
+  // carry exactly six features each. At five, every one of them ended with a
+  // "+1 more" link - a card that hides a line it has room for reads as a
+  // paywall, not as a summary.
+  //
+  // Packages with ten or eleven features still truncate, which is the point:
+  // listing them all makes the cards wildly different heights and buries the
+  // price comparison the section exists for.
+  var VISIBLE = 6;
   var shownFeatures = features.slice(0, VISIBLE);
   var hiddenCount = Math.max(0, features.length - VISIBLE);
 
@@ -111,11 +115,30 @@
   <% } %>
 
   <%#
-    The inset box along the bottom. The reference uses it for per-order fees;
-    these packages do not have any, so it carries the term information instead -
-    the same visual weight, and it answers the question the toggle above raises.
+    The inset box along the bottom.
+
+    Per-order fees when the package has them, otherwise the term information.
+    It is one box rather than two because it is one piece of the decision: the
+    rates are what a seller actually pays, and the term saving is what they get
+    for committing - showing both would double the height of the card for a
+    reader who is comparing four of them side by side.
   %>
-  <% if (isRecurring && (minMonths > 1 || sixDiscount > 0 || yearlyDiscount > 0)) { %>
+  <%
+    var fees = helpers.parseJson(service.order_fees, []).filter(function (fee) {
+      return fee && fee.label;
+    });
+  %>
+  <% if (fees.length) { %>
+    <div class="price-terms">
+      <span class="price-terms-label">Fees per order</span>
+      <% fees.forEach(function (fee) { %>
+        <div class="price-terms-row<%= Number(fee.percent) === 0 ? ' is-save' : '' %>">
+          <span><%= fee.label %></span>
+          <strong><%= Number(fee.percent) === 0 ? 'No fee' : fee.percent + '%' %></strong>
+        </div>
+      <% }); %>
+    </div>
+  <% } else if (isRecurring && (minMonths > 1 || sixDiscount > 0 || yearlyDiscount > 0)) { %>
     <div class="price-terms">
       <span class="price-terms-label">Term &amp; savings</span>
       <% if (minMonths > 1) { %>

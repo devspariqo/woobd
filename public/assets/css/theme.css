@@ -4199,3 +4199,37 @@ body.no-scroll { overflow: hidden; }
   border-radius: var(--radius-sm);
   z-index: 9999;
 }
+
+/* --------------------------------------------------------------------------
+   Per-order fee table
+
+   Used on the package detail page. A two-column row list rather than a
+   <table>: it is two values per row and the labels are short, so a table's
+   borders and header would be more chrome than content.
+   -------------------------------------------------------------------------- */
+
+.fee-table {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.fee-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--border);
+  font-size: .9375rem;
+}
+
+.fee-row:last-child { border-bottom: 0; }
+
+.fee-row span { color: var(--text-muted); }
+
+.fee-row strong { color: var(--text); font-weight: 700; }
+
+/* 0% is a selling point, not a rounding artefact - colouring it says so. */
+.fee-row strong.is-free { color: var(--success); }

@@ -29,6 +29,14 @@
         return Array.isArray(arr) ? arr.join('\n') : '';
       } catch (e) { return ''; }
     }
+    // A `fees` field is a JSON array of objects, edited as "Label: percent".
+    if (field.type === 'fees') {
+      try {
+        var fees = typeof v === 'string' ? JSON.parse(v) : v;
+        if (!Array.isArray(fees)) return '';
+        return fees.map(function (fee) { return fee.label + ': ' + fee.percent; }).join('\n');
+      } catch (e) { return ''; }
+    }
     if (field.type === 'date' && v) return String(v).slice(0, 10);
     return v;
   };
@@ -163,6 +171,11 @@
                   <% } else if (field.type === 'list') { %>
                     <textarea class="form-control" id="<%= id %>" name="<%= field.key %>" rows="7"><%= val %></textarea>
                     <p class="form-hint"><%= field.help || 'One item per line.' %></p>
+
+                  <% } else if (field.type === 'fees') { %>
+                    <textarea class="form-control" id="<%= id %>" name="<%= field.key %>" rows="5"
+                              spellcheck="false" placeholder="Physical: 5&#10;Digital: 10"><%= val %></textarea>
+                    <p class="form-hint"><%= field.help || 'One fee per line, as "Label: percent".' %></p>
 
                   <% } else if (field.type === 'select') { %>
                     <select class="form-control" id="<%= id %>" name="<%= field.key %>"
