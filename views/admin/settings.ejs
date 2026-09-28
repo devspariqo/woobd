@@ -96,6 +96,40 @@
       </div>
     </div>
   </div>
+
+  <%#
+    The domain list, spelled out.
+
+    Google refuses to draw the widget on a hostname that is not registered
+    against the key, and it says so inside the widget's own iframe - which the
+    page cannot read, and the server-side test cannot see either, because no
+    token is ever produced. The console stays clean and the form simply has a
+    blank space where the box should be, so it reads as a broken feature rather
+    than a missing setting. Printing the exact hostnames is the only place this
+    can be caught.
+  %>
+  <div class="alert alert-info" role="status">
+    <svg><use href="#i-info"/></svg>
+    <div>
+      <strong>One more step, and it is the one that catches people:</strong>
+      Google will only draw the box on a domain registered against this site key.
+      If the box is missing, add <em>every</em> hostname you open the site on:
+
+      <div class="conn-status">
+        <% captchaDomains.forEach(function (domain) { %>
+          <span class="conn-pill is-neutral"><%= domain %></span>
+        <% }); %>
+      </div>
+
+      <div style="margin-top:9px;font-size:.8125rem">
+        Open
+        <a href="https://www.google.com/recaptcha/admin" target="_blank" rel="noopener noreferrer">google.com/recaptcha/admin</a>,
+        pick this key, open <strong>Settings → Domains</strong>, and add them one per line. Google shows
+        <em>"Localhost is not in the list of supported domains for this site key"</em> inside the widget
+        when it is missing — that message is the confirmation, not a code fault.
+      </div>
+    </div>
+  </div>
 <% } %>
 
 <% if (group === 'smtp' && !mailConfigured) { %>
@@ -121,6 +155,83 @@
     <div>
       <strong>Email is configured.</strong> Send a test to confirm the credentials are accepted —
       a saved password is not the same as a working one.
+    </div>
+  </div>
+<% } %>
+
+<%#
+  What the email header will actually contain.
+
+  Shown because the two ways this goes wrong are both invisible from the
+  settings alone: no logo at all (the header silently falls back to plain text),
+  and an SVG logo, which looks perfect here and arrives as a broken image in
+  every inbox because email clients refuse to render SVG.
+%>
+<% if (group === 'email') { %>
+  <div class="panel" style="margin-bottom:20px">
+    <div class="panel-head">
+      <h2 style="margin:0;font-size:1rem">Email header preview</h2>
+      <span style="font-size:.8125rem;color:var(--text-soft)">What every message will show at the top.</span>
+    </div>
+    <div class="panel-body">
+      <div style="background:<%= settings.email_header_bg || '#ffffff' %>;border:1px solid var(--border);border-radius:12px;padding:26px;text-align:center">
+        <% if (emailLogoUrl) { %>
+          <img src="<%= emailLogoUrl %>" alt="<%= settings.site_name %>"
+               style="width:<%= emailLogoWidth %>px;max-width:100%;height:auto">
+        <% } else { %>
+          <span style="font-size:21px;font-weight:800;color:#101223"><%= settings.site_name %></span>
+        <% } %>
+      </div>
+
+      <% if (!emailLogoUrl && emailLogoMissingFile) { %>
+        <div class="alert alert-warning" role="status" style="margin-top:14px;margin-bottom:0">
+          <svg><use href="#i-alert"/></svg>
+          <div>
+            <strong>The logo file is missing.</strong>
+            A path is saved but nothing exists at it, so the header would show a broken image.
+            Upload the logo again above.
+          </div>
+        </div>
+      <% } else if (!emailLogoUrl) { %>
+        <div class="alert alert-warning" role="status" style="margin-top:14px;margin-bottom:0">
+          <svg><use href="#i-alert"/></svg>
+          <div>
+            <strong>No logo will appear — the header shows the site name as text.</strong>
+            Upload one above, or set the site logo under
+            <a href="<%= settingsUrl %>?group=branding">Branding</a>.
+          </div>
+        </div>
+      <% } else if (emailLogoIsSvg) { %>
+        <div class="alert alert-warning" role="status" style="margin-top:14px;margin-bottom:0">
+          <svg><use href="#i-alert"/></svg>
+          <div>
+            <strong>This logo is an SVG, and most email clients will not display it.</strong>
+            Gmail, Outlook and Apple Mail all block SVG images, so recipients will see a broken
+            image instead of your logo. Upload a <strong>PNG</strong> above — that is the format
+            every client renders.
+            <% if (emailLogoFromSite) { %>
+              <div style="margin-top:7px;font-size:.8125rem">
+                This is the site logo from <a href="<%= settingsUrl %>?group=branding">Branding</a>.
+                An email logo set above takes priority over it.
+              </div>
+            <% } %>
+          </div>
+        </div>
+      <% } else if (emailLogoFromSite) { %>
+        <div class="alert alert-info" role="status" style="margin-top:14px;margin-bottom:0">
+          <svg><use href="#i-info"/></svg>
+          <div>
+            No email logo is set, so this is the site logo from
+            <a href="<%= settingsUrl %>?group=branding">Branding</a>. Upload one above to use a
+            different image in emails.
+          </div>
+        </div>
+      <% } else { %>
+        <div style="margin-top:12px;font-size:.8125rem;color:var(--text-soft)">
+          This is your email logo. Send a test from the <strong>SMTP</strong> tab to see the whole
+          message.
+        </div>
+      <% } %>
     </div>
   </div>
 <% } %>

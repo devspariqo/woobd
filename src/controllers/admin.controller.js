@@ -41,17 +41,21 @@ function setNav(res, key, extra = {}) {
 
 /** Shared payload for the sidebar badges on every admin screen. */
 async function badgeCounts() {
-  const [orders, payments, tickets, contacts] = await Promise.all([
+  const [orders, payments, tickets, contacts, chat] = await Promise.all([
     orderModel.orderCounts(),
     orderModel.paymentCounts(),
     orderModel.ticketCounts(),
     db.queryOne("SELECT COUNT(*) AS unread FROM contact_messages WHERE status = 'new'"),
+    // Conversations still open. A visitor who has not been answered is the
+    // closest thing this panel has to an unread message from the chat widget.
+    db.queryOne("SELECT COUNT(*) AS open FROM chat_conversations WHERE status = 'open'"),
   ]);
   return {
     orders: orders ? Number(orders.pending) + Number(orders.in_progress) : 0,
     payments: payments ? Number(payments.pending) : 0,
     tickets: tickets ? Number(tickets.open) + Number(tickets.pending) : 0,
     contacts: contacts ? Number(contacts.unread) : 0,
+    chat: chat ? Number(chat.open) : 0,
   };
 }
 
@@ -932,6 +936,33 @@ async function settingsView(res, { group, errors = null }) {
   const smtpUser = settings.secret('smtp_user', config.smtp.user);
   const smtpPassword = settings.secret('smtp_password', config.smtp.password);
 
+  // The hostnames this key has to be registered for.
+  //
+  // Google refuses to draw the widget on a domain that is not on the key's
+  // list, and the message appears inside the widget's own iframe - the page
+  // cannot read it, and the server-side test cannot detect it either, because
+  // no token is ever produced. It reads as "the captcha is broken" with a clean
+  // console, which is the hardest kind of failure to chase. Naming the domains
+  // here is the only place it can be made visible.
+  const captchaDomains = (() => {
+    const hosts = new Set();
+
+    try {
+      hosts.add(new URL(config.app.url).hostname);
+    } catch (err) {
+      // A malformed APP_URL should not blank the whole warning.
+    }
+
+    // Local development counts. A key being tested locally almost always needs
+    // localhost adding alongside the production domain.
+    if (!config.isProd) {
+      hosts.add('localhost');
+      hosts.add('127.0.0.1');
+    }
+
+    return [...hosts].filter(Boolean);
+  })();
+
   return {
     group,
     groups: SETTINGS_GROUPS.map((key) => ({
@@ -945,6 +976,7 @@ async function settingsView(res, { group, errors = null }) {
     captchaConfigured: Boolean(captchaSiteKey && captchaSecretKey),
     captchaSiteKeySet: Boolean(captchaSiteKey),
     captchaSecretKeySet: Boolean(captchaSecretKey),
+    captchaDomains,
     googleConfigured: Boolean(
       settings.secret('google_client_id', config.google.clientId) &&
         settings.secret('google_client_secret', config.google.clientSecret)
@@ -955,6 +987,38 @@ async function settingsView(res, { group, errors = null }) {
       !smtpUser ? 'username' : null,
       !smtpPassword ? 'password' : null,
     ].filter(Boolean),
+    ...emailBranding(),
+  };
+}
+
+/**
+ * What the email header will actually contain.
+ *
+ * The same resolution order the mail service uses, so the panel cannot show a
+ * logo that the emails do not send. `isSvg` matters because email clients
+ * refuse to render SVG - a logo that looks perfect in the panel arrives as a
+ * broken image in every inbox, and nothing else warns about it.
+ */
+function emailBranding() {
+  const helpers = require('../utils/helpers');
+  const mail = require('../services/mail.service');
+
+  // Same resolution the mail service uses, including the on-disk check - the
+  // panel must not preview a logo that the emails will drop.
+  const candidates = [settings.get('email_logo'), settings.get('logo_light'), settings.get('logo_dark')].filter(Boolean);
+  const path = candidates.find((candidate) => mail.isUsableLogo(candidate)) || '';
+  const fromSiteLogo = !settings.get('email_logo') && Boolean(path);
+
+  return {
+    emailLogoUrl: path
+      ? (/^https?:\/\//i.test(path) ? path : `${config.app.url}${helpers.url(path)}`)
+      : '',
+    emailLogoIsSvg: /\.svg(\?|$)/i.test(path),
+    emailLogoFromSite: fromSiteLogo,
+    // Set but unusable - the file is missing. Worth saying, because the fix is
+    // to re-upload rather than to change anything about the setting.
+    emailLogoMissingFile: Boolean(candidates.length && !path),
+    emailLogoWidth: Math.min(420, Math.max(60, settings.getInt('email_logo_width', 200))),
   };
 }
 

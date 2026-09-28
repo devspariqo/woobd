@@ -372,6 +372,45 @@ function toPlainText(input) {
   return text.trim();
 }
 
+/**
+ * Close or reopen a conversation.
+ *
+ * Status is the only thing staff can change about a transcript. The messages
+ * themselves are a record of what a visitor was actually told, and editing that
+ * record would make it worthless as evidence if a customer later disputes it.
+ */
+async function setStatus(id, status) {
+  const next = status === 'closed' ? 'closed' : 'open';
+  await db.query('UPDATE chat_conversations SET status = ? WHERE id = ?', [next, id]);
+  return next;
+}
+
+/** Delete a conversation and everything said in it. */
+async function deleteConversation(id) {
+  // Messages first: there is no foreign key cascade on this table, so removing
+  // the parent alone would leave orphaned rows behind for good.
+  await db.query('DELETE FROM chat_messages WHERE conversation_id = ?', [id]);
+  await db.query('DELETE FROM chat_conversations WHERE id = ?', [id]);
+}
+
+/** How many conversations there are, and how many are still open. */
+async function counts() {
+  const row = await db.queryOne(
+    `SELECT COUNT(*) AS total,
+            SUM(status = 'open') AS open,
+            SUM(status = 'closed') AS closed,
+            COALESCE(SUM(message_count), 0) AS messages
+     FROM chat_conversations`
+  );
+
+  return {
+    total: Number((row && row.total) || 0),
+    open: Number((row && row.open) || 0),
+    closed: Number((row && row.closed) || 0),
+    messages: Number((row && row.messages) || 0),
+  };
+}
+
 module.exports = {
   isConfigured,
   isEnabled,
@@ -382,4 +421,7 @@ module.exports = {
   ask,
   listConversations,
   getConversation,
+  setStatus,
+  deleteConversation,
+  counts,
 };

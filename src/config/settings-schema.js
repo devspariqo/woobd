@@ -261,7 +261,7 @@ const SETTINGS = [
   { key: 'captcha_on_signup', type: 'boolean', group: 'security', default: '1', public: true, label: 'CAPTCHA on customer sign up', help: 'Show the reCAPTCHA checkbox on the customer sign-up form.' },
   { key: 'captcha_on_admin', type: 'boolean', group: 'security', default: '1', public: true, label: 'CAPTCHA on admin login', help: 'Show the reCAPTCHA checkbox on this admin panel login page.' },
   { key: 'captcha_on_contact', type: 'boolean', group: 'security', default: '1', public: true, label: 'CAPTCHA on contact form', help: 'Show the reCAPTCHA checkbox on the public contact form.' },
-  { key: 'captcha_site_key', type: 'text', group: 'security', default: '', public: true, label: 'reCAPTCHA site key', help: 'Public key from your Google reCAPTCHA v2 registration. Safe to expose to browsers.' },
+  { key: 'captcha_site_key', type: 'text', group: 'security', default: '', public: true, label: 'reCAPTCHA site key', help: 'Public key from your Google reCAPTCHA registration. Safe to expose to browsers. The key must also list every hostname you open the site on — Google will not draw the box on an unregistered domain, and the page cannot read the error it shows.' },
   {
     key: 'captcha_mode',
     type: 'select',
@@ -403,7 +403,116 @@ const SETTINGS = [
     label: 'CTA background colour',
     help: 'Used when no background image is set, and as a tint under one when it is. Leave blank for the theme default.',
   },
+
+  // ---------------- Email branding ----------------
+  //
+  // The emails were built from the site's own logo setting, which is empty on a
+  // fresh install and points at an SVG on most others - and email clients
+  // refuse to render SVG. So the header fell back to plain text, or to a broken
+  // image, on every message. A dedicated setting, defaulting to a raster file,
+  // is the fix.
+  {
+    key: 'email_logo',
+    type: 'file',
+    group: 'email',
+    default: '',
+    public: true,
+    label: 'Email logo',
+    help: 'Shown at the top of every email. Use a PNG or JPG — Gmail, Outlook and most other clients refuse to display SVG, and a broken logo in every message is worse than none. Leave blank to use the site logo, or to show the site name as text.',
+  },
+  {
+    key: 'email_logo_width',
+    type: 'number',
+    group: 'email',
+    default: '200',
+    public: true,
+    label: 'Email logo width (px)',
+    help: 'The logo is scaled to this width. 200px fits the 600px email layout comfortably.',
+  },
+  {
+    key: 'email_header_bg',
+    type: 'text',
+    group: 'email',
+    default: '#ffffff',
+    public: true,
+    label: 'Email header background',
+    help: 'Behind the logo. Use a light colour for a dark logo, or a dark colour for a light one.',
+  },
+  {
+    key: 'email_accent',
+    type: 'text',
+    group: 'email',
+    default: '',
+    public: true,
+    label: 'Email accent colour',
+    help: 'Buttons and links in every email. Leave blank to follow the theme colour.',
+  },
+  {
+    key: 'email_footer_note',
+    type: 'textarea',
+    group: 'email',
+    default: '',
+    public: true,
+    label: 'Email footer note',
+    help: 'A line under the address block — a company number, or a note about why the recipient is receiving this. Leave blank for none.',
+  },
+  {
+    key: 'email_show_socials',
+    type: 'boolean',
+    group: 'email',
+    default: '1',
+    public: true,
+    label: 'Show social links in emails',
+  },
+
+  // ---------------- Email templates ----------------
+  //
+  // Generated from src/config/email-templates.js, which the mail service reads
+  // as well - one list, so an editable field can never point at a template that
+  // no longer exists.
+  ...emailTemplates(),
+
 ];
+
+/**
+ * An editable subject and heading for every email the application sends.
+ *
+ * Two fields per template rather than a free-text body editor: the body is
+ * built from live order and customer data, and a hand-editable HTML body would
+ * either break that or have to be a full templating language. Subject and
+ * heading cover what actually changes per site - the wording.
+ */
+function emailTemplates() {
+  const { TEMPLATES } = require('./email-templates');
+  const out = [];
+
+  for (const template of TEMPLATES) {
+    const vars = template.vars.map((name) => `{${name}}`).join(', ');
+
+    out.push(
+      {
+        key: `email_tpl_${template.key}_subject`,
+        type: 'text',
+        group: 'email',
+        default: '',
+        public: false,
+        label: `${template.label} — subject`,
+        help: `Leave blank for the default: "${template.subject}". Placeholders you can use: ${vars}.`,
+      },
+      {
+        key: `email_tpl_${template.key}_heading`,
+        type: 'text',
+        group: 'email',
+        default: '',
+        public: false,
+        label: `${template.label} — heading`,
+        help: `The large line at the top of the email. Leave blank for the default: "${template.heading}".`,
+      }
+    );
+  }
+
+  return out;
+}
 
 /**
  * Background image, colour and treatment for each inner-page hero.
@@ -483,6 +592,7 @@ const GROUP_LABELS = {
   seo: 'SEO & Analytics',
   seo_files: 'Robots & Sitemap',
   page_hero: 'Page Backgrounds',
+  email: 'Email',
   header: 'Header & CTA',
   footer: 'Footer',
   social: 'Social Links',

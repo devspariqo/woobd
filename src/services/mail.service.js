@@ -8,15 +8,63 @@
  */
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
 const nodemailer = require('nodemailer');
 
 const config = require('../config');
+const emailTemplates = require('../config/email-templates');
 const settings = require('../services/settings.service');
 const logger = require('../utils/logger');
 const helpers = require('../utils/helpers');
 
 let transporter = null;
 let transporterKey = '';
+
+/**
+ * Whether a logo setting points at something an inbox could actually fetch.
+ *
+ * A remote URL is taken at its word - the server cannot know whether a CDN is
+ * up, and a bad remote URL is the operator's to notice. A local path is checked
+ * against the disk, because uploads live outside version control and a restored
+ * database routinely references files that were never copied across.
+ */
+function isUsableLogo(candidate) {
+  const value = String(candidate || '').trim();
+  if (!value) return false;
+  if (/^https?:\/\//i.test(value)) return true;
+
+  // Settings store the public path (/uploads/...); the file lives under the
+  // uploads directory, or under public/ for anything shipped with the code.
+  const relative = value.replace(/^\/+/, '');
+  const publicPath = config.uploads.publicPath.replace(/^\/+|\/+$/g, '');
+
+  const onDisk = relative.startsWith(publicPath + '/')
+    ? path.join(config.uploads.dir, relative.slice(publicPath.length + 1))
+    : path.join(config.root, 'public', relative);
+
+  try {
+    return fs.existsSync(onDisk);
+  } catch (err) {
+    return false;
+  }
+}
+
+/**
+ * Resolve a template's subject and heading, honouring the admin's overrides.
+ *
+ * The defaults live in src/config/email-templates.js, next to the field that
+ * edits them. A blank setting means "use the default", which is what keeps an
+ * untouched install sending exactly what it always did.
+ */
+function template(key, vars) {
+  const defaults = emailTemplates.BY_KEY[key] || { subject: '', heading: '' };
+
+  return {
+    subject: emailTemplates.fill(settings.get(`email_tpl_${key}_subject`) || defaults.subject, vars),
+    heading: emailTemplates.fill(settings.get(`email_tpl_${key}_heading`) || defaults.heading, vars),
+  };
+}
 
 /** Build (or reuse) a transport. Rebuilt when the SMTP settings change. */
 function getTransport() {
@@ -73,7 +121,7 @@ function resetTransport() {
  *     or call, so it carries the full set rather than just an address.
  */
 function wrapLayout({ title, body, ctaText, ctaUrl, footerNote, preheader }) {
-  const primary = settings.get('theme_primary', '#5b21f0');
+  const primary = settings.get('email_accent') || settings.get('theme_primary', '#5b21f0');
   const primaryDark = settings.get('theme_primary_dark', '#4316c4');
   const siteName = settings.get('site_name', 'WooBD.Com');
   const siteUrl = config.app.url;
@@ -86,23 +134,57 @@ function wrapLayout({ title, body, ctaText, ctaUrl, footerNote, preheader }) {
   const linkedin = settings.get('social_linkedin', '');
   const instagram = settings.get('social_instagram', '');
   const youtube = settings.get('social_youtube', '');
+  const showSocials = settings.getBool('email_show_socials', true);
+  const headerBg = settings.get('email_header_bg') || '#ffffff';
+  const logoWidth = Math.min(420, Math.max(60, settings.getInt('email_logo_width', 200)));
+
+  // The email logo, falling back to the site's own artwork.
+  //
+  // It used to read `logo_light` alone, which is empty on a fresh install - so
+  // every email went out with a bare text header, or with a broken image when
+  // the site logo happened to be an SVG. Email clients do not render SVG, which
+  // is why the dedicated setting asks for a PNG.
+  //
+  // The order is deliberate: an explicit email logo first, then the light-mode
+  // site logo, then the dark one. `logo_light` is the artwork drawn FOR light
+  // backgrounds, which is what the email header is.
+  //
+  // A candidate whose file is not actually on disk is skipped. Uploads live
+  // outside version control, so a restored database can point at a logo that
+  // was never copied across - and a broken image in every message reads as a
+  // broken brand, where a text header just looks plain.
+  const logoPath = [
+    settings.get('email_logo'),
+    settings.get('logo_light'),
+    settings.get('logo_dark'),
+  ]
+    .filter(Boolean)
+    .find(isUsableLogo) || '';
 
   // Absolute, because a relative path is meaningless in an inbox.
-  const logoPath = settings.get('logo_light', '');
   const logoUrl = logoPath
     ? (/^https?:\/\//i.test(logoPath) ? logoPath : `${siteUrl}${helpers.url(logoPath)}`)
     : '';
 
-  const socials = [
-    facebook && { label: 'Facebook', url: facebook },
-    linkedin && { label: 'LinkedIn', url: linkedin },
-    instagram && { label: 'Instagram', url: instagram },
-    youtube && { label: 'YouTube', url: youtube },
-  ].filter(Boolean);
+  const socials = showSocials
+    ? [
+        facebook && { label: 'Facebook', url: facebook },
+        linkedin && { label: 'LinkedIn', url: linkedin },
+        instagram && { label: 'Instagram', url: instagram },
+        youtube && { label: 'YouTube', url: youtube },
+      ].filter(Boolean)
+    : [];
 
   // Shown in the inbox preview line next to the subject. Without it the client
   // pulls whatever text it finds first, which is usually "View this in browser".
   const preview = preheader || title;
+
+  // The reason-for-receiving line. Overridable because "you have an account or
+  // placed an order with us" is wrong for a cold enquiry acknowledgement, and
+  // because some jurisdictions require a company number here.
+  const footerLine = helpers.escapeHtml(
+    settings.get('email_footer_note') || 'You are receiving this because you have an account or placed an order with us.'
+  );
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -122,12 +204,12 @@ function wrapLayout({ title, body, ctaText, ctaUrl, footerNote, preheader }) {
 
         <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 6px 28px rgba(16,18,35,.09);">
 
-          <!-- Header: logo on white -->
+          <!-- Header: logo on the configured background -->
           <tr>
-            <td align="center" style="padding:30px 32px 22px;background:#ffffff;">
+            <td align="center" style="padding:30px 32px 22px;background:${headerBg};">
               ${
                 logoUrl
-                  ? `<img src="${logoUrl}" alt="${helpers.escapeHtml(siteName)}" height="42" style="display:block;height:42px;width:auto;max-width:240px;border:0;outline:none;text-decoration:none;">`
+                  ? `<img src="${logoUrl}" alt="${helpers.escapeHtml(siteName)}" width="${logoWidth}" style="display:block;width:${logoWidth}px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;">`
                   : `<span style="font-size:21px;font-weight:800;color:#101223;letter-spacing:-.3px;">${helpers.escapeHtml(siteName)}</span>`
               }
             </td>
@@ -189,7 +271,7 @@ function wrapLayout({ title, body, ctaText, ctaUrl, footerNote, preheader }) {
                 <tr>
                   <td style="padding-top:16px;border-top:1px solid #e7e9f2;font-size:12px;line-height:1.7;color:#9aa0b6;">
                     <a href="${siteUrl}" style="color:${primaryDark};text-decoration:none;font-weight:600;">${helpers.escapeHtml(String(siteUrl).replace(/^https?:\/\//, '').replace(/\/$/, ''))}</a><br>
-                    You are receiving this because you have an account or placed an order with us.
+                    ${footerLine}
                   </td>
                 </tr>
               </table>
@@ -259,11 +341,13 @@ async function verify() {
 }
 
 async function sendTest(to) {
+  const t = template('test', { site: settings.get('site_name') });
+
   return send({
     to,
-    subject: `${settings.get('site_name')} - SMTP test`,
+    subject: t.subject,
     html: wrapLayout({
-      title: 'Your SMTP settings work',
+      title: t.heading,
       body: '<p>This is a test message confirming that outgoing mail is configured correctly. Order confirmations, password resets and ticket replies will now be delivered.</p>',
       ctaText: 'Open the dashboard',
       ctaUrl: `${config.app.url}${helpers.url('/admin/dashboard')}`,
@@ -273,11 +357,14 @@ async function sendTest(to) {
 }
 
 async function sendWelcome(customer) {
+  const firstName = String(customer.name || '').split(' ')[0];
+  const t = template('welcome', { site: settings.get('site_name'), first_name: firstName });
+
   return send({
     to: customer.email,
-    subject: `Welcome to ${settings.get('site_name')}`,
+    subject: t.subject,
     html: wrapLayout({
-      title: `Welcome aboard, ${customer.name.split(' ')[0]}!`,
+      title: t.heading,
       body: `<p>Your account is ready. From your dashboard you can browse packages, place an order, upload payment proof and track delivery progress.</p>
              <p style="margin-top:14px;"><strong>Email:</strong> ${helpers.escapeHtml(customer.email)}</p>`,
       ctaText: 'Go to my dashboard',
@@ -290,11 +377,13 @@ async function sendWelcome(customer) {
 
 async function sendPasswordReset(customer, token) {
   const link = `${config.app.url}${helpers.url(`/reset-password/${token}`)}`;
+  const t = template('password_reset', { site: settings.get('site_name'), first_name: String(customer.name || '').split(' ')[0] });
+
   return send({
     to: customer.email,
-    subject: 'Reset your password',
+    subject: t.subject,
     html: wrapLayout({
-      title: 'Reset your password',
+      title: t.heading,
       body: `<p>Hi ${helpers.escapeHtml(customer.name)}, we received a request to reset the password on your account.</p>
              <p>This link is valid for one hour and can only be used once.</p>`,
       ctaText: 'Choose a new password',
@@ -307,11 +396,13 @@ async function sendPasswordReset(customer, token) {
 
 async function sendEmailVerification(customer, token) {
   const link = `${config.app.url}${helpers.url(`/verify-email/${token}`)}`;
+  const t = template('email_verification', { site: settings.get('site_name'), first_name: String(customer.name || '').split(' ')[0] });
+
   return send({
     to: customer.email,
-    subject: 'Confirm your email address',
+    subject: t.subject,
     html: wrapLayout({
-      title: 'Confirm your email address',
+      title: t.heading,
       body: `<p>Hi ${helpers.escapeHtml(customer.name)}, please confirm your email address to activate every feature of your account.</p>`,
       ctaText: 'Confirm my email',
       ctaUrl: link,
@@ -322,11 +413,19 @@ async function sendEmailVerification(customer, token) {
 }
 
 async function sendOrderConfirmation(customer, order) {
+  const t = template('order_confirmation', {
+    site: settings.get('site_name'),
+    first_name: String(customer.name || '').split(' ')[0],
+    order_number: order.order_number,
+    package: order.service_title,
+    total: helpers.money(order.total, settings.get('currency_symbol')),
+  });
+
   return send({
     to: customer.email,
-    subject: `Order received - ${order.order_number}`,
+    subject: t.subject,
     html: wrapLayout({
-      title: `Order ${order.order_number} received`,
+      title: t.heading,
       body: `<p>Thanks ${helpers.escapeHtml(customer.name.split(' ')[0])}, we have your order and the team is reviewing it.</p>
              <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin-top:18px;border-collapse:collapse;font-size:14px;">
                <tr><td style="padding:9px 0;border-bottom:1px solid #eceef6;color:#767c94;">Package</td><td style="padding:9px 0;border-bottom:1px solid #eceef6;text-align:right;font-weight:600;">${helpers.escapeHtml(order.service_title)}</td></tr>
@@ -353,12 +452,19 @@ async function sendOrderStatusUpdate(customer, order, note) {
   };
   const label = statusLabels[order.status] || helpers.humanise(order.status);
   const isLive = order.status === 'active';
+  const t = template('order_status', {
+    site: settings.get('site_name'),
+    first_name: String(customer.name || '').split(' ')[0],
+    order_number: order.order_number,
+    status: label,
+    package: order.service_title,
+  });
 
   return send({
     to: customer.email,
-    subject: `Order ${order.order_number} is now ${label.toLowerCase()}`,
+    subject: t.subject,
     html: wrapLayout({
-      title: `Your order is now ${label}`,
+      title: t.heading,
       body: `<p>Hi ${helpers.escapeHtml(customer.name.split(' ')[0])}, the status of <strong>${helpers.escapeHtml(order.order_number)}</strong> (${helpers.escapeHtml(order.service_title)}) has changed.</p>
              ${note ? `<p style="margin-top:14px;padding:13px 16px;background:#f7f8fc;border-left:3px solid ${settings.get('theme_primary')};border-radius:0 8px 8px 0;">${helpers.escapeHtml(note)}</p>` : ''}
              ${isLive ? '<p style="margin-top:14px;">Your website is live and your access details are waiting in your dashboard.</p>' : ''}`,
@@ -370,11 +476,18 @@ async function sendOrderStatusUpdate(customer, order, note) {
 }
 
 async function sendPaymentReceived(customer, payment) {
+  const t = template('payment_received', {
+    site: settings.get('site_name'),
+    first_name: String(customer.name || '').split(' ')[0],
+    amount: helpers.money(payment.amount, settings.get('currency_symbol')),
+    order_number: payment.order_number || '',
+  });
+
   return send({
     to: customer.email,
-    subject: `Payment received - ${helpers.money(payment.amount, settings.get('currency_symbol'))}`,
+    subject: t.subject,
     html: wrapLayout({
-      title: 'Payment confirmed',
+      title: t.heading,
       body: `<p>Hi ${helpers.escapeHtml(customer.name.split(' ')[0])}, we have verified your payment of <strong>${helpers.money(payment.amount, settings.get('currency_symbol'))}</strong> via ${helpers.escapeHtml(payment.method)}.</p>
              <p>${payment.order_id ? 'Your order is moving forward.' : 'Thank you for your business.'}</p>`,
       ctaText: 'View my orders',
@@ -385,11 +498,17 @@ async function sendPaymentReceived(customer, payment) {
 }
 
 async function sendPaymentRejected(customer, payment, reason) {
+  const t = template('payment_rejected', {
+    site: settings.get('site_name'),
+    first_name: String(customer.name || '').split(' ')[0],
+    order_number: payment.order_number || '',
+  });
+
   return send({
     to: customer.email,
-    subject: 'We could not verify your payment',
+    subject: t.subject,
     html: wrapLayout({
-      title: 'Payment needs another look',
+      title: t.heading,
       body: `<p>Hi ${helpers.escapeHtml(customer.name.split(' ')[0])}, we were unable to verify the payment you submitted${payment.transaction_id ? ` (transaction ${helpers.escapeHtml(payment.transaction_id)})` : ''}.</p>
              ${reason ? `<p style="margin-top:14px;padding:13px 16px;background:#fff5f5;border-left:3px solid #e02b2b;border-radius:0 8px 8px 0;">${helpers.escapeHtml(reason)}</p>` : ''}
              <p style="margin-top:14px;">Please double-check the transaction ID and amount, then submit it again. If you believe this is a mistake, contact us on WhatsApp and we will sort it out.</p>`,
@@ -401,11 +520,18 @@ async function sendPaymentRejected(customer, payment, reason) {
 }
 
 async function sendTicketReply(customer, ticket, reply) {
+  const t = template('ticket_reply', {
+    site: settings.get('site_name'),
+    first_name: String(customer.name || '').split(' ')[0],
+    ticket_subject: ticket.subject,
+    ticket_number: ticket.ticket_number,
+  });
+
   return send({
     to: customer.email,
-    subject: `Re: ${ticket.subject} [${ticket.ticket_number}]`,
+    subject: t.subject,
     html: wrapLayout({
-      title: 'New reply on your ticket',
+      title: t.heading,
       body: `<p>Hi ${helpers.escapeHtml(customer.name.split(' ')[0])}, our team replied to <strong>${helpers.escapeHtml(ticket.subject)}</strong>.</p>
              <div style="margin-top:16px;padding:15px 17px;background:#f7f8fc;border-radius:10px;font-size:14.5px;">${helpers.escapeHtml(reply.message).replace(/\n/g, '<br>')}</div>`,
       ctaText: 'Open the ticket',
@@ -416,11 +542,13 @@ async function sendTicketReply(customer, ticket, reply) {
 }
 
 async function sendContactAcknowledgement(entry) {
+  const t = template('contact_ack', { site: settings.get('site_name'), name: entry.name });
+
   return send({
     to: entry.email,
-    subject: 'We received your message',
+    subject: t.subject,
     html: wrapLayout({
-      title: 'Thanks for getting in touch',
+      title: t.heading,
       body: `<p>Hi ${helpers.escapeHtml(entry.name)}, your message reached us and a member of the team will reply within one business day.</p>
              <p style="margin-top:14px;color:#767c94;font-size:14px;"><strong>Your message:</strong><br>${helpers.escapeHtml(entry.message).replace(/\n/g, '<br>')}</p>`,
       ctaText: 'Browse our packages',
@@ -439,12 +567,19 @@ async function sendContactNotification(entry) {
   // mail - the two are not always the same inbox.
   const to = settings.get('notify_admin_email') || settings.get('contact_email');
   if (!to) return { ok: false, skipped: true };
+
+  const t = template('contact_notify', {
+    site: settings.get('site_name'),
+    name: entry.name,
+    email: entry.email,
+  });
+
   return send({
     to,
-    subject: `New enquiry from ${entry.name}`,
+    subject: t.subject,
     replyTo: entry.email,
     html: wrapLayout({
-      title: 'New website enquiry',
+      title: t.heading,
       body: `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:14px;">
                <tr><td style="padding:8px 0;border-bottom:1px solid #eceef6;color:#767c94;width:110px;">Name</td><td style="padding:8px 0;border-bottom:1px solid #eceef6;">${helpers.escapeHtml(entry.name)}</td></tr>
                <tr><td style="padding:8px 0;border-bottom:1px solid #eceef6;color:#767c94;">Email</td><td style="padding:8px 0;border-bottom:1px solid #eceef6;">${helpers.escapeHtml(entry.email)}</td></tr>
@@ -525,12 +660,19 @@ async function sendAdminNewOrder(order, customer) {
       .join('')}
   </table>`;
 
+  const t = template('admin_new_order', {
+    site: settings.get('site_name'),
+    order_number: order.order_number,
+    package: order.service_title,
+    total: helpers.money(order.total, settings.get('currency_symbol')),
+  });
+
   return send({
     to: [...recipients].join(', '),
-    subject: `New order ${order.order_number} — ${order.service_title}`,
+    subject: t.subject,
     replyTo: customer.email,
     html: wrapLayout({
-      title: 'A new order just came in',
+      title: t.heading,
       preheader: `${order.order_number} from ${customer.name} — ${helpers.money(order.total, settings.get('currency_symbol'))}`,
       body: `<p style="margin:0 0 18px;">A new order has been placed and is waiting for review.</p>${detailTable}`,
       ctaText: 'Open the order',
@@ -546,6 +688,10 @@ module.exports = {
   verify,
   resetTransport,
   wrapLayout,
+  // Exported so the settings panel can resolve the logo the same way the
+  // emails do. Two implementations would drift, and the panel would then
+  // preview an image that never arrives.
+  isUsableLogo,
   sendTest,
   sendWelcome,
   sendPasswordReset,

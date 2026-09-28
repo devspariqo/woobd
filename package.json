@@ -16,6 +16,7 @@
     "setup:docker": "node scripts/setup.js --docker",
     "smoke": "node scripts/smoke.js",
     "scan:secrets": "node scripts/scan-secrets.js",
+    "check:captcha": "node scripts/check-captcha.js",
     "scrub:install": "node scripts/scrub-install-sql.js",
     "build:sql": "node scripts/build-install-sql.js",
     "preview": "node scripts/preview-settings.js",

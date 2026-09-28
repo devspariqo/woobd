@@ -1,0 +1,111 @@
+<%
+  /**
+   * Live chat conversations.
+   *
+   * The widget has always been a stateless API endpoint, so this is the first
+   * place anyone can see what visitors actually asked. It is read-mostly: a
+   * transcript is the record of what a customer was told, and editing it would
+   * destroy the only evidence if they later dispute the answer.
+   */
+  const url = function (p) { return helpers.url('/' + adminPath + '/chat' + p); };
+  const tabs = [
+    ['', 'All', stats.total],
+    ['open', 'Open', stats.open],
+    ['closed', 'Closed', stats.closed],
+  ];
+
+  const label = function (c) {
+    return c.visitor_name || c.customer_name || 'Guest visitor';
+  };
+  const email = function (c) {
+    return c.visitor_email || c.customer_email || '';
+  };
+%>
+
+<div class="chat-stats">
+  <% [['Conversations', stats.total], ['Still open', stats.open], ['Messages', stats.messages]].forEach(function (pair) { %>
+    <div class="chat-stat">
+      <span class="chat-stat-value"><%= pair[1] %></span>
+      <span class="chat-stat-label"><%= pair[0] %></span>
+    </div>
+  <% }); %>
+</div>
+
+<div class="tab-bar" style="margin-bottom:20px">
+  <% tabs.forEach(function (tab) { %>
+    <a href="<%= url(tab[0] ? '?status=' + tab[0] : '') %>"
+       class="<%= (activeStatus || '') === tab[0] ? 'active' : '' %>">
+      <%= tab[1] %><% if (tab[2]) { %> <span class="tab-count"><%= tab[2] %></span><% } %>
+    </a>
+  <% }); %>
+</div>
+
+<%#
+  An empty list has three possible causes and they need different fixes, so the
+  page says which one applies rather than leaving the operator staring at a
+  blank panel wondering whether the widget is even installed.
+%>
+<% if (!conversations || !conversations.length) { %>
+  <div class="panel">
+    <div class="panel-body">
+      <div class="empty-state">
+        <svg><use href="#i-chat"/></svg>
+        <h3>
+          <% if (!chatEnabled) { %>
+            The chat widget is switched off
+          <% } else if (!chatConfigured) { %>
+            The chat widget has no API key
+          <% } else { %>
+            No conversations yet
+          <% } %>
+        </h3>
+        <p>
+          <% if (!chatEnabled) { %>
+            Visitors cannot see the chat button at all. Turn it on under
+            <a href="<%= helpers.url('/' + adminPath + '/settings?group=chat') %>">Settings → Live chat</a>.
+          <% } else if (!chatConfigured) { %>
+            The widget is switched on but has no key to answer with, so it cannot reply.
+            Add one under
+            <a href="<%= helpers.url('/' + adminPath + '/settings?group=chat') %>">Settings → Live chat</a>.
+          <% } else { %>
+            The widget is live and ready. Conversations will appear here the moment a
+            visitor sends the first message — open the website and try it.
+          <% } %>
+        </p>
+      </div>
+    </div>
+  </div>
+<% } else { %>
+  <div class="panel">
+    <div class="panel-body" style="padding:0">
+      <% conversations.forEach(function (c) { %>
+        <a href="<%= url('/' + c.id) %>" class="chat-row">
+          <span class="chat-avatar" aria-hidden="true">
+            <%= helpers.initials(label(c)) %>
+          </span>
+
+          <span class="chat-row-main">
+            <span class="chat-row-top">
+              <strong><%= label(c) %></strong>
+              <span class="pill pill-<%= c.status === 'open' ? 'success' : 'muted' %>">
+                <%= helpers.humanise(c.status) %>
+              </span>
+              <% if (!c.customer_id) { %><span class="pill pill-info">Not signed in</span><% } %>
+              <time datetime="<%= new Date(c.updated_at).toISOString() %>" class="chat-row-time">
+                <%= helpers.timeAgo(c.updated_at) %>
+              </time>
+            </span>
+
+            <span class="chat-row-meta">
+              <%= c.message_count %> message<%= Number(c.message_count) === 1 ? '' : 's' %>
+              <% if (email(c)) { %> · <%= email(c) %><% } %>
+              <% if (c.page_url) { %> · started on <code><%= c.page_url %></code><% } %>
+            </span>
+          </span>
+
+          <svg class="chat-row-arrow"><use href="#i-arrow-right"/></svg>
+        </a>
+      <% }); %>
+    </div>
+  </div>
+<% } %>

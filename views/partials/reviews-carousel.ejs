@@ -1,0 +1,88 @@
+<%#
+  Client reviews carousel.
+
+  Expects:
+    testimonials - the list of reviews to show
+    eyebrow      - small label above the heading
+    heading      - section heading
+    lead         - optional supporting line
+    trackId      - unique id for the scroll region. Two carousels on one page
+                   would otherwise share an id, and the arrows' aria-controls
+                   would point at whichever came first.
+
+  Shared rather than duplicated. The homepage and the about page had drifted
+  into two different review components - a carousel on one, a static grid on the
+  other - so the same reviews looked like different content depending on where
+  you were. One partial cannot drift from itself.
+
+  The track is a native horizontal scroller with scroll-snap, so it works by
+  swiping on touch and with a trackpad even if the script never runs. The arrows
+  and dots are an enhancement on top of that, and only render when there is more
+  than one card to move through.
+%>
+<%
+  var reviews = typeof testimonials !== 'undefined' && testimonials ? testimonials : [];
+  var regionId = typeof trackId !== 'undefined' && trackId ? trackId : 'reviews-track';
+%>
+
+<% if (reviews.length) { %>
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-head" data-reveal>
+      <span class="eyebrow"><%= eyebrow %></span>
+      <h2><%= heading %></h2>
+      <% if (typeof lead !== 'undefined' && lead) { %>
+        <p><%= lead %></p>
+      <% } %>
+    </div>
+
+    <div class="reviews-carousel" data-carousel>
+      <% if (reviews.length > 1) { %>
+        <button type="button" class="carousel-arrow carousel-arrow-prev" data-carousel-prev
+                aria-label="Previous reviews" aria-controls="<%= regionId %>">
+          <svg><use href="#i-chevron-left"/></svg>
+        </button>
+      <% } %>
+
+      <div class="carousel-track" id="<%= regionId %>" data-carousel-track
+           tabindex="0" role="region" aria-label="Client reviews">
+        <% reviews.forEach(function (review) { %>
+          <figure class="review-card" data-carousel-item>
+            <div class="review-stars" aria-label="<%= review.rating %> out of 5">
+              <% for (var i = 1; i <= 5; i += 1) { %>
+                <svg class="<%= i <= review.rating ? '' : 'empty' %>"><use href="#i-star"/></svg>
+              <% } %>
+            </div>
+            <blockquote class="review-text"><%= review.message %></blockquote>
+            <figcaption class="review-author">
+              <% if (review.avatar) { %>
+                <img src="<%= helpers.url(review.avatar) %>" alt="<%= review.customer_name %>"
+                     class="review-avatar" loading="lazy" width="46" height="46">
+              <% } else { %>
+                <span class="review-avatar-fallback"><%= helpers.initials(review.customer_name) %></span>
+              <% } %>
+              <span>
+                <span class="review-name"><%= review.customer_name %></span>
+                <span class="review-role">
+                  <%= review.designation %><%= review.designation && review.company ? ', ' : '' %><%= review.company %>
+                </span>
+              </span>
+            </figcaption>
+          </figure>
+        <% }); %>
+      </div>
+
+      <% if (reviews.length > 1) { %>
+        <button type="button" class="carousel-arrow carousel-arrow-next" data-carousel-next
+                aria-label="Next reviews" aria-controls="<%= regionId %>">
+          <svg><use href="#i-chevron-right"/></svg>
+        </button>
+      <% } %>
+    </div>
+
+    <% if (reviews.length > 1) { %>
+      <div class="carousel-dots" data-carousel-dots role="tablist" aria-label="Choose a review"></div>
+    <% } %>
+  </div>
+</section>
+<% } %>

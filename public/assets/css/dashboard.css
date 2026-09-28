@@ -1508,3 +1508,163 @@
   border-color: var(--border);
   color: var(--text-soft);
 }
+
+/* --------------------------------------------------------------------------
+   Live chat
+
+   The widget is a stateless API endpoint, so this is the only place a
+   transcript is ever read. Bubbles are aligned by speaker - visitor left,
+   assistant right - because a wall of uniform text makes it impossible to see
+   who said what when skimming.
+   -------------------------------------------------------------------------- */
+
+.chat-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.chat-stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.chat-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--text);
+}
+
+.chat-stat-label {
+  font-size: .8125rem;
+  color: var(--text-soft);
+}
+
+.chat-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 18px;
+  border-bottom: 1px solid var(--border);
+  color: inherit;
+  text-decoration: none;
+  transition: background .15s ease;
+}
+
+.chat-row:last-child { border-bottom: 0; }
+.chat-row:hover { background: var(--surface-2); }
+
+.chat-avatar {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 102, 0, .12);
+  color: var(--secondary);
+  font-weight: 700;
+  font-size: .875rem;
+}
+
+.chat-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+
+.chat-row-top {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.chat-row-top strong { font-size: .9375rem; }
+
+.chat-row-time {
+  margin-left: auto;
+  font-size: .75rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+.chat-row-meta {
+  font-size: .8125rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-row-meta code { font-size: .75rem; }
+
+.chat-row-arrow { flex: 0 0 auto; width: 16px; height: 16px; color: var(--text-muted); }
+
+/* The transcript sits beside the visitor panel on a wide screen and stacks
+   under it on a narrow one - the transcript is the point, so it gets the room. */
+.chat-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .chat-detail { grid-template-columns: minmax(0, 1fr); }
+}
+
+.chat-detail-side { display: flex; flex-direction: column; gap: 20px; }
+
+.chat-thread { display: flex; flex-direction: column; gap: 14px; }
+
+.chat-bubble {
+  max-width: 78%;
+  border-radius: 14px;
+  padding: 11px 15px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.chat-bubble-head {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin-bottom: 5px;
+}
+
+.chat-bubble-head strong { font-size: .8125rem; }
+
+.chat-bubble-head time { font-size: .6875rem; color: var(--text-soft); }
+
+.chat-bubble-body {
+  font-size: .9375rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+}
+
+/* The visitor's own words, on the left. */
+.chat-bubble-visitor { align-self: flex-start; }
+
+/* The assistant's reply, on the right and tinted, so the two are separable at
+   a glance without reading either. */
+.chat-bubble-assistant {
+  align-self: flex-end;
+  background: rgba(255, 102, 0, .08);
+  border-color: rgba(255, 102, 0, .22);
+}
+
+.chat-bubble-system {
+  align-self: center;
+  max-width: 90%;
+  background: transparent;
+  border-style: dashed;
+  text-align: center;
+}
+
+.chat-bubble-system .chat-bubble-body { font-size: .8125rem; color: var(--text-soft); }

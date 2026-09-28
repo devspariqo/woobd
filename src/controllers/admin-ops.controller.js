@@ -13,6 +13,7 @@ const orderModel = require('../models/order.model');
 const userModel = require('../models/user.model');
 const activity = require('../services/activity.service');
 const mail = require('../services/mail.service');
+const chatService = require('../services/chat.service');
 const adminCtrl = require('./admin.controller');
 const { clean } = require('../utils/validators');
 const { fromQuery } = require('../utils/paginator');
@@ -498,6 +499,137 @@ exports.activity = async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+};
+
+// ===========================================================================
+// Live chat
+//
+// The widget is a stateless API endpoint, so nothing in the panel has ever
+// shown what visitors actually asked. These four actions are read-mostly on
+// purpose: a transcript is a record of what a customer was told, and editing it
+// would destroy the only evidence if they later dispute the answer.
+// ===========================================================================
+
+exports.chatConversations = async (req, res, next) => {
+  try {
+    const status = clean.str(req.query.status, 20);
+    const filter = status === 'open' || status === 'closed' ? status : null;
+
+    const [conversations, stats] = await Promise.all([
+      chatService.listConversations({ limit: 200, status: filter }),
+      chatService.counts(),
+    ]);
+
+    await chrome(res, 'chat');
+
+    res.render('admin/chat', {
+      layout: 'layouts/admin',
+      pageTitle: 'Live chat',
+      pageSubtitle: 'Every conversation the website assistant has had with a visitor.',
+      conversations,
+      stats,
+      activeStatus: status,
+      // Surfaced so the empty state can explain WHY there is nothing here: no
+      // key, or the widget switched off, are different problems with different
+      // fixes, and an empty list on its own says neither.
+      chatConfigured: chatService.isConfigured(),
+      chatEnabled: chatService.isEnabled(),
+      seo: { ...res.locals.seo, title: 'Live chat', robots: 'noindex,nofollow' },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.chatConversation = async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const detail = await chatService.getConversation(id);
+
+    if (!detail) {
+      req.session.flashError = 'Conversation not found.';
+      return res.redirect(res.locals.helpers.url(`${res.locals.adminPath}/chat`));
+    }
+
+    await chrome(res, 'chat');
+
+    res.render('admin/chat-conversation', {
+      layout: 'layouts/admin',
+      pageTitle: `Conversation #${detail.conversation.id}`,
+      pageSubtitle: detail.conversation.page_url || 'Started from the website widget.',
+      conversation: detail.conversation,
+      messages: detail.messages,
+      seo: { ...res.locals.seo, title: `Conversation #${id}`, robots: 'noindex,nofollow' },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.updateChatConversation = async (req, res, next) => {
+  const id = Number(req.params.id);
+
+  try {
+    const detail = await chatService.getConversation(id);
+    if (!detail) {
+      req.session.flashError = 'Conversation not found.';
+      return res.redirect(res.locals.helpers.url(`${res.locals.adminPath}/chat`));
+    }
+
+    const status = await chatService.setStatus(id, clean.str(req.body.status, 20));
+
+    await activity.log({
+      req,
+      actorType: 'staff',
+      actorId: req.session.staff.id,
+      actorName: req.session.staff.name,
+      action: 'chat.status',
+      entityType: 'chat_conversation',
+      entityId: id,
+      description: `Conversation #${id} marked ${status}.`,
+    });
+
+    req.session.flashSuccess = status === 'closed'
+      ? `Conversation #${id} closed.`
+      : `Conversation #${id} reopened.`;
+  } catch (err) {
+    req.session.flashError = 'That conversation could not be updated.';
+    logger.error('Could not update a chat conversation', err);
+  }
+
+  return res.redirect(res.locals.helpers.url(`${res.locals.adminPath}/chat/${id}`));
+};
+
+exports.deleteChatConversation = async (req, res, next) => {
+  const id = Number(req.params.id);
+
+  try {
+    const detail = await chatService.getConversation(id);
+    if (!detail) {
+      req.session.flashError = 'Conversation not found.';
+      return res.redirect(res.locals.helpers.url(`${res.locals.adminPath}/chat`));
+    }
+
+    await chatService.deleteConversation(id);
+
+    await activity.log({
+      req,
+      actorType: 'staff',
+      actorId: req.session.staff.id,
+      actorName: req.session.staff.name,
+      action: 'chat.deleted',
+      entityType: 'chat_conversation',
+      entityId: id,
+      description: `Conversation #${id} deleted (${detail.messages.length} message(s)).`,
+    });
+
+    req.session.flashSuccess = `Conversation #${id} deleted.`;
+  } catch (err) {
+    req.session.flashError = 'That conversation could not be deleted.';
+    logger.error('Could not delete a chat conversation', err);
+  }
+
+  return res.redirect(res.locals.helpers.url(`${res.locals.adminPath}/chat`));
 };
 
 module.exports = exports;

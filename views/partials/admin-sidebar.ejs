@@ -71,6 +71,9 @@
     <a href="<%= link('/contacts') %>" class="dash-nav-link<%= isActive('contacts') %>">
       <svg><use href="#i-inbox"/></svg><span>Messages</span><%- badge('contacts') %>
     </a>
+    <a href="<%= link('/chat') %>" class="dash-nav-link<%= isActive('chat') %>">
+      <svg><use href="#i-chat"/></svg><span>Live chat</span><%- badge('chat') %>
+    </a>
 
     <span class="dash-nav-label">Content</span>
     <a href="<%= link('/packages') %>" class="dash-nav-link<%= isActive('packages') %>">

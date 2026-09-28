@@ -124,6 +124,13 @@ router.post('/tickets/:id(\\d+)', ops.updateTicket);
 router.get('/contacts', ops.contacts);
 router.post('/contacts/:id(\\d+)', ops.updateContact);
 
+// Live chat. Deleting is admin-only: a transcript is the record of what a
+// customer was told, and destroying it is not a day-to-day action.
+router.get('/chat', ops.chatConversations);
+router.get('/chat/:id(\\d+)', ops.chatConversation);
+router.post('/chat/:id(\\d+)', ops.updateChatConversation);
+router.post('/chat/:id(\\d+)/delete', auth.requireRole('admin'), ops.deleteChatConversation);
+
 router.get('/activity', ops.activity);
 
 // ---------------------------------------------------------------------------

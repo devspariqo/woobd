@@ -297,70 +297,13 @@
 </section>
 
 <%# ---------------------------------------------------- REVIEWS %>
-<% if (testimonials.length) { %>
-<section class="section section-alt">
-  <div class="container">
-    <div class="section-head" data-reveal>
-      <span class="eyebrow">Client Reviews</span>
-      <h2>What our clients say</h2>
-      <p>We measure success by what our clients sell, not by how the site looks in a design tool.</p>
-    </div>
-
-    <%#
-      Carousel. The track is a native horizontal scroller with scroll-snap, so
-      it works by swiping on touch and with a trackpad on desktop even if the
-      script never runs. The arrows are an enhancement on top of that.
-      Arrows are only rendered when there is more than one card to move through.
-    %>
-    <div class="reviews-carousel" data-carousel>
-      <% if (testimonials.length > 1) { %>
-        <button type="button" class="carousel-arrow carousel-arrow-prev" data-carousel-prev
-                aria-label="Previous reviews" aria-controls="reviews-track">
-          <svg><use href="#i-chevron-left"/></svg>
-        </button>
-      <% } %>
-
-      <div class="carousel-track" id="reviews-track" data-carousel-track
-           tabindex="0" role="region" aria-label="Client reviews">
-        <% testimonials.forEach(function (review) { %>
-          <figure class="review-card" data-carousel-item>
-            <div class="review-stars" aria-label="<%= review.rating %> out of 5">
-              <% for (var i = 1; i <= 5; i += 1) { %>
-                <svg class="<%= i <= review.rating ? '' : 'empty' %>"><use href="#i-star"/></svg>
-              <% } %>
-            </div>
-            <blockquote class="review-text"><%= review.message %></blockquote>
-            <figcaption class="review-author">
-              <% if (review.avatar) { %>
-                <img src="<%= helpers.url(review.avatar) %>" alt="<%= review.customer_name %>" class="review-avatar" loading="lazy" width="46" height="46">
-              <% } else { %>
-                <span class="review-avatar-fallback"><%= helpers.initials(review.customer_name) %></span>
-              <% } %>
-              <span>
-                <span class="review-name"><%= review.customer_name %></span>
-                <span class="review-role">
-                  <%= review.designation %><%= review.designation && review.company ? ', ' : '' %><%= review.company %>
-                </span>
-              </span>
-            </figcaption>
-          </figure>
-        <% }); %>
-      </div>
-
-      <% if (testimonials.length > 1) { %>
-        <button type="button" class="carousel-arrow carousel-arrow-next" data-carousel-next
-                aria-label="Next reviews" aria-controls="reviews-track">
-          <svg><use href="#i-chevron-right"/></svg>
-        </button>
-      <% } %>
-    </div>
-
-    <% if (testimonials.length > 1) { %>
-      <div class="carousel-dots" data-carousel-dots role="tablist" aria-label="Choose a review"></div>
-    <% } %>
-  </div>
-</section>
-<% } %>
+<%- include('../partials/reviews-carousel', {
+  testimonials: testimonials,
+  eyebrow: 'Client Reviews',
+  heading: 'What our clients say',
+  lead: 'We measure success by what our clients sell, not by how the site looks in a design tool.',
+  trackId: 'reviews-track',
+}) %>
 
 <%# ---------------------------------------------------- FAQ + schema %>
 <% if (faqs.length) { %>

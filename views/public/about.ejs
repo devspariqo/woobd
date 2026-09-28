@@ -79,29 +79,29 @@
   </div>
 </section>
 
+<%
+  /**
+   * What the client gets.
+   *
+   * Each line carries its own icon rather than a repeated tick. A column of
+   * identical ticks reads as a wall of text - the icon is what lets someone
+   * skim for the one that matters to them, which is the whole reason this list
+   * exists next to a heading that promises six things.
+   */
+  const whyItems = [
+    { icon: 'zap', title: 'Speed built in', text: 'Page-speed optimisation is part of every build, not a separate line item.' },
+    { icon: 'search', title: 'SEO from day one', text: 'On-page SEO, schema markup and a sitemap configured before launch.' },
+    { icon: 'smartphone', title: 'Mobile-first', text: 'Designed and tested on real phones over real Bangladeshi networks.' },
+    { icon: 'credit-card', title: 'Local payments', text: 'bKash, Nagad, Rocket and cards wired up the way your customers already pay.' },
+    { icon: 'settings', title: 'A panel you can run', text: 'Manage packages, orders and content without training or a developer.' },
+    { icon: 'message-square', title: 'A named contact', text: 'One person in Rangpur who answers your messages and knows your project.' },
+  ];
+%>
+
 <section class="section">
   <div class="container">
     <div class="split">
-      <div data-reveal>
-        <span class="eyebrow">Why Us</span>
-        <h2 class="mb-4">What you get that most agencies charge extra for</h2>
-        <ul class="check-list">
-          <% [
-            'Page-speed optimisation built in — not a separate line item',
-            'On-page SEO, schema markup and sitemaps configured before launch',
-            'Mobile-first design tested on real devices and real networks',
-            'Payment integration for the methods your customers already use',
-            'An admin panel you can operate without training',
-            'A named contact in Rangpur who answers your messages'
-          ].forEach(function (item) { %>
-            <li>
-              <span class="tick"><svg><use href="#i-check"/></svg></span>
-              <span><%= item %></span>
-            </li>
-          <% }); %>
-        </ul>
-      </div>
-
+      <%# Details first, so the icon list lands on the right. %>
       <div data-reveal>
         <div class="card card-flat">
           <div class="card-body-lg">
@@ -144,42 +144,33 @@
           </div>
         </div>
       </div>
+
+      <div data-reveal>
+        <span class="eyebrow">Why Us</span>
+        <h2 class="mb-4">What you get that most agencies charge extra for</h2>
+
+        <ul class="why-list">
+          <% whyItems.forEach(function (item) { %>
+            <li class="why-item">
+              <span class="why-icon"><svg><use href="#i-<%= item.icon %>"/></svg></span>
+              <span class="why-text">
+                <strong><%= item.title %></strong>
+                <span><%= item.text %></span>
+              </span>
+            </li>
+          <% }); %>
+        </ul>
+      </div>
     </div>
   </div>
 </section>
 
-<% if (testimonials.length) { %>
-<section class="section section-alt">
-  <div class="container">
-    <div class="section-head" data-reveal>
-      <span class="eyebrow">Client Reviews</span>
-      <h2>Trusted by brands across Bangladesh</h2>
-    </div>
-    <div class="grid grid-3">
-      <% testimonials.slice(0, 6).forEach(function (review) { %>
-        <div class="review-card" data-reveal>
-          <div class="review-stars">
-            <% for (var i = 1; i <= 5; i += 1) { %>
-              <svg class="<%= i <= review.rating ? '' : 'empty' %>"><use href="#i-star"/></svg>
-            <% } %>
-          </div>
-          <p class="review-text">"<%= review.message %>"</p>
-          <div class="review-author">
-            <% if (review.avatar) { %>
-              <img src="<%= helpers.url(review.avatar) %>" alt="<%= review.customer_name %>" class="review-avatar" loading="lazy" width="46" height="46">
-            <% } else { %>
-              <span class="review-avatar-fallback"><%= helpers.initials(review.customer_name) %></span>
-            <% } %>
-            <span>
-              <span class="review-name"><%= review.customer_name %></span>
-              <span class="review-role"><%= review.designation %></span>
-            </span>
-          </div>
-        </div>
-      <% }); %>
-    </div>
-  </div>
-</section>
-<% } %>
+<%- include('../partials/reviews-carousel', {
+  testimonials: testimonials,
+  eyebrow: 'Client Reviews',
+  heading: 'Trusted by brands across Bangladesh',
+  lead: 'The same reviews you will find on our homepage, in full.',
+  trackId: 'about-reviews-track',
+}) %>
 
 <%- include('../partials/cta-band') %>

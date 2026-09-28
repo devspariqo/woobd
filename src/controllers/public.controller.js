@@ -1062,8 +1062,7 @@ exports.staticPage = (slug) => async (req, res, next) => {
     // Ship the mandatory pages even on a fresh install where the admin has not
     // filled them in yet. Better a sensible placeholder than a 404 on a link
     // the header, footer or brief advertises.
-    if (!page) {
-      const fallbacks = {
+    const fallbacks = {
         'privacy-policy': {
           title: 'Privacy Policy',
           slug: 'privacy-policy',
@@ -1094,10 +1093,27 @@ exports.staticPage = (slug) => async (req, res, next) => {
           title: 'Live Chat Support',
           slug: 'live-chat',
           meta_description: `Chat with the ${res.locals.site.name} team about your project, pricing or support.`,
-          content: defaultLiveChat(res.locals),        },
-      };
-      page = fallbacks[wanted];
-      if (page) page.updated_at = new Date();
+          content: defaultLiveChat(res.locals),
+        },
+    };
+
+    // A stored page with no body is not a page - it is an empty shell that
+    // shadows the built-in default, because the row exists so the fallback
+    // never runs. That is exactly how the Terms page came to render a heading
+    // with nothing underneath it.
+    //
+    // Anything the operator DID fill in is kept - title, meta description,
+    // canonical - and only the missing body comes from the default.
+    const stored = page;
+    const fallback = fallbacks[wanted];
+    const hasBody = stored && String(stored.content || '').trim();
+
+    if (fallback && !hasBody) {
+      const filled = Object.fromEntries(
+        Object.entries(stored || {}).filter(([, value]) => String(value === null || value === undefined ? '' : value).trim())
+      );
+
+      page = { ...fallback, ...filled, content: fallback.content, updated_at: (stored && stored.updated_at) || new Date() };
     }
 
     if (!page) {

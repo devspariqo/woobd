@@ -571,6 +571,10 @@ async function checkPublicContent() {
     const original = {
       site: settingsSvc.get('captcha_site_key', ''),
       secret: settingsSvc.get('captcha_secret_key', ''),
+      // The toggle too. A key pair on its own renders nothing - the form asks
+      // for both the keys and its own switch - and the suite turns the switches
+      // off for the run, so this check has to turn one back on.
+      onLogin: settingsSvc.getBool('captcha_on_login') ? '1' : '0',
     };
 
     /** Re-read a public page with the current settings. */
@@ -584,7 +588,7 @@ async function checkPublicContent() {
 
     try {
       // 1. Unconfigured - nothing should render.
-      await settingsSvc.saveMany({ captcha_site_key: '', captcha_secret_key: '' });
+      await settingsSvc.saveMany({ captcha_site_key: '', captcha_secret_key: '', captcha_on_login: '1' });
       const off = await signinMarkup();
       if (!off.widget && !off.loader) {
         ok('unconfigured CAPTCHA renders nothing', 'no empty widget, no external script');
@@ -599,6 +603,7 @@ async function checkPublicContent() {
       await settingsSvc.saveMany({
         captcha_site_key: '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI',
         captcha_secret_key: '6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe',
+        captcha_on_login: '1',
       });
       const on = await signinMarkup();
       if (on.widget && on.loader) {
@@ -612,7 +617,11 @@ async function checkPublicContent() {
         bad('configured CAPTCHA renders widget and loader', `widget=${on.widget} loader=${on.loader}`);
       }
     } finally {
-      await settingsSvc.saveMany({ captcha_site_key: original.site, captcha_secret_key: original.secret });
+      await settingsSvc.saveMany({
+        captcha_site_key: original.site,
+        captcha_secret_key: original.secret,
+        captcha_on_login: original.onLogin,
+      });
       settingsSvc.invalidate();
       await settingsSvc.loadAll(true);
     }
@@ -912,9 +921,18 @@ async function checkAssets() {
     }
 
     // A CDN would show up as an <script src> pointing off-domain.
-    const scripts = [...home.body.matchAll(/<script[^>]+src="(https?:\/\/[^"]+)"/gi)].map((m) => m[1]);
+    //
+    // reCAPTCHA is the one permitted exception, and it is not a choice: the
+    // widget only exists as a Google-hosted script. It is allowed by name
+    // rather than by "any Google URL", so a stray analytics tag would still be
+    // caught here.
+    const ALLOWED_EXTERNAL_SCRIPTS = /^https:\/\/www\.(google\.com\/recaptcha|gstatic\.com\/recaptcha)\//;
+    const scripts = [...home.body.matchAll(/<script[^>]+src="(https?:\/\/[^"]+)"/gi)]
+      .map((m) => m[1])
+      .filter((src) => !ALLOWED_EXTERNAL_SCRIPTS.test(src));
+
     if (!scripts.length) {
-      ok('all <script> tags are local', 'no external JS');
+      ok('all <script> tags are local', 'reCAPTCHA excepted - it only ships as a Google-hosted script');
     } else {
       bad('all <script> tags are local', scripts.slice(0, 3).join(', '));
     }
@@ -1043,17 +1061,57 @@ async function checkAdminSettings() {
     bad(`Security tab exposes all ${captchaKeys.length} CAPTCHA controls`, `missing: ${missingCaptcha.join(', ')}`);
   }
 
-  // The warning has to name the missing half rather than say "not configured".
-  if (securityTab.body.includes('conn-pill')) {
+  const settingsService = require('../src/services/settings.service');
+
+  // The panel's CAPTCHA guidance depends on two things: whether any switch is
+  // on, and whether the keys are saved. All four states are legitimate, and the
+  // checks below are written against the state the site is actually in rather
+  // than assuming a fresh install.
+  const captchaSwitches = ['captcha_on_login', 'captcha_on_signup', 'captcha_on_admin', 'captcha_on_contact'];
+  const anySwitchOn = captchaSwitches.some((key) => settingsService.getBool(key));
+  const keysConfigured = Boolean(
+    settingsService.get('captcha_site_key') && settingsService.get('captcha_secret_key')
+  );
+
+  if (!anySwitchOn) {
+    // Nothing switched on: nothing to warn about, and nothing to register. The
+    // panel should stay quiet instead of nagging about a feature that is off.
+    if (!securityTab.body.includes('conn-pill')) {
+      ok('the panel stays quiet with every CAPTCHA switch off');
+    } else {
+      bad('the panel stays quiet with every CAPTCHA switch off', 'a warning rendered with nothing switched on');
+    }
+  } else if (securityTab.body.includes('conn-pill')) {
     const sitePill = /Site key (saved|missing)/.test(securityTab.body);
     const secretPill = /Secret key (saved|missing)/.test(securityTab.body);
+
     if (sitePill && secretPill) {
       ok('the CAPTCHA warning names which key is missing', 'site key and secret key reported separately');
     } else {
       bad('the CAPTCHA warning names which key is missing', 'no per-key status found');
     }
+
+    // With keys saved, the panel must also say which domains the key needs.
+    //
+    // Google will not draw the widget on an unregistered hostname and reports
+    // it inside its own iframe, where neither the page nor the server-side test
+    // can see it - a clean console and a blank space where the box should be.
+    // Printing the hostnames is the only place that failure is visible.
+    if (keysConfigured) {
+      if (securityTab.body.includes('registered against this site key')) {
+        ok('the panel lists the domains the key needs');
+      } else {
+        bad('the panel lists the domains the key needs', 'no domain guidance shown with keys configured');
+      }
+
+      const listed = ['localhost', '127.0.0.1'].filter((host) => securityTab.body.includes(`>${host}<`));
+      if (listed.length) ok('local hostnames are listed for development', listed.join(', '));
+      else warn('local hostnames are listed for development', 'no localhost entry - only correct in production');
+    } else {
+      ok('the panel asks for the missing keys', 'no domain list until there is a key to register');
+    }
   } else {
-    bad('the CAPTCHA warning names which key is missing', 'no status pills rendered');
+    bad('the CAPTCHA warning renders when a switch is on', 'no status pills rendered');
   }
 
   // --- Secrets must never be rendered into the page ------------------------
@@ -1081,21 +1139,41 @@ async function checkAdminSettings() {
   const before = /name="captcha_on_contact"[^>]*checked/.test(securityTab.body) ? '1' : '0';
   const after = before === '1' ? '0' : '1';
 
+  // Preserve everything this section is not testing.
+  //
+  // It exists to prove a BOOLEAN toggle persists, so it has no business
+  // rewriting the credentials or the widget mode. Posting an empty site key is
+  // not "leave it alone" - a text field is saved exactly as posted, so it wipes
+  // a working key. The same applies to the select fields, which have to be
+  // posted but must carry their current value rather than a hardcoded one.
+  const keepSiteKey = settingsService.get('captcha_site_key') || '';
+  const keepMode = settingsService.get('captcha_mode') === 'checkbox' ? 'checkbox' : 'invisible';
+  const keepVersion = settingsService.get('captcha_version') === 'v3' ? 'v3' : 'v2';
+  const keepScore = String(settingsService.getInt('captcha_min_score', 50));
+
+  // The other three switches keep whatever they had. Only the one being tested
+  // is flipped: hardcoding them to '1' here would silently switch the CAPTCHA
+  // back on for the rest of the run, and every later form submission would come
+  // back 400 with no obvious cause.
+  const keepToggle = (key) => (settingsService.getBool(key) ? '1' : '');
+
   const postBody = new URLSearchParams({
     _csrf: csrfMatch[1],
     group: 'security',
     // Post every boolean explicitly - an unchecked box submits nothing.
-    captcha_on_login: '1',
-    captcha_on_signup: '1',
-    captcha_on_admin: '1',
+    captcha_on_login: keepToggle('captcha_on_login'),
+    captcha_on_signup: keepToggle('captcha_on_signup'),
+    captcha_on_admin: keepToggle('captcha_on_admin'),
     captcha_on_contact: after === '1' ? '1' : '',
-    captcha_site_key: '',
+    captcha_site_key: keepSiteKey,
+    // A secret is the one field where blank means "keep the stored value", so
+    // this is safe either way.
     captcha_secret_key: '',
     // Select fields must be posted too: the save validates them against their
     // options, so an omitted one is rejected rather than left unchanged.
-    captcha_mode: 'invisible',
-    captcha_version: 'v2',
-    captcha_min_score: '50',
+    captcha_mode: keepMode,
+    captcha_version: keepVersion,
+    captcha_min_score: keepScore,
     admin_path_slug: ADMIN_SLUG,
     max_login_attempts: '5',
     lockout_minutes: '15',
@@ -1133,26 +1211,40 @@ async function checkAdminSettings() {
     if (verdict.ok && verdict.skipped) ok('CAPTCHA OFF actually skips verification', 'contact form');
     else bad('CAPTCHA OFF actually skips verification', JSON.stringify(verdict));
   } else {
-    // On, but with no keys configured locally, it fails open by design.
-    if (verdict.ok) ok('CAPTCHA ON does not lock the form out when unconfigured', 'fails open as designed');
-    else bad('CAPTCHA ON does not lock the form out when unconfigured', JSON.stringify(verdict));
+    // Switch on, and the outcome depends on whether keys are configured.
+    //
+    // With no keys it must fail OPEN - locking every customer out of their own
+    // account because an admin has not pasted a key yet would be far worse than
+    // letting a form through unverified. With keys it must fail CLOSED, which
+    // is the whole point of the switch.
+    const keysConfigured = Boolean(settingsService.get('captcha_site_key') && settingsService.get('captcha_secret_key'));
+
+    if (!keysConfigured && verdict.ok) {
+      ok('CAPTCHA ON does not lock the form out when unconfigured', 'fails open as designed');
+    } else if (keysConfigured && !verdict.ok) {
+      ok('CAPTCHA ON refuses a submission with no token', verdict.reason || 'rejected');
+    } else if (keysConfigured && verdict.ok) {
+      bad('CAPTCHA ON refuses a submission with no token', 'a keyless submission was accepted');
+    } else {
+      bad('CAPTCHA ON does not lock the form out when unconfigured', JSON.stringify(verdict));
+    }
   }
 
   // --- Restore the original value so the run is idempotent -----------------
   const restoreBody = new URLSearchParams({
     _csrf: csrfMatch[1],
     group: 'security',
-    captcha_on_login: '1',
-    captcha_on_signup: '1',
-    captcha_on_admin: '1',
+    captcha_on_login: keepToggle('captcha_on_login'),
+    captcha_on_signup: keepToggle('captcha_on_signup'),
+    captcha_on_admin: keepToggle('captcha_on_admin'),
     captcha_on_contact: before === '1' ? '1' : '',
-    captcha_site_key: '',
+    captcha_site_key: keepSiteKey,
     captcha_secret_key: '',
     // Also required, or the restore POST is rejected and the flipped value
     // stays flipped - which makes the next run start from a different state.
-    captcha_mode: 'invisible',
-    captcha_version: 'v2',
-    captcha_min_score: '50',
+    captcha_mode: keepMode,
+    captcha_version: keepVersion,
+    captcha_min_score: keepScore,
     admin_path_slug: ADMIN_SLUG,
     max_login_attempts: '5',
     lockout_minutes: '15',
@@ -3781,7 +3873,44 @@ async function checkCaptchaWiring() {
   const TEST_SITE_KEY = '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
   const TEST_SECRET = '6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe';
 
+  // Every setting this section overwrites, read first so it can be put back.
+  //
+  // This used to restore to a blank value, which is fine on a site with no keys
+  // and destructive on one that has them - running the test suite would delete
+  // a working reCAPTCHA configuration. A test may change the site; it may not
+  // discard it.
+  const original = {};
+
+  async function captureOriginals() {
+    const keys = [
+      'captcha_site_key',
+      'captcha_secret_key',
+      'captcha_version',
+      'captcha_mode',
+      'captcha_on_login',
+      'captcha_on_signup',
+      'captcha_on_admin',
+      'captcha_on_contact',
+    ];
+
+    const rows = await db.query(
+      `SELECT setting_key, setting_value FROM settings WHERE setting_key IN (${keys.map(() => '?').join(', ')})`,
+      keys
+    );
+    for (const row of rows) original[row.setting_key] = row.setting_value;
+  }
+
+  async function restoreOriginals() {
+    for (const [key, value] of Object.entries(original)) {
+      await db.query('UPDATE settings SET setting_value = ? WHERE setting_key = ?', [value, key]);
+    }
+    settingsSvc.invalidate();
+    await settingsSvc.loadAll(true);
+  }
+
   try {
+    await captureOriginals();
+
     const login = await adminLogin();
     if (!login.ok) {
       warn('the CAPTCHA widget renders', `${login.reason} - skipping`);
@@ -3912,21 +4041,32 @@ async function checkCaptchaWiring() {
   }
 
   // --- Restore ---------------------------------------------------------------
-  // Straight to the table. The settings form cannot clear a secret - a blank
-  // field there means "keep the stored value" - so it is the wrong tool here.
+  // Straight to the table, and back to whatever was there before.
+  //
+  // The settings form cannot restore a secret - a blank field there means "keep
+  // the stored value" - so writing the rows directly is the only way. Writing
+  // blanks would have been simpler and would have deleted a working key pair on
+  // any site that had one.
   try {
-    await db.query(
-      "UPDATE settings SET setting_value = '' WHERE setting_key IN ('captcha_site_key', 'captcha_secret_key')"
-    );
-    await db.query("UPDATE settings SET setting_value = 'v2' WHERE setting_key = 'captcha_version'");
-    settingsSvc.invalidate();
-    await settingsSvc.loadAll(true);
+    await restoreOriginals();
 
-    const after = settingsSvc.get('captcha_site_key');
-    if (!after) ok('the test keys are cleared again', 'site key and secret emptied');
-    else warn('the test keys are cleared again', 'the site key is still set');
+    const siteKey = settingsSvc.get('captcha_site_key');
+    const expected = original.captcha_site_key || '';
+
+    if (String(siteKey || '') === String(expected)) {
+      ok('the CAPTCHA settings are restored', expected ? 'the site\'s own keys put back' : 'left unconfigured');
+    } else {
+      bad('the CAPTCHA settings are restored', `site key is "${siteKey}", expected "${expected}"`);
+    }
+
+    const version = settingsSvc.get('captcha_version');
+    if (String(version || '') === String(original.captcha_version || '')) {
+      ok('the CAPTCHA version is restored', String(version));
+    } else {
+      bad('the CAPTCHA version is restored', `got ${version}, expected ${original.captcha_version}`);
+    }
   } catch (err) {
-    bad('the test keys are cleared again', err.message);
+    bad('the CAPTCHA settings are restored', err.message);
   }
 
   await db.close().catch(() => {});
@@ -4133,6 +4273,158 @@ async function checkMailNotifications() {
         ok('the send-test action sends a message', sent[0].subject);
       } else {
         bad('the send-test action sends a message', `status ${test.status}, ${sent.length} sent`);
+      }
+
+      // --- Email branding and template overrides ----------------------------
+      //
+      // Run here, while the transport is still recording. The two failures this
+      // guards against are both invisible from the settings screen: a header
+      // with no logo at all, and a logo the inbox will not render.
+
+      const branding = await req(`/${ADMIN_SLUG}/settings?group=email`);
+      if (branding.status === 200 && branding.body.includes('Email header preview')) {
+        ok('the Email tab previews the header');
+      } else {
+        bad('the Email tab previews the header', `status ${branding.status}, no preview block`);
+      }
+
+      if (branding.body.includes('email_logo')) {
+        ok('the Email tab offers a logo upload');
+      } else {
+        bad('the Email tab offers a logo upload', 'no email_logo field');
+      }
+
+      if (branding.body.includes('subject')) {
+        ok('the Email tab lists the templates', 'editable subject and heading per template');
+      } else {
+        bad('the Email tab lists the templates', 'no template fields rendered');
+      }
+
+      // An SVG logo is the trap: it previews perfectly and arrives broken.
+      const { TEMPLATES } = require('../src/config/email-templates');
+      const schema = require('../src/config/settings-schema');
+
+      const missing = TEMPLATES.filter(
+        (t) => !schema.BY_KEY[`email_tpl_${t.key}_subject`] || !schema.BY_KEY[`email_tpl_${t.key}_heading`]
+      );
+
+      if (!missing.length) {
+        ok('every template has editable fields', `${TEMPLATES.length} template(s)`);
+      } else {
+        bad('every template has editable fields', `missing: ${missing.map((t) => t.key).join(', ')}`);
+      }
+
+      // The placeholder filler must leave an unknown name visible rather than
+      // blanking it - a subject reading "Order  is now" is far harder to spot
+      // than one reading "Order {order_number} is now".
+      const { fill } = require('../src/config/email-templates');
+      const filled = fill('Order {order_number} for {unknown_thing}', { order_number: 'WBD-1' });
+
+      if (filled === 'Order WBD-1 for {unknown_thing}') {
+        ok('placeholders fill, and an unknown one stays visible', filled);
+      } else {
+        bad('placeholders fill, and an unknown one stays visible', filled);
+      }
+
+      // A saved override must reach the message. This is the whole feature.
+      await db.query(
+        "UPDATE settings SET setting_value = ? WHERE setting_key = 'email_tpl_test_subject'",
+        ['SMOKE override {site}']
+      );
+      settingsSvc.invalidate();
+      await settingsSvc.loadAll(true);
+      mail.resetTransport();
+
+      sent.length = 0;
+      await mail.sendTest('smoke-branding@example.com');
+
+      const siteName = settingsSvc.get('site_name', 'WooBD.Com');
+      if (sent.length && sent[0].subject === `SMOKE override ${siteName}`) {
+        ok('a saved subject override is used', sent[0].subject);
+      } else {
+        bad('a saved subject override is used', sent.length ? sent[0].subject : 'nothing sent');
+      }
+
+      // Blank means "use the built-in default", so clearing it must restore the
+      // original wording rather than send an empty subject.
+      await db.query("UPDATE settings SET setting_value = '' WHERE setting_key = 'email_tpl_test_subject'");
+      settingsSvc.invalidate();
+      await settingsSvc.loadAll(true);
+      mail.resetTransport();
+
+      sent.length = 0;
+      await mail.sendTest('smoke-branding@example.com');
+
+      if (sent.length && sent[0].subject === `${siteName} - SMTP test`) {
+        ok('a blank override falls back to the default', sent[0].subject);
+      } else {
+        bad('a blank override falls back to the default', sent.length ? sent[0].subject : 'nothing sent');
+      }
+
+      // --- The SVG warning ---------------------------------------------------
+      //
+      // The trap this exists for: an SVG logo renders perfectly in the settings
+      // preview and arrives as a broken image in every inbox, because Gmail,
+      // Outlook and Apple Mail all refuse to display SVG. Nothing else in the
+      // panel says so.
+      const originalLogo = settingsSvc.get('email_logo') || '';
+
+      await db.query("UPDATE settings SET setting_value = '/assets/img/logo-light.svg' WHERE setting_key = 'email_logo'");
+      settingsSvc.invalidate();
+      await settingsSvc.loadAll(true);
+
+      const withSvg = await req(`/${ADMIN_SLUG}/settings?group=email`);
+      if (withSvg.body.includes('will not display it') || withSvg.body.includes('will not render')) {
+        ok('an SVG email logo is flagged', 'the panel warns that inboxes will not show it');
+      } else {
+        bad('an SVG email logo is flagged', 'no warning for an SVG logo');
+      }
+
+      // A raster logo must not be flagged.
+      await db.query("UPDATE settings SET setting_value = '/uploads/branding/logo.png' WHERE setting_key = 'email_logo'");
+      settingsSvc.invalidate();
+      await settingsSvc.loadAll(true);
+
+      const withPng = await req(`/${ADMIN_SLUG}/settings?group=email`);
+      if (!withPng.body.includes('will not display it')) {
+        ok('a PNG email logo is not flagged');
+      } else {
+        bad('a PNG email logo is not flagged', 'the SVG warning fired for a PNG');
+      }
+
+      await db.query('UPDATE settings SET setting_value = ? WHERE setting_key = ?', [originalLogo, 'email_logo']);
+      settingsSvc.invalidate();
+      await settingsSvc.loadAll(true);
+
+      if ((settingsSvc.get('email_logo') || '') === originalLogo) {
+        ok('the email logo setting is restored', originalLogo ? originalLogo : 'left blank');
+      } else {
+        bad('the email logo setting is restored', `expected "${originalLogo}", got "${settingsSvc.get('email_logo')}"`);
+      }
+
+      // A logo whose file is missing must be skipped, not sent.
+      //
+      // Uploads live outside version control, so a restored database routinely
+      // points at files that were never copied across. A broken image in every
+      // message reads as a broken brand; a text header just looks plain.
+      const mailSvc = require('../src/services/mail.service');
+
+      if (mailSvc.isUsableLogo('/uploads/definitely-not-here.png') === false) {
+        ok('a logo pointing at a missing file is rejected');
+      } else {
+        bad('a logo pointing at a missing file is rejected', 'a missing file was accepted');
+      }
+
+      if (mailSvc.isUsableLogo('https://cdn.example.com/logo.png') === true) {
+        ok('a remote logo URL is accepted', 'the server cannot check a CDN, so it trusts it');
+      } else {
+        bad('a remote logo URL is accepted', 'a remote URL was rejected');
+      }
+
+      if (mailSvc.isUsableLogo('') === false && mailSvc.isUsableLogo(null) === false) {
+        ok('an empty logo is rejected');
+      } else {
+        bad('an empty logo is rejected', 'an empty value was treated as usable');
       }
     }
   } catch (err) {
@@ -4354,10 +4646,190 @@ function checkInstallSql() {
   }
 }
 
+/**
+ * Turn the CAPTCHA toggles off for the duration of the run, and put them back.
+ *
+ * The suite submits real forms - sign-in, checkout, the contact box - and it
+ * cannot solve a challenge. With the toggles on, every one of those comes back
+ * 400 and the business logic behind them stops being tested at all.
+ *
+ * This is an outer save/restore. Section 23 turns the toggles back on for its
+ * own checks and restores whatever it found, so the two do not fight.
+ *
+ * Returns the values it replaced, so the caller can put them back.
+ */
+async function suspendCaptcha() {
+  const db = require('../src/config/database');
+  const settingsSvc = require('../src/services/settings.service');
+
+  const keys = ['captcha_on_login', 'captcha_on_signup', 'captcha_on_admin', 'captcha_on_contact'];
+  const saved = {};
+
+  const rows = await db.query(
+    `SELECT setting_key, setting_value FROM settings WHERE setting_key IN (${keys.map(() => '?').join(', ')})`,
+    keys
+  );
+  for (const row of rows) saved[row.setting_key] = row.setting_value;
+
+  await db.query(
+    `UPDATE settings SET setting_value = '0' WHERE setting_key IN (${keys.map(() => '?').join(', ')})`,
+    keys
+  );
+  settingsSvc.invalidate();
+  await settingsSvc.loadAll(true);
+
+  return saved;
+}
+
+async function restoreCaptcha(saved) {
+  if (!saved || !Object.keys(saved).length) return;
+
+  const db = require('../src/config/database');
+  const settingsSvc = require('../src/services/settings.service');
+
+  for (const [key, value] of Object.entries(saved)) {
+    await db.query('UPDATE settings SET setting_value = ? WHERE setting_key = ?', [value, key]);
+  }
+  settingsSvc.invalidate();
+  await settingsSvc.loadAll(true);
+}
+
+/**
+ * The live chat dashboard.
+ *
+ * The widget has always been a stateless API endpoint - it answered visitors
+ * and kept nothing anyone could read. This section proves the panel can now
+ * actually see what was said, which is the whole point of the feature.
+ */
+async function checkChatDashboard() {
+  section('27. Live chat dashboard');
+
+  const db = require('../src/config/database');
+
+  try {
+    const login = await adminLogin();
+    if (!login.ok) {
+      warn('the chat dashboard renders', `${login.reason} - skipping`);
+      await db.close().catch(() => {});
+      return;
+    }
+
+    // --- The list ------------------------------------------------------------
+    const list = await req(`/${ADMIN_SLUG}/chat`);
+
+    if (list.status === 200) ok('the chat dashboard renders', `/${ADMIN_SLUG}/chat → 200`);
+    else bad('the chat dashboard renders', `got ${list.status}`);
+
+    // A status code alone proves nothing here: the admin panel renders the
+    // dashboard for an unmatched route, so a 200 would look identical whether
+    // the chat page loaded or the route silently fell through to something else.
+    if (list.body.includes('chat-stats') || list.body.includes('chat-row')) {
+      ok('the chat page is the chat page', 'its own markup is present');
+    } else if (list.body.includes('Needs your attention')) {
+      bad('the chat page is the chat page', 'the dashboard rendered instead - the route fell through');
+    } else {
+      bad('the chat page is the chat page', 'no chat markup found in the response');
+    }
+
+    // The sidebar link, so the page is reachable without typing the URL.
+    const dashboard = await req(`/${ADMIN_SLUG}/dashboard`);
+    if (dashboard.body.includes(`/${ADMIN_SLUG}/chat`)) {
+      ok('the sidebar links to the chat dashboard');
+    } else {
+      bad('the sidebar links to the chat dashboard', 'no nav link found');
+    }
+
+    // --- The empty state explains itself --------------------------------------
+    // Three different causes, three different fixes. A blank panel that says
+    // nothing is how an operator concludes the feature is broken.
+    const conversationCount = await db.queryOne('SELECT COUNT(*) AS n FROM chat_conversations');
+    if (!Number(conversationCount.n)) {
+      if (list.body.includes('chat widget') || list.body.includes('No conversations yet')) {
+        ok('the empty state explains why there is nothing');
+      } else {
+        bad('the empty state explains why there is nothing', 'a blank panel with no explanation');
+      }
+      await db.close().catch(() => {});
+      return;
+    }
+
+    ok('the dashboard lists conversations', `${conversationCount.n} conversation(s)`);
+
+    // --- One conversation, end to end ----------------------------------------
+    const row = await db.queryOne('SELECT id, status FROM chat_conversations ORDER BY id ASC LIMIT 1');
+    const detail = await req(`/${ADMIN_SLUG}/chat/${row.id}`);
+
+    if (detail.status === 200) ok('a conversation renders', `#${row.id} → 200`);
+    else bad('a conversation renders', `#${row.id} → ${detail.status}`);
+
+    const messageCount = await db.queryOne('SELECT COUNT(*) AS n FROM chat_messages WHERE conversation_id = ?', [row.id]);
+    if (Number(messageCount.n) === 0) {
+      warn('the transcript shows its messages', 'this conversation has no messages');
+    } else if (detail.body.includes('chat-bubble')) {
+      ok('the transcript shows its messages', `${messageCount.n} bubble(s)`);
+    } else {
+      bad('the transcript shows its messages', `${messageCount.n} in the database, none on the page`);
+    }
+
+    // A visitor's message and the assistant's reply must be distinguishable,
+    // or the transcript is unreadable.
+    if (detail.body.includes('chat-bubble-visitor') && detail.body.includes('chat-bubble-assistant')) {
+      ok('visitor and assistant turns are distinguished');
+    } else {
+      bad('visitor and assistant turns are distinguished', 'no per-role bubble classes');
+    }
+
+    // --- Closing and reopening -------------------------------------------------
+    const csrf = detail.body.match(/name="_csrf"\s+value="([^"]+)"/);
+    if (!csrf) {
+      bad('a conversation can be closed', 'no CSRF token on the transcript page');
+    } else {
+      const flip = async (status) =>
+        req(`/${ADMIN_SLUG}/chat/${row.id}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ _csrf: csrf[1], status }).toString(),
+        });
+
+      const closed = await flip('closed');
+      const afterClose = await db.queryOne('SELECT status FROM chat_conversations WHERE id = ?', [row.id]);
+
+      if ([301, 302, 303].includes(closed.status) && afterClose.status === 'closed') {
+        ok('a conversation can be closed', `#${row.id} → closed`);
+      } else {
+        bad('a conversation can be closed', `status ${closed.status}, stored ${afterClose.status}`);
+      }
+
+      // Put it back, so the run is repeatable and the panel is left as found.
+      await flip(row.status === 'closed' ? 'closed' : 'open');
+      const restored = await db.queryOne('SELECT status FROM chat_conversations WHERE id = ?', [row.id]);
+
+      if (restored.status === row.status) {
+        ok('the original status is restored', row.status);
+      } else {
+        bad('the original status is restored', `expected ${row.status}, stored ${restored.status}`);
+      }
+    }
+
+    // --- A missing conversation is a redirect, not a crash --------------------
+    const missing = await reqChain(`/${ADMIN_SLUG}/chat/99999999`);
+    if (missing.status === 200 && missing.finalPath.includes('/chat')) {
+      ok('an unknown conversation redirects to the list', `→ ${missing.finalPath}`);
+    } else {
+      bad('an unknown conversation redirects to the list', `status ${missing.status}`);
+    }
+  } catch (err) {
+    bad('the chat dashboard', err.message);
+  }
+
+  await db.close().catch(() => {});
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
-async function main() {  console.log('\n  WooBD.Com smoke test');
+async function main() {
+  console.log('\n  WooBD.Com smoke test');
   console.log(`  Target : ${BASE}`);
   console.log(`  Admin  : /${ADMIN_SLUG}`);
 
@@ -4372,6 +4844,11 @@ async function main() {  console.log('\n  WooBD.Com smoke test');
       process.exit(1);
     }
   }
+  // Declared out here so the finally block can put the toggles back even if a
+  // section throws - leaving a live site with its CAPTCHA switched off would be
+  // a far worse outcome than a failed test run.
+  let savedCaptcha = null;
+
   try {
     const healthy = await checkHealth();
     if (!healthy) {
@@ -4380,6 +4857,11 @@ async function main() {  console.log('\n  WooBD.Com smoke test');
       process.exitCode = 1;
       return;
     }
+
+    // The suite submits real forms and cannot solve a challenge, so the
+    // CAPTCHA toggles come off for the run. Section 23 puts them back on for
+    // its own checks; `savedCaptcha` restores whatever the site actually had.
+    savedCaptcha = await suspendCaptcha();
 
     await checkPublicPages();
     await checkPublicContent();
@@ -4415,12 +4897,18 @@ async function main() {  console.log('\n  WooBD.Com smoke test');
     // Last: it stubs the mail transport and writes SMTP settings, so nothing
     // after it may depend on either.
     await checkMailNotifications();
+    await checkChatDashboard();
     checkInstallSql();
   } catch (err) {
     console.error('\n  ✗ Smoke test aborted by an unexpected error');
     console.error(`    ${err.stack || err.message}\n`);
     process.exitCode = 1;
   } finally {
+    // Restored even when a section threw. A test run that leaves a live site
+    // with its CAPTCHA switched off is worse than a test run that failed.
+    await restoreCaptcha(savedCaptcha).catch((err) =>
+      console.error(`  ! could not restore the CAPTCHA toggles: ${err.message}`)
+    );
     if (spawned) await stopServer();
   }
 

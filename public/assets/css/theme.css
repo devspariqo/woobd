@@ -4038,6 +4038,37 @@ body.no-scroll { overflow: hidden; }
 .check-list .tick svg { width: 13px; height: 13px; }
 
 /* --------------------------------------------------------------------------
+   "Why us" icon list
+
+   Each line gets its own icon rather than a repeated tick. Six identical ticks
+   read as one block of text; six different icons let someone skim for the one
+   that matters to them, which is the point of the list.
+   -------------------------------------------------------------------------- */
+
+.why-list { display: flex; flex-direction: column; gap: 18px; }
+
+.why-item { display: flex; align-items: flex-start; gap: 15px; }
+
+.why-icon {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: rgba(255, 102, 0, .1);
+  color: var(--secondary);
+}
+
+.why-icon svg { width: 20px; height: 20px; }
+
+.why-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+
+.why-text strong { font-size: .9375rem; line-height: 1.4; color: var(--text); }
+
+.why-text span { font-size: .875rem; line-height: 1.62; color: var(--text-muted); }
+
+/* --------------------------------------------------------------------------
    21. Reveal-on-scroll
    -------------------------------------------------------------------------- */
 [data-reveal] {
