@@ -326,6 +326,44 @@ async function findPaymentById(id) {
   );
 }
 
+/**
+ * Find the payment a gateway confirmation belongs to.
+ *
+ * Two lookups, in order of trust. `gateway_ref` is the gateway's own id for the
+ * transaction and is unique, so it identifies the payment even if the
+ * `tran_id` we sent was somehow lost. `transaction_id` is our own reference,
+ * used before the gateway has answered.
+ */
+async function findPaymentByGatewayRef(reference) {
+  const value = String(reference || '').trim();
+  if (!value) return null;
+
+  return db.queryOne(
+    `SELECT p.*, c.name AS customer_name, c.email AS customer_email, o.order_number, o.total AS order_total
+     FROM payments p
+     JOIN customers c ON c.id = p.customer_id
+     LEFT JOIN orders o ON o.id = p.order_id
+     WHERE p.gateway_ref = ? OR p.transaction_id = ?
+     ORDER BY (p.gateway_ref = ?) DESC
+     LIMIT 1`,
+    [value, value, value]
+  );
+}
+
+/**
+ * Record what the gateway said about a payment.
+ *
+ * Kept separate from approvePayment so the raw response is written even when
+ * the transaction turns out not to be valid - a refused or mismatched payment
+ * is exactly the one whose evidence matters later.
+ */
+async function setGatewayResult(id, { gatewayRef, gatewayData }) {
+  await db.query(
+    'UPDATE payments SET gateway_ref = ?, gateway_data = ? WHERE id = ?',
+    [gatewayRef || null, gatewayData ? JSON.stringify(gatewayData) : null, id]
+  );
+}
+
 async function listPayments({ page = 1, perPage = 20, search = '', status = '', method = '', customerId = null } = {}) {
   const conditions = [];
   const params = [];
@@ -858,7 +896,7 @@ module.exports = {
 
   listDeliverables, createDeliverable, updateDeliverable, deleteDeliverable, replaceDeliverables,
 
-  createPayment, findPaymentById, listPayments, approvePayment, rejectPayment, paymentCounts, paymentsByMethod,
+  createPayment, findPaymentById, findPaymentByGatewayRef, setGatewayResult, listPayments, approvePayment, rejectPayment, paymentCounts, paymentsByMethod,
 
   createInvoice, createInvoiceItem, findInvoiceById, findInvoiceByNumber, listInvoices, invoiceItems,
   updateInvoice, deleteInvoice, invoiceCounts,

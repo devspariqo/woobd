@@ -194,12 +194,36 @@
         <% }); %>
       </div>
       <div style="margin-top:9px;font-size:.8125rem">
-        Every method here is a manual transfer the customer records and you verify. To take
-        money automatically, a gateway integration is a separate piece of work — the
-        <strong>Card</strong> method below is instructions only.
+        <%
+          // Which of these settle themselves and which need a human. The
+          // distinction matters more than the list: an operator who thinks a
+          // manual method is automatic stops checking, and the payments sit
+          // unverified.
+          var gatewayLive = payments.sslcommerz && payments.sslcommerz.enabled;
+        %>
+        <% if (gatewayLive) { %>
+          <strong>SSLCommerz settles itself.</strong> Cards, wallets and net banking are confirmed
+          by the gateway and the order is marked paid without anyone reviewing it. Everything else
+          is a transfer the customer records and you verify by hand.
+        <% } else { %>
+          Every method here is a manual transfer the customer records and you verify by hand.
+          To take money automatically, fill in the <strong>SSLCommerz</strong> credentials below and
+          switch it on — it confirms its own payments, so nothing needs reviewing.
+        <% } %>
       </div>
     </div>
   </div>
+
+  <% if (payments.sslcommerz && payments.sslcommerz.switchedOn && !payments.sslcommerz.enabled) { %>
+    <div class="alert alert-warning" role="status">
+      <svg><use href="#i-alert"/></svg>
+      <div>
+        <strong>SSLCommerz is switched on but has no store credentials.</strong>
+        Customers are not offered it, because they would be sent to a provider that has never heard
+        of this store. Add the store ID and password below.
+      </div>
+    </div>
+  <% } %>
 <% } %>
 
 <% if (group === 'smtp' && mailConfigured) { %>

@@ -14,10 +14,12 @@ const contentModel = require('../models/content.model');
 const settings = require('../services/settings.service');
 const mail = require('../services/mail.service');
 const activity = require('../services/activity.service');
+const sslcommerz = require('../services/sslcommerz.service');
 const storage = require('../lib/storage');
 const captcha = require('../middleware/captcha');
 const { clean, validate } = require('../utils/validators');
 const { fromQuery } = require('../utils/paginator');
+const helpers = require('../utils/helpers');
 const config = require('../config');
 const logger = require('../utils/logger');
 
@@ -541,8 +543,24 @@ exports.submitPayment = async (req, res, next) => {
     if (!form.method || !allowedMethods.includes(form.method)) {
       errors.method = 'Please choose how you paid.';
     }
-    if (!form.transaction_id) errors.transaction_id = 'Enter the transaction ID from your payment receipt.';
-    if (form.amount <= 0) errors.amount = 'Enter the amount you sent.';
+
+    const isGateway = Boolean(chosen && chosen.kind === 'gateway');
+
+    // What is still owed. A gateway is charged this amount, and the same figure
+    // the page showed the customer - computed the same way on purpose, so the
+    // two cannot disagree about what is being paid.
+    const outstanding = order.payment_status === 'paid' ? 0
+      : order.payment_status === 'partial' ? Number(order.total) / 2
+      : Number(order.total);
+
+    if (isGateway) {
+      // There is no receipt to read a transaction ID from: the customer has not
+      // paid yet, and the gateway supplies its own reference afterwards.
+      if (outstanding <= 0) errors.amount = 'There is nothing left to pay on this order.';
+    } else {
+      if (!form.transaction_id) errors.transaction_id = 'Enter the transaction ID from your payment receipt.';
+      if (form.amount <= 0) errors.amount = 'Enter the amount you sent.';
+    }
 
     if (Object.keys(errors).length) {
       setNav(res, 'orders', { navCounts: await navCounts(customerId) });
@@ -562,19 +580,61 @@ exports.submitPayment = async (req, res, next) => {
       ? await storage.recordMedia(files, { folder: 'payments', uploaderId: customerId, uploaderType: 'customer' })
       : [];
 
+    // For a gateway this is our own reference for the attempt, generated here
+    // because the gateway has not issued one yet. The callbacks are matched
+    // back on it.
+    const reference = isGateway
+      ? `PAY-${order.id}-${Date.now()}`
+      : form.transaction_id;
+
     const paymentId = await orderModel.createPayment({
       customer_id: customerId,
       order_id: order.id,
       method: form.method,
       method_type: chosen ? chosen.channel : 'manual',
-      amount: form.amount,
+      amount: isGateway ? outstanding : form.amount,
       currency: settings.get('currency_code', 'BDT'),
-      transaction_id: form.transaction_id,
+      transaction_id: reference,
       sender_number: form.sender_number || null,
       screenshot: saved.length ? saved[0].file_url : null,
       status: 'pending',
       admin_note: form.note || null,
     });
+
+    // --- Gateway: hand the customer to the provider -------------------------
+    if (isGateway) {
+      const started = await sslcommerz.initiate({
+        payment: { amount: outstanding, currency: settings.get('currency_code', 'BDT'), transaction_id: reference },
+        order,
+        customer: req.session.customer,
+        urls: {
+          success: helpers.absoluteUrl('/payment/sslcommerz/success'),
+          fail: helpers.absoluteUrl('/payment/sslcommerz/fail'),
+          cancel: helpers.absoluteUrl('/payment/sslcommerz/cancel'),
+          ipn: helpers.absoluteUrl('/payment/sslcommerz/ipn'),
+        },
+      });
+
+      if (!started.ok) {
+        // The payment row stays, marked rejected with the reason. Deleting it
+        // would lose the record of an attempt the customer made and the gateway
+        // refused.
+        await orderModel.rejectPayment(paymentId, { note: `Gateway refused the session: ${started.error}`.slice(0, 500) });
+        req.session.flashError = started.error;
+        return res.redirect(res.locals.helpers.url(`/account/orders/${order.id}`));
+      }
+
+      await activity.log({
+        req,
+        action: 'payment.gateway_started',
+        entityType: 'payment',
+        entityId: paymentId,
+        description: `${form.method} session opened for order ${order.order_number} (${outstanding}).`,
+      });
+
+      // Off to SSLCommerz. Nothing is settled until they confirm it back.
+      return res.redirect(started.gatewayUrl);
+    }
 
     await activity.log({
       req,
@@ -595,6 +655,171 @@ exports.submitPayment = async (req, res, next) => {
     logger.error('Payment submission failed', err);
     req.session.flashError = 'We could not record your payment just now. Please try again.';
     return res.redirect(res.locals.helpers.url(`/account/orders/${req.body.order_id}`));
+  }
+};
+
+// ---------------------------------------------------------------------------
+// SSLCommerz callbacks
+//
+// These are public: the gateway calls them, and the customer's browser arrives
+// on them. Nothing here trusts what it is given. The `val_id` in the request is
+// a claim that a transaction exists, and the only thing that turns it into a
+// settled payment is a server-to-server call to SSLCommerz asking whether it is
+// real and for how much.
+//
+// Without that call anyone could reach the success URL directly and mark their
+// own order paid - which is why the validation step is the whole point of the
+// integration rather than a detail of it.
+// ---------------------------------------------------------------------------
+
+/**
+ * Confirm a gateway transaction and settle it.
+ *
+ * Shared by the browser redirect and the IPN, because they carry the same
+ * information and must reach the same conclusion. The IPN is the reliable one -
+ * the customer can close the tab before the redirect lands - so this has to be
+ * safe to run twice.
+ */
+async function settleGatewayPayment(payload) {
+  const valId = clean.str(payload.val_id, 120);
+  const tranId = clean.str(payload.tran_id, 120);
+
+  if (!valId) return { ok: false, reason: 'no-reference' };
+
+  const payment = await orderModel.findPaymentByGatewayRef(tranId || valId);
+  if (!payment) return { ok: false, reason: 'unknown-payment' };
+
+  // Already settled by this same transaction. The IPN usually arrives first and
+  // the browser second, so this is the normal path, not an error.
+  if (payment.status === 'approved' && payment.gateway_ref === valId) {
+    return { ok: true, already: true, payment };
+  }
+
+  const check = await sslcommerz.validate(valId);
+
+  if (!check.ok) {
+    // Keep whatever the gateway said. A refused transaction is exactly the one
+    // whose evidence matters when the customer asks what happened.
+    await orderModel.setGatewayResult(payment.id, { gatewayRef: null, gatewayData: check.data || { error: check.error } });
+    return { ok: false, reason: 'not-validated', error: check.error, payment };
+  }
+
+  // The amount has to be the one we asked for. A gateway confirming a smaller
+  // figure than the order is not a payment for that order.
+  const expected = Number(payment.amount);
+  const actual = Number(check.amount);
+
+  if (!(actual + 0.01 >= expected)) {
+    await orderModel.setGatewayResult(payment.id, { gatewayRef: valId, gatewayData: check.data });
+    logger.warn('SSLCommerz confirmed an amount below the order', { payment: payment.id, expected, actual });
+    return { ok: false, reason: 'amount-mismatch', expected, actual, payment };
+  }
+
+  try {
+    await orderModel.setGatewayResult(payment.id, { gatewayRef: valId, gatewayData: check.data });
+  } catch (err) {
+    // The unique index on gateway_ref refused it: this transaction is already
+    // recorded against a different payment. Refusing is the correct outcome -
+    // the alternative is crediting one payment twice.
+    if (err && err.code === 'ER_DUP_ENTRY') {
+      logger.warn('SSLCommerz reference already used by another payment', { val_id: valId, payment: payment.id });
+      return { ok: false, reason: 'already-used', payment };
+    }
+    throw err;
+  }
+
+  await orderModel.approvePayment(payment.id, { note: `Settled by SSLCommerz (${check.status}).` });
+
+  return { ok: true, payment, amount: actual };
+}
+
+/** Where to send the customer once the gateway has finished with them. */
+function gatewayDestination(req, payment, signedIn) {
+  if (signedIn && payment && payment.order_id) {
+    return helpers.url(`/account/orders/${payment.order_id}`);
+  }
+  return helpers.url('/signin');
+}
+
+exports.sslcommerzSuccess = async (req, res) => {
+  const payload = { ...req.query, ...req.body };
+  const signedIn = Boolean(req.session && req.session.customer);
+
+  try {
+    const result = await settleGatewayPayment(payload);
+
+    if (result.ok) {
+      req.session.flashSuccess = result.already
+        ? 'This payment has already been confirmed. Thank you.'
+        : 'Payment received and confirmed. Thank you.';
+    } else if (result.reason === 'no-reference') {
+      req.session.flashError = 'That payment could not be identified. If you were charged, contact us with your receipt.';
+    } else if (result.reason === 'amount-mismatch') {
+      req.session.flashError = 'The gateway confirmed a different amount to your order. We have not marked it paid — please contact us.';
+    } else {
+      req.session.flashError = result.error || 'We could not confirm that payment. If you were charged, contact us with your receipt.';
+    }
+
+    return res.redirect(gatewayDestination(req, result.payment, signedIn));
+  } catch (err) {
+    logger.error('SSLCommerz success callback failed', err);
+    req.session.flashError = 'We could not confirm that payment just now. If you were charged, contact us with your receipt.';
+    return res.redirect(signedIn ? helpers.url('/account/orders') : helpers.url('/signin'));
+  }
+};
+
+/**
+ * A failed or cancelled payment.
+ *
+ * Deliberately does NOT mark the payment rejected. The customer may well retry,
+ * and a rejection written here would sit on the order as a failed attempt they
+ * never made - the gateway can fail a session for a timeout on its own side.
+ * The pending row stays until something confirms or a human reviews it.
+ */
+function gatewayAbandoned(req, res) {
+  const payload = { ...req.query, ...req.body };
+  const signedIn = Boolean(req.session && req.session.customer);
+  const tranId = clean.str(payload.tran_id, 120);
+
+  logger.info('SSLCommerz session did not complete', { tran_id: tranId, status: payload.status });
+
+  req.session.flashError = 'That payment was not completed. You can try again whenever you are ready.';
+
+  return res.redirect(signedIn && tranId
+    ? helpers.url('/account/orders')
+    : helpers.url('/signin'));
+}
+
+exports.sslcommerzFail = gatewayAbandoned;
+exports.sslcommerzCancel = gatewayAbandoned;
+
+/**
+ * The IPN.
+ *
+ * Server-to-server, so there is no session and no customer to redirect. The
+ * gateway only cares about the status code, and it retries anything that is not
+ * a 200 - which is why a validation failure still answers 200 with a body
+ * explaining itself. A 500 here would have SSLCommerz retry a transaction that
+ * is never going to validate.
+ */
+exports.sslcommerzIpn = async (req, res) => {
+  const payload = { ...req.query, ...req.body };
+
+  try {
+    const result = await settleGatewayPayment(payload);
+
+    if (result.ok) {
+      logger.info('SSLCommerz IPN settled a payment', { payment: result.payment.id, already: Boolean(result.already) });
+      return res.status(200).send('OK');
+    }
+
+    logger.warn('SSLCommerz IPN did not settle', { reason: result.reason });
+    return res.status(200).send(`Not settled: ${result.reason}`);
+  } catch (err) {
+    // Still a 200: the gateway retrying will not fix a bug on our side, and a
+    // retry storm buries the log line that matters.
+    logger.error('SSLCommerz IPN failed', err);
+    return res.status(200).send('Error');
   }
 };
 

@@ -1319,6 +1319,41 @@
     });
   }
 
+  /**
+   * Show the manual transfer fields only when a manual method is chosen.
+   *
+   * A gateway sends the customer to the provider to pay, so asking them for a
+   * transaction ID and a screenshot of a receipt they do not have yet is worse
+   * than useless: it reads as a broken form, and `required` would stop them
+   * from continuing at all.
+   *
+   * The `required` flags come off with the fields. Hiding a required input does
+   * not stop it blocking submission - the browser still refuses, and the error
+   * points at a field nobody can see.
+   */
+  function initPaymentMethodToggle() {
+    var radios = $$('input[name="method"][data-method-kind]');
+    if (!radios.length) return;
+
+    var manualBlocks = $$('[data-manual-only]');
+    var label = $('[data-submit-label]');
+
+    var apply = function () {
+      var checked = radios.filter(function (radio) { return radio.checked; })[0];
+      var isGateway = checked && checked.getAttribute('data-method-kind') === 'gateway';
+
+      manualBlocks.forEach(function (block) {
+        block.hidden = isGateway;
+        $$('[required]', block).forEach(function (field) { field.required = !isGateway; });
+      });
+
+      if (label) label.textContent = isGateway ? 'Continue to payment' : 'Submit payment';
+    };
+
+    radios.forEach(function (radio) { radio.addEventListener('change', apply); });
+    apply();
+  }
+
   function boot() {
     initTheme();
     initHeader();
@@ -1339,6 +1374,7 @@
     initCompare();
     initHeroVideo();
     initTermToggle();
+    initPaymentMethodToggle();
   }
 
   if (document.readyState === 'loading') {

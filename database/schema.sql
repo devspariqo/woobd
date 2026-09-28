@@ -361,6 +361,17 @@ CREATE TABLE IF NOT EXISTS `payments` (
   `amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
   `currency` VARCHAR(8) NOT NULL DEFAULT 'BDT',
   `transaction_id` VARCHAR(120) DEFAULT NULL,
+  -- What a payment gateway told us when we asked it to confirm the transaction.
+  --
+  -- `gateway_ref` is the gateway's own id for the transaction (SSLCommerz calls
+  -- it val_id) and is UNIQUE: the same confirmation must never be able to credit
+  -- an order twice, and the IPN and the browser redirect both deliver it.
+  --
+  -- `gateway_data` keeps the whole validated response. When a customer disputes
+  -- a payment, the gateway's answer at the time is the only evidence that
+  -- settles it, and it is not re-fetchable later.
+  `gateway_ref` VARCHAR(120) DEFAULT NULL,
+  `gateway_data` JSON DEFAULT NULL,
   `sender_number` VARCHAR(30) DEFAULT NULL,
   `screenshot` VARCHAR(255) DEFAULT NULL,
   `status` ENUM('pending','approved','rejected','refunded') NOT NULL DEFAULT 'pending',
@@ -373,6 +384,7 @@ CREATE TABLE IF NOT EXISTS `payments` (
   KEY `idx_payments_customer` (`customer_id`),
   KEY `idx_payments_order` (`order_id`),
   KEY `idx_payments_status` (`status`),
+  UNIQUE KEY `uq_payments_gateway_ref` (`gateway_ref`),
   CONSTRAINT `fk_payments_customer` FOREIGN KEY (`customer_id`)
     REFERENCES `customers` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_payments_order` FOREIGN KEY (`order_id`)

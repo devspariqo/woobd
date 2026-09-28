@@ -14,6 +14,7 @@ const helpers = require('../utils/helpers');
 const storage = require('../lib/storage');
 const config = require('../config');
 const { PAYMENT_METHODS } = require('../config/payment-methods');
+const sslcommerz = require('../services/sslcommerz.service');
 
 /** Short-lived menu cache: menus change rarely but render on every page. */
 let menuCache = null;
@@ -314,9 +315,12 @@ function viewContext() {
 
       for (const method of PAYMENT_METHODS) {
         const wallet = method.kind === 'wallet';
+        const manual = method.kind === 'manual';
+        const gateway = method.kind === 'gateway';
+
         const switchedOn = settings.getBool(`payment_${method.key}_enabled`);
         const number = wallet ? String(settings.get(`payment_${method.key}_number`) || '').trim() : '';
-        const note = wallet ? '' : String(settings.get(`payment_${method.key}_note`) || '').trim();
+        const note = manual ? String(settings.get(`payment_${method.key}_note`) || '').trim() : '';
 
         // A method switched on with nothing to send money TO cannot be
         // completed by the customer - a wallet with no number renders
@@ -324,7 +328,23 @@ function viewContext() {
         // them with nothing to do. Both read as a broken checkout, so the
         // method is withheld from customers and `switchedOn` keeps the raw
         // toggle so the panel can say why.
-        const usable = switchedOn && (wallet ? Boolean(number) : Boolean(note));
+        //
+        // A gateway has nothing to send money to; what it needs is credentials,
+        // and without them the customer is redirected to a provider that has
+        // never heard of this store.
+        let usable = false;
+        let unusableReason = null;
+
+        if (gateway) {
+          usable = switchedOn && sslcommerz.isConfigured();
+          if (switchedOn && !usable) unusableReason = 'no store credentials';
+        } else if (wallet) {
+          usable = switchedOn && Boolean(number);
+          if (switchedOn && !usable) unusableReason = 'no receiving number';
+        } else {
+          usable = switchedOn && Boolean(note);
+          if (switchedOn && !usable) unusableReason = 'no instructions';
+        }
 
         builtPayments[method.key] = {
           key: method.key,
@@ -334,14 +354,11 @@ function viewContext() {
           tone: method.tone,
           enabled: usable,
           switchedOn,
-          // Why it is being withheld, for the settings screen.
-          unusableReason: switchedOn && !usable
-            ? (wallet ? 'no receiving number' : 'no instructions')
-            : null,
+          unusableReason,
           logo: settings.get(`payment_${method.key}_logo`) || '',
           number: wallet ? number : null,
           type: wallet ? settings.get(`payment_${method.key}_type`) : null,
-          note: wallet ? null : note,
+          note: manual ? note : null,
         };
       }
 

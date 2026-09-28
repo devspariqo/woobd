@@ -340,6 +340,43 @@ const SETTINGS = [
   ...paymentMethods(),
 
   { key: 'payment_instructions', type: 'textarea', group: 'payments', default: 'Send the exact amount to one of the numbers below, then submit the transaction ID on the order page. We verify payments within 24 hours.', public: true, label: 'Payment instructions' },
+
+  // ---------------- SSLCommerz gateway ----------------
+  //
+  // The one method here that settles automatically. Everything else is a
+  // transfer the customer records and staff verify by hand.
+  //
+  // The on/off switch is generated with the method itself
+  // (`payment_sslcommerz_enabled`); what follows is the credentials, which
+  // belong to the provider rather than to the method.
+  {
+    key: 'sslcommerz_mode',
+    type: 'select',
+    group: 'payments',
+    default: 'sandbox',
+    public: true,
+    label: 'SSLCommerz mode',
+    options: ['sandbox', 'live'],
+    help: 'Sandbox and live are different servers with different credentials. Sandbox credentials against the live server are simply rejected; live credentials against sandbox take no money. Change this and the credentials together, or not at all.',
+  },
+  {
+    key: 'sslcommerz_store_id',
+    type: 'text',
+    group: 'payments',
+    default: '',
+    public: false,
+    label: 'SSLCommerz store ID',
+    help: 'From your SSLCommerz merchant panel. The sandbox store ID and the live one are different values.',
+  },
+  {
+    key: 'sslcommerz_store_password',
+    type: 'text',
+    group: 'payments',
+    default: '',
+    public: false,
+    label: 'SSLCommerz store password',
+    help: 'The API password for the same store. Kept out of the page and out of any export.',
+  },
   { key: 'invoice_prefix', type: 'text', group: 'payments', default: 'INV-', public: false, label: 'Invoice prefix' },
   { key: 'order_prefix', type: 'text', group: 'payments', default: 'WBD-', public: false, label: 'Order prefix' },
   { key: 'tax_percent', type: 'number', group: 'payments', default: '0', public: true, label: 'Tax / VAT (%)' },
@@ -509,7 +546,7 @@ function paymentMethods() {
           options: ['Personal', 'Merchant'],
         }
       );
-    } else {
+    } else if (method.kind === 'manual') {
       out.push({
         key: `payment_${method.key}_note`,
         type: 'textarea',
@@ -520,6 +557,8 @@ function paymentMethods() {
         help: 'Shown to the customer at checkout. For a bank transfer this is where the account details go.',
       });
     }
+    // A gateway method has no receiving details: the customer is redirected to
+    // the provider, and the credentials belong to that provider's own settings.
 
     out.push({
       key: `payment_${method.key}_logo`,

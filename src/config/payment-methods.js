@@ -16,6 +16,9 @@
  * `kind` decides the shape:
  *   wallet  money is sent to a number. Fields: number, account type.
  *   manual  money is sent some other way and the customer records it. Field: note.
+ *   gateway the customer is redirected to a payment provider. No receiving
+ *           details at all - the credentials live in the service that talks to
+ *           the provider, and are not per-method.
  *
  * `label` is both the display name and the value stored on the payment row, so
  * renaming one after payments exist would orphan the old rows. Add a method
@@ -116,6 +119,17 @@ const PAYMENT_METHODS = [
     note: 'Card payments are processed through our secure gateway. Share the last 4 digits of your card and the transaction reference so we can match it.',
     blurb: 'Visa, Mastercard and Amex through a gateway.',
   },
+
+  // --- Hosted gateway -------------------------------------------------------
+  {
+    key: 'sslcommerz',
+    label: 'Card / Mobile Banking',
+    kind: 'gateway',
+    channel: 'gateway',
+    tone: 'primary',
+    enabled: false,
+    blurb: 'SSLCommerz: cards, bKash, Nagad, Rocket, Upay and net banking on their own secure pages. Confirms itself, so nothing needs verifying by hand.',
+  },
 ];
 
 /** Fast lookup by key. */
@@ -128,14 +142,15 @@ const BY_KEY = PAYMENT_METHODS.reduce((acc, method) => {
  * The setting keys a method owns.
  *
  * A wallet has a receiving number and an account type; a manual method has
- * instructions instead. Both have a switch and a logo.
+ * instructions instead; a gateway has neither, because there is nowhere for the
+ * customer to send anything. All three have a switch and a logo.
  */
 function settingKeys(method) {
   const keys = [`payment_${method.key}_enabled`];
 
   if (method.kind === 'wallet') {
     keys.push(`payment_${method.key}_number`, `payment_${method.key}_type`);
-  } else {
+  } else if (method.kind === 'manual') {
     keys.push(`payment_${method.key}_note`);
   }
 

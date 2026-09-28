@@ -10,6 +10,7 @@
 const express = require('express');
 
 const ctrl = require('../controllers/public.controller');
+const customerCtrl = require('../controllers/customer.controller');
 const security = require('../middleware/security');
 const captcha = require('../middleware/captcha');
 
@@ -96,5 +97,29 @@ router.post('/newsletter', security.formLimiter, captcha.honeypot('website'), ct
 // The chat widget is polled from the browser, so it gets its own generous limit
 // keyed by session rather than a form limit.
 router.post('/api/chat', security.chatLimiter, ctrl.chatMessage);
+
+// ---------------------------------------------------------------------------
+// SSLCommerz callbacks
+//
+// Public by necessity: SSLCommerz calls these, not a signed-in customer. They
+// live here rather than in the customer router because everything under
+// /account requires a session, and the IPN has none - it is a server talking to
+// a server.
+//
+// Being public is safe because nothing here trusts the request. The reference
+// in it only says which transaction to ask SSLCommerz about; the answer to that
+// question is what settles the payment.
+//
+// Both GET and POST are accepted on the browser-facing ones: SSLCommerz posts
+// the customer back by default, but the URLs get pasted into test tools and a
+// GET should not 404 while a POST works.
+// ---------------------------------------------------------------------------
+for (const action of ['success', 'fail', 'cancel']) {
+  router.get(`/payment/sslcommerz/${action}`, customerCtrl[`sslcommerz${action[0].toUpperCase()}${action.slice(1)}`]);
+  router.post(`/payment/sslcommerz/${action}`, customerCtrl[`sslcommerz${action[0].toUpperCase()}${action.slice(1)}`]);
+}
+
+router.get('/payment/sslcommerz/ipn', customerCtrl.sslcommerzIpn);
+router.post('/payment/sslcommerz/ipn', customerCtrl.sslcommerzIpn);
 
 module.exports = router;

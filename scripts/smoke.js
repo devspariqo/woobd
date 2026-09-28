@@ -5382,6 +5382,577 @@ async function checkPaymentMethods() {
   await db.close().catch(() => {});
 }
 
+/**
+ * Password reset and email verification.
+ *
+ * Both emails link to /<path>/<token>, and both handlers read req.params.token -
+ * but neither route declared the parameter. Every link 404'd, so a customer who
+ * asked for a reset got an email that led nowhere, and the page that did exist
+ * always reported the link as expired because the token it read was always
+ * undefined.
+ *
+ * The whole chain is exercised here rather than just the two URLs, because the
+ * two halves each looked fine on their own: the route existed, the handler
+ * existed, and only the link between them was missing.
+ */
+async function checkAccountRecovery() {
+  section('31. Password reset and email verification');
+
+  const bcrypt = require('bcryptjs');
+  const db = require('../src/config/database');
+
+  const tokenFrom = (html) => (html.match(/name="_csrf"\s+value="([^"]+)"/) || [])[1];
+
+  const email = `smoke-recovery-${Date.now()}@example.com`;
+  const oldPassword = 'SmokePass#2025';
+  const newPassword = 'SmokePass#2026';
+
+  let customerId = null;
+
+  try {
+    customerId = await db.insert('customers', {
+      name: 'Smoke Recovery',
+      email,
+      phone: '+8801700000002',
+      password_hash: await bcrypt.hash(oldPassword, 12),
+      status: 'active',
+      email_verified_at: new Date(),
+      country: 'Bangladesh',
+    });
+
+    // --- Ask for a reset through the real form -------------------------------
+    resetCookies();
+    const forgot = await req('/forgot-password');
+    const forgotToken = tokenFrom(forgot.body);
+
+    if (!forgotToken) {
+      bad('the forgot-password form renders', 'no CSRF token');
+      await db.close().catch(() => {});
+      return;
+    }
+    ok('the forgot-password form renders');
+
+    const requested = await req('/forgot-password', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ _csrf: forgotToken, email, website: '' }).toString(),
+    });
+
+    if ([301, 302, 303].includes(requested.status)) {
+      ok('a reset can be requested', `→ ${String(requested.location).replace(BASE, '')}`);
+    } else {
+      bad('a reset can be requested', `got ${requested.status}`);
+    }
+
+    const stored = await db.queryOne(
+      'SELECT reset_token, reset_expires_at FROM customers WHERE id = ?',
+      [customerId]
+    );
+
+    if (stored && stored.reset_token) {
+      ok('a reset token is stored', `${String(stored.reset_token).slice(0, 10)}…`);
+    } else {
+      bad('a reset token is stored', 'nothing was written');
+      await db.close().catch(() => {});
+      return;
+    }
+
+    // --- The link in the email must open the form ---------------------------
+    //
+    // This is the bug: /reset-password/<token> had no route, so the link the
+    // customer actually received returned 404.
+    const link = `/reset-password/${stored.reset_token}`;
+    const page = await req(link);
+
+    if (page.status === 200) {
+      ok('the emailed reset link opens', `${link.replace(stored.reset_token, '<token>')} → 200`);
+    } else {
+      bad('the emailed reset link opens', `→ ${page.status}`);
+    }
+
+    // And it must be the form, not the expired notice.
+    if (page.body.includes('name="token"') && page.body.includes('name="password"')) {
+      ok('it is the reset form', 'token and password fields present');
+    } else {
+      bad('it is the reset form', 'the page rendered without the form');
+    }
+
+    if (!/expired|no longer valid/i.test(page.body)) {
+      ok('a fresh link is not reported as expired');
+    } else {
+      bad('a fresh link is not reported as expired', 'the page says the link is dead');
+    }
+
+    const formCsrf = tokenFrom(page.body);
+
+    // --- Choosing a new password --------------------------------------------
+    const mismatch = await req('/reset-password', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        _csrf: formCsrf,
+        token: stored.reset_token,
+        password: newPassword,
+        password_confirm: 'SomethingElse#2026',
+      }).toString(),
+    });
+
+    if (mismatch.status === 400) {
+      ok('a mismatched confirmation is refused', '400');
+    } else {
+      bad('a mismatched confirmation is refused', `got ${mismatch.status}`);
+    }
+
+    const changed = await req('/reset-password', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        _csrf: formCsrf,
+        token: stored.reset_token,
+        password: newPassword,
+        password_confirm: newPassword,
+      }).toString(),
+    });
+
+    if ([301, 302, 303].includes(changed.status)) {
+      ok('the new password is accepted', `→ ${String(changed.location).replace(BASE, '')}`);
+    } else {
+      bad('the new password is accepted', `got ${changed.status}`);
+    }
+
+    // The password must actually have changed, not just redirected.
+    const after = await db.queryOne('SELECT password_hash, reset_token FROM customers WHERE id = ?', [customerId]);
+    const usesNew = await bcrypt.compare(newPassword, after.password_hash);
+    const usesOld = await bcrypt.compare(oldPassword, after.password_hash);
+
+    if (usesNew && !usesOld) {
+      ok('the stored password is the new one');
+    } else {
+      bad('the stored password is the new one', `new=${usesNew}, old=${usesOld}`);
+    }
+
+    if (!after.reset_token) {
+      ok('the reset token is burned', 'single use only');
+    } else {
+      bad('the reset token is burned', 'the token can be replayed');
+    }
+
+    // --- A used link must say so, not 404 ------------------------------------
+    const replay = await req(link);
+    if (replay.status === 400 && /expired|no longer valid/i.test(replay.body)) {
+      ok('a used link reports itself expired', '400 with the expired notice');
+    } else {
+      bad('a used link reports itself expired', `got ${replay.status}`);
+    }
+
+    // --- The new password signs in -------------------------------------------
+    resetCookies();
+    const signin = await req('/signin');
+    const signinToken = tokenFrom(signin.body);
+
+    const signedIn = await req('/signin', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ _csrf: signinToken, email, password: newPassword, website: '', next: '/account' }).toString(),
+    });
+
+    if ([301, 302, 303].includes(signedIn.status)) {
+      ok('the customer can sign in with the new password');
+    } else {
+      bad('the customer can sign in with the new password', `got ${signedIn.status}`);
+    }
+
+    // --- Email verification, the same shape ----------------------------------
+    const verifyToken = `smoke-verify-${Date.now()}`;
+    const verifyId = await db.insert('customers', {
+      name: 'Smoke Verify',
+      email: `smoke-verify-${Date.now()}@example.com`,
+      phone: '+8801700000003',
+      password_hash: await bcrypt.hash(oldPassword, 12),
+      status: 'active',
+      verification_token: verifyToken,
+      country: 'Bangladesh',
+    });
+
+    resetCookies();
+    const verified = await req(`/verify-email/${verifyToken}`);
+
+    // A valid token redirects to the sign-in page with a success message. A
+    // 404 would mean the link never reached the handler at all.
+    if ([301, 302, 303].includes(verified.status)) {
+      ok('the emailed verification link resolves', 'not a 404');
+    } else {
+      bad('the emailed verification link resolves', `got ${verified.status}`);
+    }
+
+    const verifiedRow = await db.queryOne('SELECT email_verified_at, verification_token FROM customers WHERE id = ?', [verifyId]);
+
+    if (verifiedRow && verifiedRow.email_verified_at) {
+      ok('the email is marked verified');
+    } else {
+      bad('the email is marked verified', 'email_verified_at is still empty');
+    }
+
+    if (verifiedRow && !verifiedRow.verification_token) {
+      ok('the verification token is burned');
+    } else {
+      bad('the verification token is burned', 'the token can be replayed');
+    }
+
+    await db.query('DELETE FROM customers WHERE id = ?', [verifyId]);
+  } catch (err) {
+    bad('account recovery', err.message);
+  } finally {
+    if (customerId) await db.query('DELETE FROM customers WHERE id = ?', [customerId]).catch(() => {});
+  }
+
+  await db.close().catch(() => {});
+}
+
+/**
+ * The SSLCommerz gateway.
+ *
+ * The property that matters most is negative: reaching the success URL must not
+ * mark anything paid. That URL is public, the `val_id` in it is a string anyone
+ * can type, and an integration that trusts it hands out free orders. So the
+ * gateway's HTTP calls are stubbed here and the assertions are about what
+ * happens when it says yes, when it says no, and when it says yes for the wrong
+ * amount.
+ */
+async function checkSslcommerz() {
+  section('32. SSLCommerz gateway');
+
+  const bcrypt = require('bcryptjs');
+  const db = require('../src/config/database');
+  const settingsSvc = require('../src/services/settings.service');
+  const sslcommerz = require('../src/services/sslcommerz.service');
+
+  const GATEWAY_URL = 'https://sandbox.sslcommerz.test/pay/session-123';
+
+  const KEYS = [
+    'payment_sslcommerz_enabled',
+    'sslcommerz_mode',
+    'sslcommerz_store_id',
+    'sslcommerz_store_password',
+  ];
+
+  let saved = {};
+  let customerId = null;
+  let orderId = null;
+  const extraOrderIds = [];
+
+  const realFetch = global.fetch;
+
+  // What the stubbed gateway will say next. Each test sets it before acting.
+  let validationReply = { status: 'VALID', amount: null };
+
+  global.fetch = async (url) => {
+    const target = String(url);
+
+    // Initiate: answer with a session URL, the way SSLCommerz does.
+    if (target.includes('/gwprocess/')) {
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ status: 'SUCCESS', GatewayPageURL: GATEWAY_URL, sessionkey: 'smoke-session' }),
+      };
+    }
+
+    // Validate: this is the answer that decides whether a payment is real.
+    if (target.includes('/validator/')) {
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({
+          status: validationReply.status,
+          amount: validationReply.amount,
+          currency: 'BDT',
+          bank_tran_id: 'BANK-SMOKE-1',
+          card_type: 'VISA-Dutch Bangla',
+        }),
+      };
+    }
+
+    return { ok: false, status: 404, text: async () => 'unexpected url: ' + target };
+  };
+
+  try {
+    // --- A known configuration ----------------------------------------------
+    const rows = await db.query(
+      `SELECT setting_key, setting_value FROM settings WHERE setting_key IN (${KEYS.map(() => '?').join(', ')})`,
+      KEYS
+    );
+    for (const row of rows) saved[row.setting_key] = row.setting_value;
+
+    await db.query("UPDATE settings SET setting_value = '1' WHERE setting_key = 'payment_sslcommerz_enabled'");
+    await db.query("UPDATE settings SET setting_value = 'sandbox' WHERE setting_key = 'sslcommerz_mode'");
+    await db.query("UPDATE settings SET setting_value = 'smoketest' WHERE setting_key = 'sslcommerz_store_id'");
+    await db.query("UPDATE settings SET setting_value = 'smokepass' WHERE setting_key = 'sslcommerz_store_password'");
+    settingsSvc.invalidate();
+    await settingsSvc.loadAll(true);
+
+    if (sslcommerz.isConfigured()) ok('the gateway reports itself configured');
+    else bad('the gateway reports itself configured', 'isConfigured() said no with both credentials set');
+
+    if (sslcommerz.isLive() === false) ok('sandbox mode selects the sandbox hosts');
+    else bad('sandbox mode selects the sandbox hosts', 'isLive() was true in sandbox mode');
+
+    // --- The customer and the order ------------------------------------------
+    const email = `smoke-gw-${Date.now()}@example.com`;
+    const password = 'SmokePass#2025';
+
+    customerId = await db.insert('customers', {
+      name: 'Smoke Gateway',
+      email,
+      phone: '+8801700000004',
+      password_hash: await bcrypt.hash(password, 12),
+      status: 'active',
+      email_verified_at: new Date(),
+      country: 'Bangladesh',
+    });
+
+    const service = await db.queryOne("SELECT id, title, price FROM services WHERE slug = 'starter'");
+    orderId = await db.insert('orders', {
+      order_number: `SMOKE-GW-${Date.now()}`,
+      customer_id: customerId,
+      service_id: service.id,
+      service_title: service.title,
+      total: service.price,
+      status: 'pending',
+      payment_status: 'unpaid',
+      billing_cycle: 'monthly',
+      term_months: 1,
+    });
+
+    resetCookies();
+    const signinPage = await req('/signin');
+    const signinToken = (signinPage.body.match(/name="_csrf"\s+value="([^"]+)"/) || [])[1];
+
+    const signedIn = await req('/signin', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ _csrf: signinToken, email, password, website: '', next: '/account' }).toString(),
+    });
+
+    if (![301, 302, 303].includes(signedIn.status)) {
+      bad('a customer can reach the gateway checkout', `sign-in returned ${signedIn.status}`);
+      await db.close().catch(() => {});
+      return;
+    }
+
+    const form = await req(`/account/orders/${orderId}/pay`);
+    const formToken = (form.body.match(/name="_csrf"\s+value="([^"]+)"/) || [])[1];
+    const gatewayLabel = sslcommerz.isConfigured() ? 'Card / Mobile Banking' : '';
+
+    const options = [...form.body.matchAll(/name="method" value="([^"]+)"/g)].map((m) => m[1]);
+
+    if (options.includes(gatewayLabel)) {
+      ok('the gateway is offered once configured', gatewayLabel);
+    } else {
+      bad('the gateway is offered once configured', `offered: ${options.join(', ') || 'none'}`);
+    }
+
+    // The manual fields must be hideable for a gateway - there is no receipt.
+    if (form.body.includes('data-manual-only') && form.body.includes('data-submit-label')) {
+      ok('the checkout can hide the manual fields for a gateway');
+    } else {
+      bad('the checkout can hide the manual fields for a gateway', 'no hooks in the markup');
+    }
+
+    // --- Submitting opens a session and redirects ----------------------------
+    const opened = await req('/account/payments', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ _csrf: formToken, order_id: String(orderId), method: gatewayLabel }).toString(),
+    });
+
+    if ([301, 302, 303].includes(opened.status) && String(opened.location).startsWith(GATEWAY_URL)) {
+      ok('choosing the gateway redirects to the provider', 'session URL returned');
+    } else {
+      bad('choosing the gateway redirects to the provider', `status ${opened.status}, location ${opened.location}`);
+    }
+
+    const pending = await db.queryOne(
+      "SELECT id, status, method_type, transaction_id, amount FROM payments WHERE order_id = ? ORDER BY id DESC LIMIT 1",
+      [orderId]
+    );
+
+    if (pending && pending.method_type === 'gateway' && pending.status === 'pending') {
+      ok('a pending gateway payment is recorded', `tran_id ${pending.transaction_id}`);
+    } else {
+      bad('a pending gateway payment is recorded', pending ? `${pending.status}/${pending.method_type}` : 'no row');
+    }
+
+    // --- THE TEST THAT MATTERS ----------------------------------------------
+    //
+    // The success URL is public and the val_id in it is a string anyone can
+    // type. SSLCommerz is about to say the transaction is not valid, so nothing
+    // may be settled - however convincing the request looks.
+    validationReply = { status: 'INVALID_TRANSACTION', amount: null };
+
+    await req(
+      `/payment/sslcommerz/success?tran_id=${encodeURIComponent(pending.transaction_id)}&val_id=FORGED-123&amount=${service.price}`,
+      { withCookies: false }
+    );
+
+    const afterForged = await db.queryOne('SELECT status FROM payments WHERE id = ?', [pending.id]);
+    const orderAfterForged = await db.queryOne('SELECT payment_status FROM orders WHERE id = ?', [orderId]);
+
+    if (afterForged.status === 'pending' && orderAfterForged.payment_status === 'unpaid') {
+      ok('a forged success callback settles nothing', 'the gateway was asked and said no');
+    } else {
+      bad('a forged success callback settles nothing', `payment ${afterForged.status}, order ${orderAfterForged.payment_status}`);
+    }
+
+    // --- A real confirmation settles it --------------------------------------
+    validationReply = { status: 'VALID', amount: Number(service.price) };
+
+    await req(
+      `/payment/sslcommerz/success?tran_id=${encodeURIComponent(pending.transaction_id)}&val_id=VALID-456&amount=${service.price}`,
+      { withCookies: false }
+    );
+
+    const settled = await db.queryOne('SELECT status, gateway_ref FROM payments WHERE id = ?', [pending.id]);
+    const orderSettled = await db.queryOne('SELECT payment_status FROM orders WHERE id = ?', [orderId]);
+
+    if (settled.status === 'approved' && orderSettled.payment_status === 'paid') {
+      ok('a validated confirmation settles the payment', `gateway_ref ${settled.gateway_ref}`);
+    } else {
+      bad('a validated confirmation settles the payment', `payment ${settled.status}, order ${orderSettled.payment_status}`);
+    }
+
+    if (settled.gateway_ref === 'VALID-456') {
+      ok('the gateway reference is recorded', 'so the transaction can be traced later');
+    } else {
+      bad('the gateway reference is recorded', `got ${settled.gateway_ref}`);
+    }
+
+    // --- The IPN arriving after the redirect ---------------------------------
+    //
+    // This is the normal order of events, not an edge case: SSLCommerz posts
+    // the IPN while the customer is still being redirected, so the second
+    // arrival has to be harmless.
+    await req(`/payment/sslcommerz/ipn?tran_id=${encodeURIComponent(pending.transaction_id)}&val_id=VALID-456`, {
+      withCookies: false,
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: 'val_id=VALID-456&tran_id=' + encodeURIComponent(pending.transaction_id),
+    });
+
+    const approvedCount = await db.queryOne(
+      "SELECT COUNT(*) AS n FROM payments WHERE order_id = ? AND status = 'approved'",
+      [orderId]
+    );
+    const orderAfterIpn = await db.queryOne('SELECT payment_status FROM orders WHERE id = ?', [orderId]);
+
+    if (Number(approvedCount.n) === 1 && orderAfterIpn.payment_status === 'paid') {
+      ok('a repeated confirmation does not credit twice', 'still one approved payment');
+    } else {
+      bad('a repeated confirmation does not credit twice', `${approvedCount.n} approved payments`);
+    }
+
+    // --- An amount below the order is refused --------------------------------
+    //
+    // A second order, deliberately. The first is fully paid by now, and the
+    // checkout correctly refuses to open a session for an order with nothing
+    // owing - so testing the amount guard against it would only ever prove that
+    // the earlier guard fired.
+    const underOrderId = await db.insert('orders', {
+      order_number: `SMOKE-GW2-${Date.now()}`,
+      customer_id: customerId,
+      service_id: service.id,
+      service_title: service.title,
+      total: service.price,
+      status: 'pending',
+      payment_status: 'unpaid',
+      billing_cycle: 'monthly',
+      term_months: 1,
+    });
+    extraOrderIds.push(underOrderId);
+
+    const underForm = await req(`/account/orders/${underOrderId}/pay`);
+    const underToken = (underForm.body.match(/name="_csrf"\s+value="([^"]+)"/) || [])[1];
+
+    await req('/account/payments', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ _csrf: underToken, order_id: String(underOrderId), method: gatewayLabel }).toString(),
+    });
+
+    const underPending = await db.queryOne(
+      'SELECT id, transaction_id FROM payments WHERE order_id = ? ORDER BY id DESC LIMIT 1',
+      [underOrderId]
+    );
+
+    if (!underPending) {
+      bad('a confirmation for less than the order is refused', 'no session was opened for the second order');
+    } else {
+      // The gateway confirms a real transaction, but for less than the order.
+      validationReply = { status: 'VALID', amount: 10 };
+
+      await req(
+        `/payment/sslcommerz/success?tran_id=${encodeURIComponent(underPending.transaction_id)}&val_id=UNDERPAID-1`,
+        { withCookies: false }
+      );
+
+      const underpaid = await db.queryOne('SELECT status FROM payments WHERE id = ?', [underPending.id]);
+      const underOrder = await db.queryOne('SELECT payment_status FROM orders WHERE id = ?', [underOrderId]);
+
+      if (underpaid.status !== 'approved' && underOrder.payment_status === 'unpaid') {
+        ok('a confirmation for less than the order is refused', `payment stayed ${underpaid.status}`);
+      } else {
+        bad('a confirmation for less than the order is refused', `payment ${underpaid.status}, order ${underOrder.payment_status}`);
+      }
+    }
+
+    // --- The gateway is withheld without credentials --------------------------
+    await db.query("UPDATE settings SET setting_value = '' WHERE setting_key = 'sslcommerz_store_id'");
+    settingsSvc.invalidate();
+    await settingsSvc.loadAll(true);
+
+    const bare = await req(`/account/orders/${orderId}/pay`);
+    const bareOptions = [...bare.body.matchAll(/name="method" value="([^"]+)"/g)].map((m) => m[1]);
+
+    if (!bareOptions.includes(gatewayLabel)) {
+      ok('the gateway is withheld without credentials', 'a customer is never sent to a provider that has never heard of this store');
+    } else {
+      bad('the gateway is withheld without credentials', 'offered with no store id');
+    }
+  } catch (err) {
+    bad('the SSLCommerz gateway', err.message);
+  } finally {
+    global.fetch = realFetch;
+
+    try {
+      for (const id of [orderId, ...extraOrderIds]) {
+        if (!id) continue;
+        await db.query('DELETE FROM payments WHERE order_id = ?', [id]).catch(() => {});
+        await db.query('DELETE FROM orders WHERE id = ?', [id]).catch(() => {});
+      }
+      if (customerId) await db.query('DELETE FROM customers WHERE id = ?', [customerId]).catch(() => {});
+
+      for (const [key, value] of Object.entries(saved)) {
+        await db.query('UPDATE settings SET setting_value = ? WHERE setting_key = ?', [value, key]);
+      }
+      settingsSvc.invalidate();
+      await settingsSvc.loadAll(true);
+
+      const after = await db.query(
+        `SELECT setting_key, setting_value FROM settings WHERE setting_key IN (${KEYS.map(() => '?').join(', ')})`,
+        KEYS
+      );
+      const drifted = after.filter((row) => String(row.setting_value) !== String(saved[row.setting_key] ?? ''));
+
+      if (!drifted.length) ok('the SSLCommerz settings are restored');
+      else bad('the SSLCommerz settings are restored', `changed: ${drifted.map((r) => r.setting_key).join(', ')}`);
+    } catch (err) {
+      bad('the SSLCommerz settings are restored', err.message);
+    }
+  }
+
+  await db.close().catch(() => {});
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -5458,6 +6029,8 @@ async function main() {
     await checkOrderHandoverLayout();
     await checkPackages();
     await checkPaymentMethods();
+    await checkAccountRecovery();
+    await checkSslcommerz();
     checkInstallSql();
 
 

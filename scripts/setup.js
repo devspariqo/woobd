@@ -1403,7 +1403,58 @@ const COLUMN_MIGRATIONS = [
   { table: 'services', column: 'yearly_discount_percent', definition: 'DECIMAL(5,2) NOT NULL DEFAULT 0.00 AFTER min_months' },
   { table: 'orders', column: 'term_months', definition: 'INT UNSIGNED NOT NULL DEFAULT 1 AFTER billing_cycle' },
   { table: 'services', column: 'order_fees', definition: 'JSON DEFAULT NULL AFTER features' },
+  { table: 'payments', column: 'gateway_ref', definition: 'VARCHAR(120) DEFAULT NULL AFTER transaction_id' },
+  { table: 'payments', column: 'gateway_data', definition: 'JSON DEFAULT NULL AFTER gateway_ref' },
 ];
+
+/**
+ * Indexes added after the table was first created.
+ *
+ * Checked against information_schema.STATISTICS rather than by trying to create
+ * them, so this is safe on every deploy. A unique index on a nullable column
+ * still permits any number of NULLs, which is what makes `gateway_ref` usable
+ * here: manual payments leave it empty and never collide.
+ */
+const INDEX_MIGRATIONS = [
+  {
+    table: 'payments',
+    name: 'uq_payments_gateway_ref',
+    definition: 'UNIQUE KEY `uq_payments_gateway_ref` (`gateway_ref`)',
+  },
+];
+
+async function stepIndexMigrations(db) {
+  let added = 0;
+
+  for (const index of INDEX_MIGRATIONS) {
+    const existing = await db.queryOne(
+      `SELECT COUNT(*) AS n FROM information_schema.STATISTICS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?`,
+      [index.table, index.name]
+    );
+
+    if (Number(existing && existing.n)) continue;
+
+    if (DRY_RUN) {
+      console.log(`  + would add index ${index.name} on ${index.table}`);
+      added += 1;
+      continue;
+    }
+
+    try {
+      await db.query(`ALTER TABLE ${db.escapeId(index.table)} ADD ${index.definition}`);
+      console.log(`  + index ${index.name} on ${index.table}`);
+      added += 1;
+    } catch (err) {
+      // A duplicate value already in the table would refuse a unique index.
+      // Saying so is far more useful than a raw driver error, and it is not a
+      // reason to stop the rest of the setup.
+      console.log(`  · could not add ${index.name}: ${err.message}`);
+    }
+  }
+
+  if (added) console.log(`  ✓ ${added} index(es) added`);
+}
 
 /**
  * Packages that were withdrawn.
@@ -1533,6 +1584,7 @@ async function stepMigrations(db) {
   }
 
   await stepEnumWidenings(db);
+  await stepIndexMigrations(db);
 
   // --- Withdrawn packages ------------------------------------------------
   //

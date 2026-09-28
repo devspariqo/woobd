@@ -41,9 +41,15 @@
                 <% methods.forEach(function (method) { %>
                   <label style="display:flex;gap:13px;align-items:center;padding:14px 16px;border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer">
                     <input type="radio" name="method" value="<%= method.label %>"
+                           data-method-kind="<%= method.kind %>"
                            style="flex-shrink:0" <%= f.method === method.label ? 'checked' : '' %> required>
                     <span style="flex:1;min-width:0">
-                      <span style="display:block;font-weight:600;font-size:.9375rem"><%= method.label %></span>
+                      <span style="display:block;font-weight:600;font-size:.9375rem">
+                        <%= method.label %>
+                        <% if (method.kind === 'gateway') { %>
+                          <span class="pill pill-info" style="margin-left:6px">Confirms instantly</span>
+                        <% } %>
+                      </span>
                       <% if (method.number) { %>
                         <span style="display:block;font-size:.8438rem;color:var(--text-soft);margin-top:2px">
                           Send to <strong data-copy-target><%= method.number %></strong>
@@ -53,6 +59,15 @@
                         <%# A manual method: no receiving number, so the operator's
                             instructions are what the customer needs to read. %>
                         <span style="display:block;font-size:.8438rem;color:var(--text-soft);margin-top:2px"><%= method.note %></span>
+                      <% } else if (method.kind === 'gateway') { %>
+                        <%#
+                          Nothing to send anywhere: the customer leaves the site
+                          and pays on the provider's own pages, then comes back.
+                        %>
+                        <span style="display:block;font-size:.8438rem;color:var(--text-soft);margin-top:2px">
+                          You will be taken to SSLCommerz to pay securely, then brought back here.
+                          Card details are entered on their page, never on ours.
+                        </span>
                       <% } %>
                     </span>
                   </label>
@@ -76,13 +91,21 @@
         </div>
       </div>
 
+      <%#
+        The manual fields, hidden when a gateway method is chosen.
+
+        Wrapped rather than the whole panel, because the submit button lives in
+        the panel foot and has to stay - for a gateway it becomes "Continue to
+        payment" and the customer needs it more than ever.
+      %>
       <div class="panel" style="margin-bottom:22px">
-        <div class="panel-head">
-          <div>
-            <h3>Transfer details</h3>
-            <p>Copy these from your payment receipt exactly as shown.</p>
+        <div data-manual-only>
+          <div class="panel-head">
+            <div>
+              <h3>Transfer details</h3>
+              <p>Copy these from your payment receipt exactly as shown.</p>
+            </div>
           </div>
-        </div>
         <div class="panel-body">
           <div class="form-row">
             <div class="form-group">
@@ -124,12 +147,14 @@
                       placeholder="Anything we should know about this payment…"><%= f.note || '' %></textarea>
           </div>
         </div>
+      </div>
 
-        <div class="panel-foot">
+      <div class="panel" style="margin-bottom:22px">
+        <div class="panel-foot" style="border-top:0">
           <div class="row-between" style="gap:13px;flex-wrap:wrap">
             <a href="<%= helpers.url('/account/orders/' + order.id) %>" class="btn btn-ghost">Cancel</a>
-            <button type="submit" class="btn btn-primary">
-              <svg><use href="#i-upload"/></svg> Submit payment
+            <button type="submit" class="btn btn-primary" data-submit-button>
+              <svg><use href="#i-upload"/></svg> <span data-submit-label>Submit payment</span>
             </button>
           </div>
         </div>
