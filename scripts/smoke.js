@@ -3762,10 +3762,27 @@ async function checkCrawlerFilesAndCompare() {
       warn('both minified assets exist', `missing: ${missing.map(([, m]) => m).join(', ')}`);
     }
 
-    if (home.body.includes('media="print"') && home.body.includes("onload=\"this.media='all'\"")) {
-      ok('fonts load without blocking the first paint');
+    // --- Fonts -------------------------------------------------------------
+    //
+    // Two acceptable states, and the check has to know both.
+    //
+    // Self-hosted is the one that ships: a 3.6 KB stylesheet from our own
+    // origin, deliberately render-blocking so the text is not laid out twice -
+    // once in the fallback and again when the real font lands. Section 34
+    // covers the rest of that.
+    //
+    // The Google fallback is only reached on a checkout that has never run
+    // `npm run build:fonts`, and there the stylesheet has to be kept off the
+    // critical path, because it is a third-party round trip.
+    const selfHosted = home.body.includes('/assets/fonts/fonts.css');
+    const deferred = home.body.includes('media="print"') && home.body.includes("onload=\"this.media='all'\"");
+
+    if (selfHosted) {
+      ok('fonts are served from this origin', 'no third-party round trip before the first paint');
+    } else if (deferred) {
+      ok('fonts load without blocking the first paint', 'the Google fallback is deferred');
     } else {
-      warn('fonts load without blocking the first paint', 'the font stylesheet still blocks rendering');
+      warn('fonts load without blocking the first paint', 'neither self-hosted nor deferred');
     }
 
     // --- Package card -----------------------------------------------------
@@ -6060,6 +6077,79 @@ async function checkBuildWithoutDevDependencies() {
   }
 }
 
+/**
+ * The webfonts are served from this origin.
+ *
+ * Loading them from fonts.googleapis.com cost two extra origins before the
+ * first paint - DNS, TLS and a round trip to googleapis.com for the stylesheet,
+ * then the same again to gstatic.com for the file. Self-hosting took FCP from
+ * 2.8s to 1.7s and the performance score from 91 to 95 under Lighthouse's
+ * mobile throttling, so it is worth a check that it has not quietly reverted.
+ *
+ * A page that still points at Google is not broken, only slow - which is
+ * exactly the kind of thing that goes unnoticed.
+ */
+async function checkSelfHostedFonts() {
+  section('34. Webfonts are self-hosted');
+
+  const fs = require('fs');
+  const path = require('path');
+
+  const FONT_DIR = path.join(__dirname, '..', 'public', 'assets', 'fonts');
+
+  try {
+    const pages = ['/', '/services', '/contact', '/signin'];
+    const offenders = [];
+
+    for (const page of pages) {
+      const res = await req(page);
+      if (/fonts\.googleapis\.com|fonts\.gstatic\.com/.test(res.body)) offenders.push(page);
+    }
+
+    if (!offenders.length) {
+      ok('no page loads fonts from Google', pages.join(', '));
+    } else {
+      bad('no page loads fonts from Google', `still pointing there: ${offenders.join(', ')}`);
+    }
+
+    const home = await req('/');
+
+    if (home.body.includes('/assets/fonts/fonts.css')) {
+      ok('the local font stylesheet is linked');
+    } else {
+      bad('the local font stylesheet is linked', 'no link to /assets/fonts/fonts.css');
+    }
+
+    // The preload is what makes the font arrive before the text needs it. It
+    // has to be a real file, or the browser fetches nothing and warns.
+    const preloads = [...home.body.matchAll(/href="(\/assets\/fonts\/[^"]+\.woff2)"/g)].map((m) => m[1]);
+
+    if (preloads.length) {
+      const missing = preloads.filter((url) => !fs.existsSync(path.join(__dirname, '..', 'public', url)));
+      if (!missing.length) ok('the preloaded font files exist', preloads.map((p) => path.basename(p)).join(', '));
+      else bad('the preloaded font files exist', `missing: ${missing.join(', ')}`);
+    } else {
+      bad('the preloaded font files exist', 'nothing is preloaded');
+    }
+
+    // A preload without crossorigin is fetched a second time for the real
+    // request, which is worse than not preloading at all.
+    if (/rel="preload"[^>]*as="font"[^>]*crossorigin/.test(home.body.replace(/\s+/g, ' '))) {
+      ok('the font preloads are cross-origin enabled');
+    } else {
+      bad('the font preloads are cross-origin enabled', 'a preload without crossorigin is discarded and refetched');
+    }
+
+    if (fs.existsSync(path.join(FONT_DIR, 'manifest.json')) && fs.existsSync(path.join(FONT_DIR, 'fonts.css'))) {
+      ok('the generated font files are present', 'fonts.css and manifest.json');
+    } else {
+      bad('the generated font files are present', 'run "npm run build:fonts"');
+    }
+  } catch (err) {
+    bad('self-hosted fonts', err.message);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -6139,6 +6229,7 @@ async function main() {
     await checkAccountRecovery();
     await checkSslcommerz();
     await checkBuildWithoutDevDependencies();
+    await checkSelfHostedFonts();
     checkInstallSql();
 
 

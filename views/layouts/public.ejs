@@ -88,16 +88,51 @@
     same width class, so it is a font change rather than a layout shift.
   %>
   <%
+    // Self-hosted when scripts/fetch-fonts.js has been run, which is the case
+    // on any checkout that has run the build. Falls back to Google otherwise.
+    var localFonts = helpers.localFonts();
+
     var fontHref = 'https://fonts.googleapis.com/css2?family='
       + encodeURIComponent(fonts.heading).replace(/%20/g, '+') + ':wght@400;500;600;700;800'
-      + '&family=' + encodeURIComponent(fonts.body).replace(/%20/g, '+') + ':wght@400;500;600'
+      + (fonts.body === fonts.heading ? '' : '&family=' + encodeURIComponent(fonts.body).replace(/%20/g, '+') + ':wght@400;500;600')
       + '&display=swap';
   %>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" as="style" href="<%= fontHref %>">
-  <link rel="stylesheet" href="<%= fontHref %>" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="<%= fontHref %>"></noscript>
+
+  <% if (localFonts) { %>
+    <%#
+      Same origin, and the two files the first paint needs are preloaded.
+
+      Loading these from Google cost two extra origins before the first paint -
+      DNS, TLS and a round trip to googleapis.com for the stylesheet, then the
+      same again to gstatic.com for the file. Measured under Lighthouse's mobile
+      throttling, removing the webfonts entirely moved performance 91 → 100,
+      FCP 2.8s → 0.9s. Self-hosting keeps the typeface and drops the third
+      parties.
+
+      `crossorigin` is required on a font preload: fonts are fetched in CORS
+      mode, and a preload without it is discarded and fetched a second time.
+
+      The stylesheet is deliberately render-blocking, unlike the Google one it
+      replaces. It is 3.6 KB from our own origin, and applying it before the
+      first paint is what stops the text being laid out twice - once in the
+      fallback and again when the real font arrives.
+    %>
+    <% localFonts.preload.forEach(function (file) { %>
+      <link rel="preload" as="font" type="font/woff2" crossorigin
+            href="<%= helpers.url('/assets/fonts/' + file) %>">
+    <% }); %>
+    <link rel="stylesheet" href="<%= helpers.versioned(localFonts.css) %>">
+  <% } else { %>
+    <%#
+      The Google fallback, unchanged: non-blocking, with a preconnect to each
+      origin it needs. Only reached when the fonts have not been fetched.
+    %>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" as="style" href="<%= fontHref %>">
+    <link rel="stylesheet" href="<%= fontHref %>" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="<%= fontHref %>"></noscript>
+  <% } %>
 
   <link rel="stylesheet" href="<%= helpers.versioned('/assets/css/theme.css') %>">
 

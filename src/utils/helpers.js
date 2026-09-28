@@ -342,11 +342,42 @@ function jsonLd(value) {
     .replace(/\u2029/g, '\\u2029');
 }
 
+/**
+ * The self-hosted webfonts, or null when they have not been built.
+ *
+ * Returns { css, preload } - the stylesheet URL and the woff2 files worth
+ * preloading. `scripts/fetch-fonts.js` writes both, and the manifest is what
+ * makes the preload list match the files on disk rather than a guess at what
+ * Google would have named them.
+ *
+ * Returning null is the normal state for a checkout that has never run the
+ * fetch, and the layout falls back to Google Fonts in that case - so this is a
+ * speed-up when it is available, never a requirement.
+ */
+function localFonts() {
+  const dir = path.join(__dirname, '..', '..', 'public', 'assets', 'fonts');
+
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'));
+    if (!fs.existsSync(path.join(dir, 'fonts.css'))) return null;
+
+    return {
+      css: '/assets/fonts/fonts.css',
+      preload: Array.isArray(manifest.preload)
+        ? manifest.preload.filter((file) => fs.existsSync(path.join(dir, file)))
+        : [],
+    };
+  } catch (err) {
+    return null;
+  }
+}
+
 module.exports = {
   url,
   absoluteUrl,
   assetUrl,
   versioned,
+  localFonts,
   contrastText,
   escapeHtml,
   jsonLd,

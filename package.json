@@ -22,7 +22,8 @@
     "preview": "node scripts/preview-settings.js",
     "preview:admin": "node scripts/preview-admin.js",
     "reset": "node scripts/setup.js --reset",
-    "build:assets": "node scripts/minify-assets.js"
+    "build:assets": "node scripts/minify-assets.js",
+    "build:fonts": "node scripts/fetch-fonts.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
