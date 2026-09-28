@@ -4825,6 +4825,81 @@ async function checkChatDashboard() {
   await db.close().catch(() => {});
 }
 
+/**
+ * The handover details table on the order page.
+ *
+ * Layout, not data. The columns used to carry their own heading - rendered on
+ * the first row and blanked on every row after - and the Visible checkbox was
+ * nudged level with the text inputs by a `padding-bottom` hack. A heading row
+ * plus same-height grid cells is what replaces it, and the assertions are on
+ * the structure that makes that work rather than on pixels.
+ */
+async function checkOrderHandoverLayout() {
+  section('28. Order handover details layout');
+
+  const db = require('../src/config/database');
+
+  try {
+    const login = await adminLogin();
+    if (!login.ok) {
+      warn('the handover table renders', `${login.reason} - skipping`);
+      await db.close().catch(() => {});
+      return;
+    }
+
+    const order = await db.queryOne('SELECT id FROM orders ORDER BY id ASC LIMIT 1');
+    if (!order) {
+      warn('the handover table renders', 'no orders to open');
+      await db.close().catch(() => {});
+      return;
+    }
+
+    const page = await req(`/${ADMIN_SLUG}/orders/${order.id}`);
+    if (page.status !== 200) {
+      bad('the handover table renders', `order ${order.id} → ${page.status}`);
+      await db.close().catch(() => {});
+      return;
+    }
+    ok('the handover table renders', `order ${order.id}`);
+
+    // Exactly one heading row. The old markup put the heading inside the list,
+    // on the first row only, so counting is the check.
+    const heads = (page.body.match(/class="deliverable-head"/g) || []).length;
+    if (heads === 1) ok('there is one heading row', 'not one per row');
+    else bad('there is one heading row', `found ${heads}`);
+
+    const rows = (page.body.match(/class="deliverable-row"/g) || []).length;
+    const checks = (page.body.match(/class="deliverable-visible"/g) || []).length;
+
+    if (rows > 0 && rows === checks) {
+      ok('every row has a Visible cell', `${rows} row(s)`);
+    } else {
+      bad('every row has a Visible cell', `${rows} rows, ${checks} Visible cells`);
+    }
+
+    // The old padding nudge is what caused the misalignment. If it comes back,
+    // so does the bug.
+    if (!/padding-bottom:\s*11px/.test(page.body)) {
+      ok('the alignment padding hack is gone');
+    } else {
+      bad('the alignment padding hack is gone', 'padding-bottom:11px is back in the markup');
+    }
+
+    // The cloned template must match the rendered rows, or the first row
+    // somebody adds is the one that looks wrong.
+    const template = page.body.match(/<template data-repeat-template>[\s\S]*?<\/template>/);
+    if (template && template[0].includes('deliverable-row') && template[0].includes('deliverable-visible')) {
+      ok('the add-row template matches the rendered rows');
+    } else {
+      bad('the add-row template matches the rendered rows', 'the template uses different markup');
+    }
+  } catch (err) {
+    bad('the handover table', err.message);
+  }
+
+  await db.close().catch(() => {});
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -4898,6 +4973,7 @@ async function main() {
     // after it may depend on either.
     await checkMailNotifications();
     await checkChatDashboard();
+    await checkOrderHandoverLayout();
     checkInstallSql();
   } catch (err) {
     console.error('\n  ✗ Smoke test aborted by an unexpected error');

@@ -1668,3 +1668,56 @@
 }
 
 .chat-bubble-system .chat-bubble-body { font-size: .8125rem; color: var(--text-soft); }
+
+/* --------------------------------------------------------------------------
+   Order handover details
+
+   A four-column grid with a header row above it. The columns used to carry
+   their own heading - rendered on the first row and blanked on every row after
+   - which left the checkbox needing a padding nudge to sit level with the text
+   inputs. Same-height cells in one grid need no nudge.
+   -------------------------------------------------------------------------- */
+
+.deliverable-head,
+.deliverable-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) 66px auto;
+  gap: 11px;
+  align-items: center;
+}
+
+.deliverable-head {
+  margin-bottom: 8px;
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.deliverable-head-visible { text-align: center; }
+
+.deliverable-row { margin-bottom: 12px; }
+
+/* Exactly the height of .form-control, so the box lines up with the fields
+   beside it instead of floating at whatever height its label happened to be. */
+.deliverable-visible {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 42px;
+  cursor: pointer;
+}
+
+/* Two columns cannot hold a label, a value and a checkbox on a phone. The
+   heading row goes away with them - it would label the wrong things. */
+@media (max-width: 720px) {
+  .deliverable-head { display: none; }
+
+  .deliverable-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .deliverable-row .form-control { grid-column: 1 / -1; }
+}

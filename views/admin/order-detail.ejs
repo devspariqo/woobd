@@ -47,24 +47,38 @@
           </div>
 
           <div data-repeatable>
+            <%#
+              A real header row rather than a label repeated on the first row only.
+
+              The columns used to carry their own heading, rendered for index 0 and
+              a blank placeholder for every row after it - so the heading sat inside
+              the list and the checkbox had to be nudged up with a padding hack to
+              line up with the text inputs. A separate header row removes both: the
+              fields line up because they are the same height in the same grid, and
+              there is nothing to compensate for.
+            %>
+            <div class="deliverable-head" aria-hidden="true">
+              <span>Label</span>
+              <span>Value</span>
+              <span class="deliverable-head-visible">Visible</span>
+              <span></span>
+            </div>
+
             <div data-repeat-list>
               <% if (deliverables && deliverables.length) { %>
                 <% deliverables.forEach(function (item, index) { %>
-                  <div data-repeat-row style="display:grid;grid-template-columns:1fr 1.6fr auto auto;gap:11px;align-items:end;margin-bottom:12px">
-                    <div>
-                      <% if (index === 0) { %><label class="form-label">Label</label><% } %>
-                      <input type="text" name="deliverable_label" class="form-control" value="<%= item.label %>"
-                             placeholder="Website admin cPanel URL" maxlength="150">
-                    </div>
-                    <div>
-                      <% if (index === 0) { %><label class="form-label">Value</label><% } %>
-                      <input type="text" name="deliverable_value" class="form-control" value="<%= item.value || '' %>"
-                             placeholder="https://cpanel.hostinger.com or the password" maxlength="4000">
-                    </div>
-                    <label style="display:flex;flex-direction:column;align-items:center;gap:5px;font-size:.75rem;color:var(--text-soft);font-weight:600;padding-bottom:11px;cursor:pointer">
-                      <% if (index === 0) { %><span>Visible</span><% } else { %><span>&nbsp;</span><% } %>
+                  <div data-repeat-row class="deliverable-row">
+                    <input type="text" name="deliverable_label" class="form-control" value="<%= item.label %>"
+                           placeholder="Website admin cPanel URL" maxlength="150" aria-label="Label">
+
+                    <input type="text" name="deliverable_value" class="form-control" value="<%= item.value || '' %>"
+                           placeholder="https://cpanel.hostinger.com or the password" maxlength="4000" aria-label="Value">
+
+                    <label class="deliverable-visible">
                       <input type="checkbox" name="deliverable_visible" value="<%= index %>" <%= item.is_visible ? 'checked' : '' %>>
+                      <span class="sr-only">Visible to the customer</span>
                     </label>
+
                     <button type="button" class="btn btn-ghost btn-sm" data-repeat-remove aria-label="Remove row"
                             style="height:42px;padding:0 13px">
                       <svg><use href="#i-trash"/></svg>
@@ -81,20 +95,18 @@
                      ['Admin password', ''],
                      ['Database name', '']
                    ].forEach(function (preset, index) { %>
-                  <div data-repeat-row style="display:grid;grid-template-columns:1fr 1.6fr auto auto;gap:11px;align-items:end;margin-bottom:12px">
-                    <div>
-                      <% if (index === 0) { %><label class="form-label">Label</label><% } %>
-                      <input type="text" name="deliverable_label" class="form-control" value="<%= preset[0] %>" maxlength="150">
-                    </div>
-                    <div>
-                      <% if (index === 0) { %><label class="form-label">Value</label><% } %>
-                      <input type="text" name="deliverable_value" class="form-control" value="<%= preset[1] %>"
-                             placeholder="Fill this in before activating" maxlength="4000">
-                    </div>
-                    <label style="display:flex;flex-direction:column;align-items:center;gap:5px;font-size:.75rem;color:var(--text-soft);font-weight:600;padding-bottom:11px;cursor:pointer">
-                      <% if (index === 0) { %><span>Visible</span><% } else { %><span>&nbsp;</span><% } %>
+                  <div data-repeat-row class="deliverable-row">
+                    <input type="text" name="deliverable_label" class="form-control" value="<%= preset[0] %>"
+                           maxlength="150" aria-label="Label">
+
+                    <input type="text" name="deliverable_value" class="form-control" value="<%= preset[1] %>"
+                           placeholder="Fill this in before activating" maxlength="4000" aria-label="Value">
+
+                    <label class="deliverable-visible">
                       <input type="checkbox" name="deliverable_visible" value="<%= index %>" checked>
+                      <span class="sr-only">Visible to the customer</span>
                     </label>
+
                     <button type="button" class="btn btn-ghost btn-sm" data-repeat-remove aria-label="Remove row"
                             style="height:42px;padding:0 13px">
                       <svg><use href="#i-trash"/></svg>
@@ -107,17 +119,16 @@
             <%# Template cloned by dashboard.js initRepeatable(). __INDEX__ is
                 replaced with a fresh row number on each add. %>
             <template data-repeat-template>
-              <div data-repeat-row style="display:grid;grid-template-columns:1fr 1.6fr auto auto;gap:11px;align-items:end;margin-bottom:12px">
-                <div>
-                  <input type="text" name="deliverable_label" class="form-control" value="" placeholder="Label" maxlength="150">
-                </div>
-                <div>
-                  <input type="text" name="deliverable_value" class="form-control" value="" placeholder="Value" maxlength="4000">
-                </div>
-                <label style="display:flex;flex-direction:column;align-items:center;gap:5px;font-size:.75rem;color:var(--text-soft);font-weight:600;padding-bottom:11px;cursor:pointer">
-                  <span>&nbsp;</span>
+              <div data-repeat-row class="deliverable-row">
+                <input type="text" name="deliverable_label" class="form-control" value="" placeholder="Label" maxlength="150" aria-label="Label">
+
+                <input type="text" name="deliverable_value" class="form-control" value="" placeholder="Value" maxlength="4000" aria-label="Value">
+
+                <label class="deliverable-visible">
                   <input type="checkbox" name="deliverable_visible" value="__INDEX__" checked>
+                  <span class="sr-only">Visible to the customer</span>
                 </label>
+
                 <button type="button" class="btn btn-ghost btn-sm" data-repeat-remove aria-label="Remove row"
                         style="height:42px;padding:0 13px">
                   <svg><use href="#i-trash"/></svg>
