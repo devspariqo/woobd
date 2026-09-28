@@ -2969,8 +2969,18 @@ async function checkEditorAndFooter() {
         const parts = [];
         const fields = { _csrf: token, group: 'payments' };
         // Post every non-file field so nothing else in the group is disturbed.
+        //
+        // Booleans are the exception, and getting them wrong is what made this
+        // test disturb everything: a browser omits an unchecked box entirely,
+        // and the handler reads any present value as ON - so posting '0' for a
+        // switched-off method turned it ON. Only the ones that are actually on
+        // get posted.
         for (const def of require('../src/config/settings-schema').BY_GROUP.payments) {
           if (def.type === 'file') continue;
+          if (def.type === 'boolean') {
+            if (settingsSvc.getBool(def.key)) fields[def.key] = '1';
+            continue;
+          }
           fields[def.key] = String(settingsSvc.get(def.key, def.default));
         }
         for (const [name, value] of Object.entries(fields)) {
@@ -5113,6 +5123,265 @@ async function checkPackages() {
   await db.close().catch(() => {});
 }
 
+/**
+ * Payment methods.
+ *
+ * The failure this section exists for: a method switched on in the panel but
+ * missing from the server's allow-list is offered at checkout and then refused
+ * on submit. The customer sees "please choose how you paid" with their choice
+ * already selected, which reads as the payment system being broken. That is
+ * what four hardcoded lists in four files quietly does.
+ */
+async function checkPaymentMethods() {
+  section('30. Payment methods');
+
+  const bcrypt = require('bcryptjs');
+  const db = require('../src/config/database');
+  const settingsSvc = require('../src/services/settings.service');
+  const { PAYMENT_METHODS } = require('../src/config/payment-methods');
+  const schema = require('../src/config/settings-schema');
+
+  const KEYS = PAYMENT_METHODS.flatMap((m) => [
+    `payment_${m.key}_enabled`,
+    m.kind === 'wallet' ? `payment_${m.key}_number` : `payment_${m.key}_note`,
+  ]);
+
+  let saved = {};
+  // Declared out here so the finally block can clean up whatever the try block
+  // managed to create before it bailed.
+  let createdCustomerId = null;
+  let createdOrderId = null;
+
+  /** Build a multipart body with one file. */
+  const multipart = (fields, file) => {
+    const boundary = `----WooBDPay${Date.now()}`;
+    const parts = [];
+    for (const [name, value] of Object.entries(fields)) {
+      parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`));
+    }
+    if (file) {
+      parts.push(Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="${file.field}"; filename="${file.filename}"\r\nContent-Type: ${file.type}\r\n\r\n`
+      ));
+      parts.push(file.data);
+      parts.push(Buffer.from('\r\n'));
+    }
+    parts.push(Buffer.from(`--${boundary}--\r\n`));
+    return { body: Buffer.concat(parts), contentType: `multipart/form-data; boundary=${boundary}` };
+  };
+
+  try {
+    // --- The registry drives the settings ------------------------------------
+    const missingSettings = PAYMENT_METHODS.filter((m) => !schema.BY_KEY[`payment_${m.key}_enabled`]);
+
+    if (!missingSettings.length) {
+      ok('every method has an enable switch', `${PAYMENT_METHODS.length} method(s) declared`);
+    } else {
+      bad('every method has an enable switch', `missing: ${missingSettings.map((m) => m.key).join(', ')}`);
+    }
+
+    // --- A known state, so the assertions below mean something ---------------
+    const rows = await db.query(
+      `SELECT setting_key, setting_value FROM settings WHERE setting_key IN (${KEYS.map(() => '?').join(', ')})`,
+      KEYS
+    );
+    for (const row of rows) saved[row.setting_key] = row.setting_value;
+
+
+    await db.query("UPDATE settings SET setting_value = '1' WHERE setting_key IN ('payment_bkash_enabled', 'payment_upay_enabled', 'payment_tap_enabled', 'payment_cod_enabled')");
+    await db.query("UPDATE settings SET setting_value = '01700000000' WHERE setting_key = 'payment_upay_number'");
+    await db.query("UPDATE settings SET setting_value = 'Send cash with the courier.' WHERE setting_key = 'payment_cod_note'");
+    // Switched on, but nothing to send money to.
+    await db.query("UPDATE settings SET setting_value = '' WHERE setting_key = 'payment_tap_number'");
+    settingsSvc.invalidate();
+    await settingsSvc.loadAll(true);
+
+    // --- What the public pages show ------------------------------------------
+    const home = await req('/');
+    const chips = [...home.body.matchAll(/class="payment-chip">([^<]+)</g)].map((m) => m[1].trim());
+
+    if (chips.includes('Upay')) ok('a newly enabled wallet appears', 'Upay, with a number set');
+    else bad('a newly enabled wallet appears', `chips: ${chips.join(', ') || 'none'}`);
+
+    if (chips.includes('Cash on delivery')) ok('a manual method appears', 'Cash on delivery');
+    else bad('a manual method appears', `chips: ${chips.join(', ') || 'none'}`);
+
+    // The guard: switched on but unusable must not reach a customer.
+    if (!chips.some((c) => c.includes('Tap'))) {
+      ok("a wallet with no number is withheld", "Tap'Pay is switched on but has no receiving number");
+    } else {
+      bad("a wallet with no number is withheld", 'offered with nothing to pay into');
+    }
+
+    // --- The panel says why ---------------------------------------------------
+    const login = await adminLogin();
+    if (!login.ok) {
+      warn('the panel explains a withheld method', `${login.reason} - skipping`);
+      return;
+    }
+
+    const paymentsTab = await req(`/${ADMIN_SLUG}/settings?group=payments`);
+    if (paymentsTab.body.includes('switched on but') && paymentsTab.body.includes('no receiving number')) {
+      ok('the panel explains a withheld method', 'names it and says why');
+    } else {
+      bad('the panel explains a withheld method', 'nothing on the payments tab explains it');
+    }
+
+    // --- The checkout offers, and the server accepts -------------------------
+    //
+    // The round trip is the point. Rendering a method is not the same as
+    // accepting it, and the gap between the two is the bug.
+    const email = `smoke-pay-${Date.now()}@example.com`;
+    const password = 'SmokePass#2025';
+
+    const customerId = await db.insert('customers', {
+      name: 'Smoke Payer',
+      email,
+      phone: '+8801700000001',
+      password_hash: await bcrypt.hash(password, 12),
+      status: 'active',
+      email_verified_at: new Date(),
+      country: 'Bangladesh',
+    });
+    createdCustomerId = customerId;
+
+    const service = await db.queryOne("SELECT id, title, price FROM services WHERE slug = 'starter'");
+    const orderId = await db.insert('orders', {
+      order_number: `SMOKE-PAY-${Date.now()}`,
+      customer_id: customerId,
+      service_id: service.id,
+      service_title: service.title,
+      total: service.price,
+      status: 'pending',
+      payment_status: 'unpaid',
+      billing_cycle: 'monthly',
+      term_months: 1,
+    });
+    createdOrderId = orderId;
+
+    resetCookies();
+    const signinPage = await req('/signin');
+    const signinToken = (signinPage.body.match(/name="_csrf"\s+value="([^"]+)"/) || [])[1];
+
+    const signedIn = await req('/signin', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ _csrf: signinToken, email, password, website: '', next: '/account' }).toString(),
+    });
+
+    if (![301, 302, 303].includes(signedIn.status)) {
+      bad('a customer can reach the payment form', `sign-in returned ${signedIn.status}`);
+      return;
+    }
+
+    const form = await req(`/account/orders/${orderId}/pay`);
+    const formToken = (form.body.match(/name="_csrf"\s+value="([^"]+)"/) || [])[1];
+
+    if (form.status !== 200) {
+      bad('a customer can reach the payment form', `got ${form.status}`);
+      return;
+    }
+
+    // Every usable method, and only those, as radio options.
+    const options = [...form.body.matchAll(/name="method" value="([^"]+)"/g)].map((m) => m[1]);
+
+    if (options.includes('Upay') && options.includes('Cash on delivery')) {
+      ok('the checkout offers the enabled methods', options.join(', '));
+    } else {
+      bad('the checkout offers the enabled methods', `offered: ${options.join(', ') || 'none'}`);
+    }
+
+    if (!options.some((o) => o.includes('Tap'))) {
+      ok('the checkout withholds the unusable one', "Tap'Pay not offered");
+    } else {
+      bad('the checkout withholds the unusable one', "Tap'Pay was offered with no number");
+    }
+
+    // --- Submitting an offered method is accepted ----------------------------
+    // Built once: two calls would produce two boundaries, and the body would
+    // not match the Content-Type header.
+    const body1 = multipart({
+      _csrf: formToken,
+      order_id: String(orderId),
+      method: 'Upay',
+      transaction_id: 'SMOKE-TXN-1',
+      amount: String(service.price),
+      note: '',
+    }, null);
+
+    const accepted = await req('/account/payments', {
+      method: 'POST',
+      headers: { 'content-type': body1.contentType },
+      body: body1.body,
+    });
+
+    const stored = await db.queryOne('SELECT method, method_type, status FROM payments WHERE order_id = ?', [orderId]);
+
+    if ([301, 302, 303].includes(accepted.status) && stored && stored.method === 'Upay') {
+      ok('a submitted method is accepted', `Upay stored as ${stored.method_type}, ${stored.status}`);
+    } else {
+      bad('a submitted method is accepted', `status ${accepted.status}, stored ${stored ? stored.method : 'nothing'}`);
+    }
+
+    // --- Submitting a withheld method is refused -----------------------------
+    //
+    // The guard against a customer hand-crafting a method the site never
+    // offered them.
+    const body2 = multipart({
+      _csrf: formToken,
+      order_id: String(orderId),
+      method: "Tap\u2019Pay",
+      transaction_id: 'SMOKE-TXN-2',
+      amount: String(service.price),
+      note: '',
+    }, null);
+
+    const refused = await req('/account/payments', {
+      method: 'POST',
+      headers: { 'content-type': body2.contentType },
+      body: body2.body,
+    });
+
+    if (refused.status === 400) {
+      ok('a method that was never offered is refused', '400');
+    } else {
+      bad('a method that was never offered is refused', `got ${refused.status}`);
+    }
+  } catch (err) {
+    bad('payment methods', err.message);
+  } finally {
+    // In a finally, not after the try. Every early return above would otherwise
+    // skip it, and this section switches payment methods ON - leaving a live
+    // site taking payments through methods it was not configured for.
+    try {
+      await db.query('DELETE FROM payments WHERE order_id = ?', [createdOrderId || 0]);
+      if (createdOrderId) await db.query('DELETE FROM orders WHERE id = ?', [createdOrderId]);
+      if (createdCustomerId) await db.query('DELETE FROM customers WHERE id = ?', [createdCustomerId]);
+
+      for (const [key, value] of Object.entries(saved)) {
+        await db.query('UPDATE settings SET setting_value = ? WHERE setting_key = ?', [value, key]);
+      }
+      settingsSvc.invalidate();
+      await settingsSvc.loadAll(true);
+
+      // Confirm it, rather than assuming - a silent restore failure is how a
+      // test run leaves the site changed.
+      const after = await db.query(
+        `SELECT setting_key, setting_value FROM settings WHERE setting_key IN (${KEYS.map(() => '?').join(', ')})`,
+        KEYS
+      );
+      const drifted = after.filter((row) => String(row.setting_value) !== String(saved[row.setting_key] ?? ''));
+
+      if (!drifted.length) ok('the payment settings are restored');
+      else bad('the payment settings are restored', `changed: ${drifted.map((r) => r.setting_key).join(', ')}`);
+    } catch (err) {
+      bad('the payment settings are restored', err.message);
+    }
+  }
+
+  await db.close().catch(() => {});
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -5188,7 +5457,10 @@ async function main() {
     await checkChatDashboard();
     await checkOrderHandoverLayout();
     await checkPackages();
+    await checkPaymentMethods();
     checkInstallSql();
+
+
   } catch (err) {
     console.error('\n  ✗ Smoke test aborted by an unexpected error');
     console.error(`    ${err.stack || err.message}\n`);

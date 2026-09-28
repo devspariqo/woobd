@@ -1422,6 +1422,62 @@ const WITHDRAWN_SERVICE_SLUGS = [
   'corporate-website-with-cms',
 ];
 
+/**
+ * Enums that gained values after the fact.
+ *
+ * MySQL cannot add a value to an ENUM in place, so the column is redefined.
+ * The check is on the column's current definition rather than on its existence,
+ * which is what makes this safe on every deploy: once the values are present
+ * the statement is skipped.
+ *
+ * Widening an ENUM is non-destructive - existing rows keep their values - so
+ * unlike a column addition there is no data to lose by running it.
+ */
+const ENUM_WIDENINGS = [
+  {
+    table: 'payments',
+    column: 'method_type',
+    // The channel the payment came through. 'manual' and 'card' were the only
+    // two the original four methods needed; wallets and the other manual
+    // channels need names of their own, and storing everything as 'manual'
+    // would make the column say nothing.
+    values: ['wallet', 'bank_transfer', 'cash_on_delivery'],
+    definition:
+      "ENUM('manual','card','gateway','wallet','bank_transfer','cash_on_delivery') NOT NULL DEFAULT 'manual'",
+  },
+];
+
+async function stepEnumWidenings(db) {
+  let widened = 0;
+
+  for (const change of ENUM_WIDENINGS) {
+    const column = await db.queryOne(
+      `SELECT COLUMN_TYPE AS type FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+      [change.table, change.column]
+    );
+
+    if (!column) continue;
+
+    const missing = change.values.filter((value) => !String(column.type).includes(`'${value}'`));
+    if (!missing.length) continue;
+
+    if (DRY_RUN) {
+      console.log(`  + would widen ${change.table}.${change.column} for ${missing.join(', ')}`);
+      widened += 1;
+      continue;
+    }
+
+    await db.query(
+      `ALTER TABLE ${db.escapeId(change.table)} MODIFY ${db.escapeId(change.column)} ${change.definition}`
+    );
+    console.log(`  + ${change.table}.${change.column} now accepts ${missing.join(', ')}`);
+    widened += 1;
+  }
+
+  if (widened) console.log(`  ✓ ${widened} enum(s) widened`);
+}
+
 async function stepMigrations(db) {
   divider('1b. Column migrations');
 
@@ -1475,6 +1531,8 @@ async function stepMigrations(db) {
         : `  ✓ all ${present} column(s) already present`
     );
   }
+
+  await stepEnumWidenings(db);
 
   // --- Withdrawn packages ------------------------------------------------
   //

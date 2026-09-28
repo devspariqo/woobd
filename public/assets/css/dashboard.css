@@ -1721,3 +1721,13 @@
 
   .deliverable-row .form-control { grid-column: 1 / -1; }
 }
+
+/* Amber, for "switched on but not finished" - distinct from is-missing, which
+   is red and means the feature is broken rather than incomplete. */
+.conn-pill.is-warn {
+  background: rgba(240, 160, 32, .12);
+  border-color: rgba(240, 160, 32, .3);
+  color: #92610b;
+}
+
+[data-theme='dark'] .conn-pill.is-warn { color: #fcd34d; }

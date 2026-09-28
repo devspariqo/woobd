@@ -332,21 +332,13 @@ const SETTINGS = [
   },
 
   // ---------------- Payments ----------------
-  { key: 'payment_bkash_enabled', type: 'boolean', group: 'payments', default: '1', public: true, label: 'Enable bKash' },
-  { key: 'payment_bkash_number', type: 'text', group: 'payments', default: '01789668276', public: true, label: 'bKash number' },
-  { key: 'payment_bkash_type', type: 'select', group: 'payments', default: 'Personal', public: true, label: 'bKash account type', options: ['Personal', 'Merchant'] },
-  { key: 'payment_bkash_logo', type: 'file', group: 'payments', default: '', public: true, label: 'bKash logo', help: 'Shown in the footer. Without it the method is shown as a text badge.' },
-  { key: 'payment_nagad_enabled', type: 'boolean', group: 'payments', default: '1', public: true, label: 'Enable Nagad' },
-  { key: 'payment_nagad_number', type: 'text', group: 'payments', default: '01789668276', public: true, label: 'Nagad number' },
-  { key: 'payment_nagad_type', type: 'select', group: 'payments', default: 'Personal', public: true, label: 'Nagad account type', options: ['Personal', 'Merchant'] },
-  { key: 'payment_nagad_logo', type: 'file', group: 'payments', default: '', public: true, label: 'Nagad logo' },
-  { key: 'payment_rocket_enabled', type: 'boolean', group: 'payments', default: '1', public: true, label: 'Enable Rocket' },
-  { key: 'payment_rocket_number', type: 'text', group: 'payments', default: '017896682761', public: true, label: 'Rocket number' },
-  { key: 'payment_rocket_type', type: 'select', group: 'payments', default: 'Personal', public: true, label: 'Rocket account type', options: ['Personal', 'Merchant'] },
-  { key: 'payment_rocket_logo', type: 'file', group: 'payments', default: '', public: true, label: 'Rocket logo' },
-  { key: 'payment_card_enabled', type: 'boolean', group: 'payments', default: '1', public: true, label: 'Enable card payment' },
-  { key: 'payment_card_note', type: 'textarea', group: 'payments', default: 'Card payments are processed through our secure gateway. Share the last 4 digits of your card and the transaction reference so we can match it.', public: true, label: 'Card payment instructions' },
-  { key: 'payment_card_logo', type: 'file', group: 'payments', default: '', public: true, label: 'Card / gateway logo', help: 'For example a Visa, Mastercard or SSLCommerz mark.' },
+  //
+  // Generated from src/config/payment-methods.js, which the context middleware,
+  // the public views and the customer controller all read as well. Adding a
+  // method there adds its fields here, offers it at checkout and accepts it on
+  // submit - in one edit, instead of five that have to be kept in step.
+  ...paymentMethods(),
+
   { key: 'payment_instructions', type: 'textarea', group: 'payments', default: 'Send the exact amount to one of the numbers below, then submit the transaction ID on the order page. We verify payments within 24 hours.', public: true, label: 'Payment instructions' },
   { key: 'invoice_prefix', type: 'text', group: 'payments', default: 'INV-', public: false, label: 'Invoice prefix' },
   { key: 'order_prefix', type: 'text', group: 'payments', default: 'WBD-', public: false, label: 'Order prefix' },
@@ -473,6 +465,75 @@ const SETTINGS = [
   ...emailTemplates(),
 
 ];
+
+/**
+ * An editable field set for every payment method.
+ *
+ * Grouped so the switch, the receiving details and the logo sit together, and
+ * so a method added to the registry appears in the panel without anybody having
+ * to remember to add it.
+ */
+function paymentMethods() {
+  const { PAYMENT_METHODS } = require('./payment-methods');
+  const out = [];
+
+  for (const method of PAYMENT_METHODS) {
+    out.push({
+      key: `payment_${method.key}_enabled`,
+      type: 'boolean',
+      group: 'payments',
+      default: method.enabled ? '1' : '0',
+      public: true,
+      label: `Enable ${method.label}`,
+      help: method.blurb,
+    });
+
+    if (method.kind === 'wallet') {
+      out.push(
+        {
+          key: `payment_${method.key}_number`,
+          type: 'text',
+          group: 'payments',
+          default: method.number || '',
+          public: true,
+          label: `${method.label} number`,
+          help: 'The wallet number customers send money to.',
+        },
+        {
+          key: `payment_${method.key}_type`,
+          type: 'select',
+          group: 'payments',
+          default: method.accountType || 'Personal',
+          public: true,
+          label: `${method.label} account type`,
+          options: ['Personal', 'Merchant'],
+        }
+      );
+    } else {
+      out.push({
+        key: `payment_${method.key}_note`,
+        type: 'textarea',
+        group: 'payments',
+        default: method.note || '',
+        public: true,
+        label: `${method.label} instructions`,
+        help: 'Shown to the customer at checkout. For a bank transfer this is where the account details go.',
+      });
+    }
+
+    out.push({
+      key: `payment_${method.key}_logo`,
+      type: 'file',
+      group: 'payments',
+      default: '',
+      public: true,
+      label: `${method.label} logo`,
+      help: 'Shown in the footer and on the package pages. Without it the method is shown as a text badge, so this is optional.',
+    });
+  }
+
+  return out;
+}
 
 /**
  * An editable subject and heading for every email the application sends.

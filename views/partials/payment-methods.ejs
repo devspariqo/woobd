@@ -11,19 +11,18 @@
 %>
 <%
   var size = typeof size === 'undefined' ? 'md' : size;
-  var methods = [
-    { key: 'bkash', label: 'bKash', data: payments.bkash },
-    { key: 'nagad', label: 'Nagad', data: payments.nagad },
-    { key: 'rocket', label: 'Rocket', data: payments.rocket },
-    { key: 'card', label: 'Card', data: payments.card }
-  ].filter(function (m) { return m.data && m.data.enabled; });
+
+  // Straight from the registry, in registry order. This list used to be written
+  // out here, in the footer and at checkout, so a method added to one was
+  // missing from the others until somebody noticed.
+  var methods = (payments.methods || []).filter(function (m) { return m.enabled; });
 %>
 <% if (methods.length) { %>
   <div class="pay-methods pay-methods-<%= size %>">
     <% methods.forEach(function (method) { %>
-      <% if (method.data.logo) { %>
+      <% if (method.logo) { %>
         <span class="pay-chip pay-chip-logo" title="<%= method.label %>">
-          <img src="<%= helpers.url(method.data.logo) %>" alt="<%= method.label %>" loading="lazy">
+          <img src="<%= helpers.url(method.logo) %>" alt="<%= method.label %>" loading="lazy">
         </span>
       <% } else { %>
         <span class="pay-chip"><%= method.label %></span>

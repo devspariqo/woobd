@@ -13,6 +13,7 @@ const settings = require('../services/settings.service');
 const helpers = require('../utils/helpers');
 const storage = require('../lib/storage');
 const config = require('../config');
+const { PAYMENT_METHODS } = require('../config/payment-methods');
 
 /** Short-lived menu cache: menus change rarely but render on every page. */
 let menuCache = null;
@@ -165,7 +166,9 @@ function viewContext() {
     res.locals.isCustomer = false;
     res.locals.badges = {};
     res.locals.layout = isAdminRequest(req) ? 'layouts/admin' : 'layouts/public';
-    res.locals.payments = { bkash: {}, nagad: {}, rocket: {}, card: {}, instructions: '' };
+    // Shape only, until the settings have loaded. `methods` is present so a
+    // template that iterates it does not have to guard against undefined.
+    res.locals.payments = { methods: [], enabled: [], instructions: '' };
     res.locals.socials = [];
     res.locals.chat = { enabled: false, greeting: '' };
     res.locals.googleAuth = { enabled: false };
@@ -300,30 +303,55 @@ function viewContext() {
         onSignup: settings.getBool('google_auth_on_signup'),
       };
 
+      // Payment methods, built from the registry.
+      //
+      // Two shapes, both deliberate. `methods` is the array the views iterate,
+      // so a method added to the registry is offered at checkout without
+      // touching a template. The named keys (`payments.bkash`) are kept because
+      // they are what every view read before this existed, and a stale reader
+      // would otherwise render an empty box rather than fail loudly.
+      const builtPayments = {};
+
+      for (const method of PAYMENT_METHODS) {
+        const wallet = method.kind === 'wallet';
+        const switchedOn = settings.getBool(`payment_${method.key}_enabled`);
+        const number = wallet ? String(settings.get(`payment_${method.key}_number`) || '').trim() : '';
+        const note = wallet ? '' : String(settings.get(`payment_${method.key}_note`) || '').trim();
+
+        // A method switched on with nothing to send money TO cannot be
+        // completed by the customer - a wallet with no number renders
+        // "Send to (Personal)", and a manual method with no instructions leaves
+        // them with nothing to do. Both read as a broken checkout, so the
+        // method is withheld from customers and `switchedOn` keeps the raw
+        // toggle so the panel can say why.
+        const usable = switchedOn && (wallet ? Boolean(number) : Boolean(note));
+
+        builtPayments[method.key] = {
+          key: method.key,
+          label: method.label,
+          kind: method.kind,
+          channel: method.channel,
+          tone: method.tone,
+          enabled: usable,
+          switchedOn,
+          // Why it is being withheld, for the settings screen.
+          unusableReason: switchedOn && !usable
+            ? (wallet ? 'no receiving number' : 'no instructions')
+            : null,
+          logo: settings.get(`payment_${method.key}_logo`) || '',
+          number: wallet ? number : null,
+          type: wallet ? settings.get(`payment_${method.key}_type`) : null,
+          note: wallet ? null : note,
+        };
+      }
+
       res.locals.payments = {
-        bkash: {
-          enabled: settings.getBool('payment_bkash_enabled'),
-          number: settings.get('payment_bkash_number'),
-          type: settings.get('payment_bkash_type'),
-          logo: settings.get('payment_bkash_logo') || '',
-        },
-        nagad: {
-          enabled: settings.getBool('payment_nagad_enabled'),
-          number: settings.get('payment_nagad_number'),
-          type: settings.get('payment_nagad_type'),
-          logo: settings.get('payment_nagad_logo') || '',
-        },
-        rocket: {
-          enabled: settings.getBool('payment_rocket_enabled'),
-          number: settings.get('payment_rocket_number'),
-          type: settings.get('payment_rocket_type'),
-          logo: settings.get('payment_rocket_logo') || '',
-        },
-        card: {
-          enabled: settings.getBool('payment_card_enabled'),
-          note: settings.get('payment_card_note'),
-          logo: settings.get('payment_card_logo') || '',
-        },
+        ...builtPayments,
+        methods: PAYMENT_METHODS.map((method) => builtPayments[method.key]),
+        // The methods a customer can actually pick, in registry order. Derived
+        // once here so the checkout list and the server's allow-list cannot
+        // disagree - which is how a method gets offered and then rejected.
+        enabled: PAYMENT_METHODS.map((method) => builtPayments[method.key]).filter((method) => method.enabled),
         instructions: settings.get('payment_instructions'),
       };
 

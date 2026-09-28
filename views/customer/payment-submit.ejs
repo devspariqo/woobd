@@ -4,12 +4,12 @@
   const f = form || {};
   const errs = errors || {};
 
-  // Only the payment methods the admin has switched on.
-  const methods = [];
-  if (payments.bkash.enabled)  methods.push({ name: 'bKash',  number: payments.bkash.number,  type: payments.bkash.type,  tone: 'danger' });
-  if (payments.nagad.enabled)  methods.push({ name: 'Nagad',  number: payments.nagad.number,  type: payments.nagad.type,  tone: 'warning' });
-  if (payments.rocket.enabled) methods.push({ name: 'Rocket', number: payments.rocket.number, type: payments.rocket.type, tone: 'info' });
-  if (payments.card.enabled)   methods.push({ name: 'Card',   number: null,                   type: payments.card.note,   tone: 'primary' });
+  // Only the payment methods the admin has switched on, in registry order.
+  //
+  // Built from the same list the server validates against, so a method can
+  // never be offered here and then refused on submit - which is what a
+  // hardcoded list in each place quietly does.
+  const methods = payments.enabled || [];
 
   // The controller passes the order but not its payment rows, so derive the
   // outstanding balance from the order's own payment_status rather than
@@ -40,17 +40,19 @@
               <div style="display:grid;gap:11px">
                 <% methods.forEach(function (method) { %>
                   <label style="display:flex;gap:13px;align-items:center;padding:14px 16px;border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer">
-                    <input type="radio" name="method" value="<%= method.name %>"
-                           style="flex-shrink:0" <%= f.method === method.name ? 'checked' : '' %> required>
+                    <input type="radio" name="method" value="<%= method.label %>"
+                           style="flex-shrink:0" <%= f.method === method.label ? 'checked' : '' %> required>
                     <span style="flex:1;min-width:0">
-                      <span style="display:block;font-weight:600;font-size:.9375rem"><%= method.name %></span>
+                      <span style="display:block;font-weight:600;font-size:.9375rem"><%= method.label %></span>
                       <% if (method.number) { %>
                         <span style="display:block;font-size:.8438rem;color:var(--text-soft);margin-top:2px">
                           Send to <strong data-copy-target><%= method.number %></strong>
                           <% if (method.type) { %> (<%= method.type %>)<% } %>
                         </span>
-                      <% } else if (method.type) { %>
-                        <span style="display:block;font-size:.8438rem;color:var(--text-soft);margin-top:2px"><%= method.type %></span>
+                      <% } else if (method.note) { %>
+                        <%# A manual method: no receiving number, so the operator's
+                            instructions are what the customer needs to read. %>
+                        <span style="display:block;font-size:.8438rem;color:var(--text-soft);margin-top:2px"><%= method.note %></span>
                       <% } %>
                     </span>
                   </label>

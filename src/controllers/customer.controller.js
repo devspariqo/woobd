@@ -526,11 +526,16 @@ exports.submitPayment = async (req, res, next) => {
       note: clean.text(req.body.note, 500),
     };
 
-    const allowedMethods = [];
-    if (settings.getBool('payment_bkash_enabled')) allowedMethods.push('bKash');
-    if (settings.getBool('payment_nagad_enabled')) allowedMethods.push('Nagad');
-    if (settings.getBool('payment_rocket_enabled')) allowedMethods.push('Rocket');
-    if (settings.getBool('payment_card_enabled')) allowedMethods.push('Card');
+    // The same list the checkout renders, from the registry.
+    //
+    // This used to be four hardcoded names, so switching on a fifth method in
+    // the panel offered it to the customer and then refused it here. The
+    // customer sees "please choose how you paid" with their method selected,
+    // which reads as the payment system being broken.
+    const allowedMethods = res.locals.payments.enabled.map((method) => method.label);
+    const chosen = allowedMethods.indexOf(form.method) >= 0
+      ? res.locals.payments.enabled[allowedMethods.indexOf(form.method)]
+      : null;
 
     const errors = {};
     if (!form.method || !allowedMethods.includes(form.method)) {
@@ -561,7 +566,7 @@ exports.submitPayment = async (req, res, next) => {
       customer_id: customerId,
       order_id: order.id,
       method: form.method,
-      method_type: form.method === 'Card' ? 'card' : 'manual',
+      method_type: chosen ? chosen.channel : 'manual',
       amount: form.amount,
       currency: settings.get('currency_code', 'BDT'),
       transaction_id: form.transaction_id,

@@ -149,6 +149,59 @@
   </div>
 <% } %>
 
+<%#
+  Payment methods that are switched on but cannot be completed.
+
+  A wallet with no receiving number renders "Send to (Personal)" at checkout
+  and a manual method with no instructions leaves the customer with nothing to
+  do. Both are withheld from customers rather than shown broken, so this is the
+  only place the reason is visible - and it is invisible from the switch alone.
+%>
+<% if (group === 'payments') { %>
+  <%
+    var blocked = (payments.methods || []).filter(function (m) { return m.switchedOn && !m.enabled; });
+    var live = (payments.methods || []).filter(function (m) { return m.enabled; });
+  %>
+
+  <% if (blocked.length) { %>
+    <div class="alert alert-warning" role="status">
+      <svg><use href="#i-alert"/></svg>
+      <div>
+        <strong>
+          <%= blocked.length %> method<%= blocked.length === 1 ? ' is' : 's are' %> switched on but
+          cannot be offered yet.
+        </strong>
+        Customers do not see them, because there is nothing for them to pay into:
+        <div class="conn-status">
+          <% blocked.forEach(function (m) { %>
+            <span class="conn-pill is-warn"><%= m.label %> — <%= m.unusableReason %></span>
+          <% }); %>
+        </div>
+        <div style="margin-top:9px;font-size:.8125rem">
+          Fill in the details below and they appear at checkout on their own.
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <div class="alert alert-info" role="status">
+    <svg><use href="#i-info"/></svg>
+    <div>
+      <strong><%= live.length %> method<%= live.length === 1 ? '' : 's' %> offered at checkout:</strong>
+      <div class="conn-status">
+        <% (payments.methods || []).forEach(function (m) { %>
+          <span class="conn-pill <%= m.enabled ? 'is-ok' : 'is-neutral' %>"><%= m.label %></span>
+        <% }); %>
+      </div>
+      <div style="margin-top:9px;font-size:.8125rem">
+        Every method here is a manual transfer the customer records and you verify. To take
+        money automatically, a gateway integration is a separate piece of work — the
+        <strong>Card</strong> method below is instructions only.
+      </div>
+    </div>
+  </div>
+<% } %>
+
 <% if (group === 'smtp' && mailConfigured) { %>
   <div class="alert alert-success" role="status">
     <svg><use href="#i-check-circle"/></svg>

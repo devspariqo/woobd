@@ -357,7 +357,7 @@ CREATE TABLE IF NOT EXISTS `payments` (
   `order_id` INT UNSIGNED DEFAULT NULL,
   `invoice_id` INT UNSIGNED DEFAULT NULL,
   `method` VARCHAR(60) NOT NULL,
-  `method_type` ENUM('manual','card','gateway') NOT NULL DEFAULT 'manual',
+  `method_type` ENUM('manual','card','gateway','wallet','bank_transfer','cash_on_delivery') NOT NULL DEFAULT 'manual',
   `amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
   `currency` VARCHAR(8) NOT NULL DEFAULT 'BDT',
   `transaction_id` VARCHAR(120) DEFAULT NULL,
